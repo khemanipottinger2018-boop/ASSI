@@ -26,63 +26,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(cached.data);
     }
 
-    console.log('🔍 Checking tutor availability for:', subject);
+    console.log('🔍 Fetching tutors for:', subject);
 
-    // Try the main query first
+    let dbTutors: (DbTutor & { name: string; email: string })[] = [];
+    let usedFallback = false;
+
+    // Try OPENJSON query first
     try {
-      const dbTutors = await executeQuery<DbTutor & { name: string; email: string }>(`
+      dbTutors = await executeQuery<DbTutor & { name: string; email: string }>(`
         SELECT t.*, u.name, u.email
         FROM tutors t
         JOIN users u ON t.user_id = u.id
-        WHERE t.is_available = 1
-        AND EXISTS (
+        WHERE EXISTS (
           SELECT 1 
           FROM OPENJSON(t.subjects) 
           WHERE value = @param0
         )
       `, [subject]);
-
+      
       console.log(`✅ Found ${dbTutors.length} tutors using OPENJSON`);
-
-      const tutors = dbTutors.map(dbTutorToAppTutor);
-      const enhancedTutors = tutors.map(tutor => ({
-        ...tutor,
-        subject_credentials: tutor.subject_credentials || getDefaultCredentials(subject),
-        display_rating: tutor.rating ? `⭐ ${tutor.rating.toFixed(1)}` : 'New Tutor',
-        hourly_rate_display: `$${tutor.hourly_rate}/hour`
-      }));
-
-      const responseData = {
-        success: true,
-        hasTutors: enhancedTutors.length > 0,
-        availableTutors: enhancedTutors.length,
-        tutors: enhancedTutors,
-        subject: subject,
-        cached: false
-      };
-
-      // Cache the result
-      cache.set(cacheKey, {
-        data: responseData,
-        timestamp: Date.now()
-      });
-
-      return NextResponse.json(responseData);
-
     } catch (openJsonError) {
       console.log('🔄 OPENJSON failed, trying LIKE query...');
+      usedFallback = true;
       
       // Fallback to LIKE query
-      const dbTutors = await executeQuery<DbTutor & { name: string; email: string }>(`
+      dbTutors = await executeQuery<DbTutor & { name: string; email: string }>(`
         SELECT t.*, u.name, u.email
         FROM tutors t
         JOIN users u ON t.user_id = u.id
-        WHERE t.is_available = 1
-        AND t.subjects LIKE '%' + @param0 + '%'
+        WHERE t.subjects LIKE '%' + @param0 + '%'
       `, [subject]);
 
       // Additional filtering for LIKE query
-      const filteredTutors = dbTutors.filter(tutor => {
+      dbTutors = dbTutors.filter(tutor => {
         try {
           const tutorSubjects = JSON.parse(tutor.subjects);
           return Array.isArray(tutorSubjects) && tutorSubjects.includes(subject);
@@ -91,34 +67,36 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      console.log(`✅ Found ${filteredTutors.length} tutors using LIKE fallback`);
-
-      const tutors = filteredTutors.map(dbTutorToAppTutor);
-      const enhancedTutors = tutors.map(tutor => ({
-        ...tutor,
-        subject_credentials: tutor.subject_credentials || getDefaultCredentials(subject),
-        display_rating: tutor.rating ? `⭐ ${tutor.rating.toFixed(1)}` : 'New Tutor',
-        hourly_rate_display: `$${tutor.hourly_rate}/hour`
-      }));
-
-      const responseData = {
-        success: true,
-        hasTutors: enhancedTutors.length > 0,
-        availableTutors: enhancedTutors.length,
-        tutors: enhancedTutors,
-        subject: subject,
-        usedFallback: true,
-        cached: false
-      };
-
-      // Cache the result
-      cache.set(cacheKey, {
-        data: responseData,
-        timestamp: Date.now()
-      });
-
-      return NextResponse.json(responseData);
+      console.log(`✅ Found ${dbTutors.length} tutors using LIKE fallback`);
     }
+
+    // Convert and enhance tutors
+    const tutors = dbTutors.map(dbTutorToAppTutor);
+    const enhancedTutors = tutors.map(tutor => ({
+      ...tutor,
+      subject_credentials: tutor.subject_credentials || getDefaultCredentials(subject),
+      display_rating: tutor.rating ? `⭐ ${tutor.rating.toFixed(1)}` : 'New Tutor',
+      hourly_rate_display: `$${tutor.hourly_rate}/hour`,
+      is_online: tutor.is_available // Keep the availability status for display
+    }));
+
+    const responseData = {
+      success: true,
+      hasTutors: enhancedTutors.length > 0,
+      availableTutors: enhancedTutors.length,
+      tutors: enhancedTutors,
+      subject: subject,
+      usedFallback,
+      cached: false
+    };
+
+    // Cache the result
+    cache.set(cacheKey, {
+      data: responseData,
+      timestamp: Date.now()
+    });
+
+    return NextResponse.json(responseData);
 
   } catch (error) {
     console.error('💥 Error fetching tutors:', error);
@@ -137,7 +115,14 @@ function getDefaultCredentials(subject: string): string {
     science: 'CXC Grade 2 | Scientific Methodology',
     history: 'CXC Grade 2 | Historical Analysis',
     geography: 'CXC Grade 3 | Geographic Systems',
-    it: 'CXC Grade 2 | Information Technology Specialist'
+    it: 'CXC Grade 2 | Information Technology Specialist',
+    physics: 'CXC Grade 2 | Physics Principles',
+    chemistry: 'CXC Grade 2 | Chemical Analysis',
+    biology: 'CXC Grade 2 | Biological Sciences',
+    business: 'CXC Grade 2 | Business Principles',
+    accounts: 'CXC Grade 2 | Accounting Specialist',
+    spanish: 'CXC Grade 2 | Spanish Language',
+    french: 'CXC Grade 2 | French Language'
   };
   return defaultCredentials[subject.toLowerCase()] || `Qualified ${subject} Tutor`;
 }

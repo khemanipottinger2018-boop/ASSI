@@ -24,6 +24,7 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
   const [hasTutors, setHasTutors] = useState(false);
   const [loadingTutors, setLoadingTutors] = useState(false);
   const [tutorCount, setTutorCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const subjects = [
@@ -49,17 +50,28 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
       if (!selectedSubject) {
         setHasTutors(false);
         setTutorCount(0);
+        setError(null);
         return;
       }
 
       setLoadingTutors(true);
+      setError(null);
+      
       try {
         console.log('🔍 Checking tutor availability for:', selectedSubject);
         const response = await fetch(`/api/tutors/availability?subject=${encodeURIComponent(selectedSubject)}`);
         
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`API error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+          // Handle non-JSON error responses
+          let errorMessage = `Server error: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || `Server error: ${response.status}`;
+          } catch {
+            // If response isn't JSON, use status text
+            errorMessage = `Server error: ${response.status} - ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
         
         const data = await response.json();
@@ -72,11 +84,13 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
           console.warn('API returned failure:', data.error);
           setHasTutors(false);
           setTutorCount(0);
+          setError(data.error || 'Failed to check tutor availability');
         }
       } catch (error) {
         console.error('❌ Failed to check tutor availability:', error);
         setHasTutors(false);
         setTutorCount(0);
+        setError(error instanceof Error ? error.message : 'Connection failed');
       } finally {
         setLoadingTutors(false);
       }
@@ -87,6 +101,7 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
 
   const handleSubjectChange = (subjectValue: string) => {
     setSelectedSubject(subjectValue);
+    setError(null); // Clear error when subject changes
     const subject = subjects.find(s => s.value === subjectValue);
     if (subject && onThemeChange) {
       onThemeChange(subject.theme);
@@ -153,21 +168,23 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
           ))}
         </select>
 
-        {/* Simple Tutor Count Display */}
+        {/* Status Display */}
         {selectedSubject && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            className="text-center"
+            className="text-center space-y-2"
           >
             {loadingTutors ? (
               <p className="text-yellow-300 text-sm">🔍 Checking tutor availability...</p>
+            ) : error ? (
+              <p className="text-red-300 text-sm">❌ {error}</p>
             ) : hasTutors ? (
               <p className="text-green-300 text-sm font-semibold">
                 ✅ {tutorCount} tutor{tutorCount !== 1 ? 's' : ''} available for {selectedSubject}
               </p>
             ) : (
-              <p className="text-orange-300 text-sm">📚 No live tutors available - try AI Assistant</p>
+              <p className="text-orange-300 text-sm">📚 No tutors available - try AI Assistant</p>
             )}
           </motion.div>
         )}
@@ -191,21 +208,21 @@ export default function ServiceSelector({ onServiceSelect, onThemeChange }: {
             whileHover={hasTutors ? { scale: 1.05, y: -2 } : {}}
             whileTap={hasTutors ? { scale: 0.95 } : {}}
             onClick={handleTutorRequest}
-            disabled={!selectedSubject || !hasTutors || loadingTutors}
+            disabled={!selectedSubject || !hasTutors || loadingTutors || !!error}
             className={`${
-              hasTutors 
+              hasTutors && !error
                 ? 'bg-orange-600/90 hover:bg-orange-500' 
                 : 'bg-gray-600/70 cursor-not-allowed'
             } text-white p-5 rounded-2xl font-bold disabled:opacity-50 transition-all duration-300 shadow-lg border-2 ${
-              hasTutors ? 'border-orange-400/30 hover:border-orange-300/50' : 'border-gray-400/20'
+              hasTutors && !error ? 'border-orange-400/30 hover:border-orange-300/50' : 'border-gray-400/20'
             }`}
           >
             <div className="text-2xl mb-2">
-              {loadingTutors ? '⏳' : hasTutors ? '👨‍🏫' : '⏸️'}
+              {loadingTutors ? '⏳' : error ? '❌' : hasTutors ? '👨‍🏫' : '⏸️'}
             </div>
             Live ASSI-stant<br/>
             <span className="text-sm font-normal">
-              {loadingTutors ? 'Checking...' : hasTutors ? `${tutorCount} Available` : 'No Tutors'}
+              {loadingTutors ? 'Checking...' : error ? 'Error' : hasTutors ? `${tutorCount} Available` : 'No Tutors'}
             </span>
           </motion.button>
 

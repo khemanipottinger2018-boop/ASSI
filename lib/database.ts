@@ -8,57 +8,37 @@ const dbConfig = {
     trustServerCertificate: true,
     integratedSecurity: true,
     enableArithAbort: true,
-    connectTimeout: 15000, // Reduced from 30s
-    requestTimeout: 10000  // Reduced from 30s
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
+    connectTimeout: 15000,
+    requestTimeout: 10000
   }
 };
 
-// Connection pool - reuse instead of creating new connections
-let pool: sql.ConnectionPool;
-let poolPromise: Promise<sql.ConnectionPool>;
-
-export async function getPool(): Promise<sql.ConnectionPool> {
-  if (pool) return pool;
-  if (poolPromise) return poolPromise;
-
-  poolPromise = (async () => {
-    try {
-      console.log('🔌 Creating database connection pool...');
-      pool = new sql.ConnectionPool(dbConfig);
-      await pool.connect();
-      console.log('✅ Database pool connected');
-      return pool;
-    } catch (error) {
-      poolPromise = undefined as any;
-      throw error;
-    }
-  })();
-
-  return poolPromise;
-}
-
+// Simple connection without pooling for now
 export async function executeQuery<T = any>(query: string, params?: any[]): Promise<T[]> {
-  const pool = await getPool();
-  
   try {
+    console.log('🔌 Connecting to database...');
+    const pool = await sql.connect(dbConfig);
+    
     const request = pool.request();
     
     if (params) {
       params.forEach((param, index) => {
-        request.input(`param${index}`, param);
+        // Handle different parameter types
+        if (typeof param === 'string' && param.length === 36) { // UUID format
+          request.input(`param${index}`, sql.UniqueIdentifier, param);
+        } else {
+          request.input(`param${index}`, param);
+        }
       });
     }
     
     console.log('📊 Executing query...');
     const result = await request.query(query);
+    await pool.close();
+    
     return result.recordset as T[];
   } catch (error) {
-    console.error('💥 Database query error:', error);
+    console.error('💥 Database error:', error);
     throw error;
   }
 }
