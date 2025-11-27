@@ -1,0 +1,10 @@
+          {/* Forgot password link */}
+          <div className="mt-3 text-center">
+            <motion.a 
+              href="/forgot-password"
+              whileHover={{ scale: 1.05 }}
+              className="text-blue-600 hover:text-blue-700 text-xs font-medium inline-block"
+            >
+              Forgot your password?
+            </motion.a>
+          </div>

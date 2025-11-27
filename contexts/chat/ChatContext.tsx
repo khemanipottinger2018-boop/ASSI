@@ -1,0 +1,1 @@
+// Chat state management
