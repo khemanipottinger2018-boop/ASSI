@@ -235,3 +235,41 @@ router.get('/:userId', async (req: Request, res: Response) => {
 });
 
 export default router;
+// ✅ GET /api/tutors/public/count - Get real tutor counts from database
+router.get('/count', async (req: Request, res: Response) => {
+  try {
+    console.log('📊 Counting tutors from database...');
+    const pool = await getPool();
+    
+    // Count total tutors and online tutors (is_available = true)
+    const result = await pool.request().query(`
+      SELECT 
+        COUNT(*) as totalCount,
+        SUM(CASE WHEN is_available = 1 THEN 1 ELSE 0 END) as onlineCount
+      FROM Tutors
+      WHERE profile_completed_at IS NOT NULL
+    `);
+
+    const counts = result.recordset[0];
+    
+    console.log('🎯 Database tutor counts:', {
+      totalCount: counts.totalCount,
+      onlineCount: counts.onlineCount
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        totalCount: parseInt(counts.totalCount) || 0,
+        onlineCount: parseInt(counts.onlineCount) || 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Count tutors error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch tutor counts from database'
+    });
+  }
+});

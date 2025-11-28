@@ -1,0 +1,55 @@
+#!/bin/bash
+
+echo "🔐 Fixing INVALID_TOKEN_PAYLOAD error..."
+
+# Create a token validation utility
+cat > utils/tokenCleanup.ts << 'TOKEN_EOF'
+export const validateToken = (token: string | null): boolean => {
+  if (!token) return false;
+  
+  try {
+    // Check if it's a valid JWT format (3 parts separated by dots)
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    
+    // Try to decode the payload
+    const payload = JSON.parse(atob(parts[1]));
+    
+    // Check if token is expired
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+export const clearInvalidTokens = (): void => {
+  const token = localStorage.getItem('auth_token');
+  const user = localStorage.getItem('user');
+  
+  if (!validateToken(token)) {
+    console.log('🔄 Clearing invalid tokens...');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+  }
+};
+
+export const getValidToken = (): string | null => {
+  const token = localStorage.getItem('auth_token');
+  return validateToken(token) ? token : null;
+};
+TOKEN_EOF
+
+echo "✅ Token validation utilities created!"
+echo "📁 File: utils/tokenCleanup.ts"
+echo ""
+echo "🔧 To fix immediately:"
+echo "1. Open browser DevTools (F12)"
+echo "2. Go to Application → Local Storage → http://localhost:3000"
+echo "3. Delete 'auth_token' and 'user' items"
+echo "4. Refresh the page"
+echo ""
+echo "🔄 The error should disappear after clearing invalid tokens!"

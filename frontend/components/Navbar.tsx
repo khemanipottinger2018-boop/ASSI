@@ -32,12 +32,15 @@ export default function Navbar() {
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   const navRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkAuth();
+    // Simulate notification count - replace with actual socket/data
+    setNotificationCount(3);
   }, [pathname]);
 
   const checkAuth = async () => {
@@ -90,6 +93,11 @@ export default function Navbar() {
     setUser(null);
     setUserMenuOpen(false);
     router.push('/');
+  };
+
+  const handleNotificationsClick = () => {
+    // TODO: Implement notification panel or redirect
+    console.log('Notifications clicked');
   };
 
   // Navigation items for left dropdown
@@ -219,17 +227,34 @@ export default function Navbar() {
               {loading ? (
                 <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />
               ) : user ? (
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`flex items-center space-x-2 p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover}`}
-                >
-                  <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
-                    <User size={14} className="text-white" />
-                  </div>
-                  <span className={`font-medium text-sm hidden sm:block ${style.text}`}>
-                    {user.username}
-                  </span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  {/* Notification Bell */}
+                  <button 
+                    onClick={handleNotificationsClick}
+                    className={`p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover} relative`}
+                  >
+                    <Bell size={18} />
+                    {/* Notification Badge */}
+                    {notificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                        {notificationCount}
+                      </span>
+                    )}
+                  </button>
+                  
+                  {/* User Avatar */}
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className={`flex items-center space-x-2 p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover}`}
+                  >
+                    <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
+                      <User size={14} className="text-white" />
+                    </div>
+                    <span className={`font-medium text-sm hidden sm:block ${style.text}`}>
+                      {user.username}
+                    </span>
+                  </button>
+                </div>
               ) : (
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}

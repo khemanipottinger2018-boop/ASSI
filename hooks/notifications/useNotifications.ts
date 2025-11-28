@@ -3,7 +3,7 @@ import { useSocket } from '../socket/useSocket';
 
 export interface Notification {
   id: string;
-  type: 'session_booked' | 'message_received' | 'payment_received' | 'system_alert';
+  type: 'session_booked' | 'new_message' | 'payment_received' | 'system_announcement' | 'tutor_application_status' | 'session_reminder';
   title: string;
   message: string;
   data?: any;
@@ -18,15 +18,25 @@ export const useNotifications = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { isConnected, emit, on, off } = useSocket();
 
+  // Join user notification room when connected
+  useEffect(() => {
+    if (isConnected) {
+      const userId = localStorage.getItem('user_id') || JSON.parse(localStorage.getItem('user') || '{}').id;
+      if (userId) {
+        emit('join-user-room', userId);
+      }
+    }
+  }, [isConnected, emit]);
+
   // Fetch initial notifications
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/notifications');
+      const response = await fetch('http://localhost:3001/api/notifications/recent');
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
+        setNotifications(data.data || []);
+        setUnreadCount(data.data?.filter((n: any) => !n.is_read).length || 0);
       }
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
@@ -39,12 +49,12 @@ export const useNotifications = () => {
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
       const response = await fetch(`http://localhost:3001/api/notifications/${notificationId}/read`, {
-        method: 'PUT'
+        method: 'PATCH'
       });
 
       if (response.ok) {
-        setNotifications(prev => 
-          prev.map(notif => 
+        setNotifications(prev =>
+          prev.map(notif =>
             notif.id === notificationId ? { ...notif, isRead: true } : notif
           )
         );
@@ -58,8 +68,8 @@ export const useNotifications = () => {
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/notifications/read-all', {
-        method: 'PUT'
+      const response = await fetch('http://localhost:3001/api/notifications/mark-all-read', {
+        method: 'POST'
       });
 
       if (response.ok) {
@@ -71,14 +81,37 @@ export const useNotifications = () => {
     }
   }, []);
 
-  // Listen for real-time notifications
+  // Get unread count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/notifications/unread-count');
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+    }
+  }, []);
+
+  // Listen for real-time notifications - FIXED EVENT NAME
   useEffect(() => {
     if (!isConnected) return;
 
-    const handleNewNotification = (notification: Notification) => {
+    const handleNewNotification = (data: { notification: any; unread_count: number }) => {
+      const notification: Notification = {
+        id: data.notification.notification_id,
+        type: data.notification.type,
+        title: data.notification.title,
+        message: data.notification.message,
+        data: data.notification.data,
+        isRead: data.notification.is_read,
+        createdAt: new Date(data.notification.created_at)
+      };
+
       setNotifications(prev => [notification, ...prev]);
-      setUnreadCount(prev => prev + 1);
-      
+      setUnreadCount(data.unread_count);
+
       // Show browser notification if permitted
       if (Notification.permission === 'granted') {
         new Notification(notification.title, {
@@ -88,10 +121,11 @@ export const useNotifications = () => {
       }
     };
 
-    on('new_notification', handleNewNotification);
+    // Backend sends 'new-notification' (with dash)
+    on('new-notification', handleNewNotification);
 
     return () => {
-      off('new_notification');
+      off('new-notification');
     };
   }, [isConnected, on, off]);
 
@@ -107,7 +141,8 @@ export const useNotifications = () => {
   // Initial fetch
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+    fetchUnreadCount();
+  }, [fetchNotifications, fetchUnreadCount]);
 
   return {
     notifications,

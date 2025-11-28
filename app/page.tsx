@@ -1,17 +1,18 @@
-// app/page.tsx
 'use client';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import LavalampBackground from 'frontend/ui/LavalampBackground';
-import FloatingShapes from 'frontend/ui/FloatingShapes';
-import AnimatedQuote from 'frontend/ui/AnimatedQuote';
-import ServiceSelector from 'frontend/ui/ServiceSelector';
+import LavalampBackground from '../frontend/ui/LavalampBackground';
+import FloatingShapes from '../frontend/ui/FloatingShapes';
+import AnimatedQuote from '../frontend/ui/AnimatedQuote';
+import ServiceSelector from '../frontend/ui/ServiceSelector';
+import { useLandingStats } from '../hooks/useLandingStats';
 
 export default function Home() {
   const [currentPhase, setCurrentPhase] = useState<'loading' | 'quote' | 'selection'>('loading');
   const [currentTheme, setCurrentTheme] = useState('caribbean-vibrant');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const { stats, isLoading: statsLoading } = useLandingStats();
 
   // Initial loading -> quote
   useEffect(() => {
@@ -47,22 +48,27 @@ export default function Home() {
   const isSubjectTheme = currentTheme !== 'caribbean-vibrant' && currentPhase === 'selection';
 
   return (
-    <main className={`min-h-screen relative overflow-hidden ${isSubjectTheme ? 'bg-black' : ''}`} role="main" aria-label="ASSI Tutoring Platform">
+    <main className="min-h-screen relative overflow-hidden bg-black"> {/* Force black background */}
       <h1 className="sr-only">ASSI - Academic Support & Study Initiative</h1>
       
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={displayTheme}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 1.5 }}
-        >
-          <LavalampBackground theme={displayTheme} />
-          <FloatingShapes theme={displayTheme} />
-        </motion.div>
-      </AnimatePresence>
+      {/* Background Container - FIXED: Ensure it covers entire viewport */}
+      <div className="fixed inset-0 w-full h-full">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={displayTheme}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.5 }}
+            className="w-full h-full"
+          >
+            <LavalampBackground theme={displayTheme} />
+            <FloatingShapes theme={displayTheme} />
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
+      {/* Content */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
         {/* Error Display */}
         {error && (
@@ -78,6 +84,30 @@ export default function Home() {
             >
               Dismiss
             </button>
+          </motion.div>
+        )}
+
+        {/* Real-time Platform Stats */}
+        {currentPhase === 'selection' && !statsLoading && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="fixed top-4 right-4 bg-black/30 backdrop-blur-sm rounded-lg p-4 text-white border border-white/20 z-40"
+          >
+            <div className="text-xs space-y-1">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>{stats.onlineTutors || 0} tutors online</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span>{stats.totalTutors || 0} total tutors</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span>{stats.availableSubjects || 0} subjects</span>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -145,7 +175,7 @@ export default function Home() {
                 </motion.div>
               )}
 
-              {/* Call to Action */}
+              {/* Enhanced Call to Action with Real Stats */}
               {!isLoading && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -153,13 +183,13 @@ export default function Home() {
                   transition={{ delay: 0.5 }}
                   className="mt-8 text-center text-white/80 max-w-md"
                 >
-                  <p className="text-sm">
-                    Select a subject above to browse verified tutors and start a live chat session
+                  <p className="text-sm mb-4">
+                    Join <span className="text-green-400 font-semibold">{stats.totalTutors || 0}+ tutors</span> and thousands of students learning right now
                   </p>
                   <div className="mt-4 flex justify-center space-x-4 text-xs">
                     <div className="flex items-center">
-                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                      Verified Tutors
+                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                      {stats.onlineTutors || 0} Online Now
                     </div>
                     <div className="flex items-center">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
@@ -167,7 +197,7 @@ export default function Home() {
                     </div>
                     <div className="flex items-center">
                       <span className="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
-                      Real-time Help
+                      {stats.availableSubjects || 0} Subjects
                     </div>
                   </div>
                 </motion.div>
