@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { createClient } from 'redis';
+import crypto from 'crypto';
 
 import { redisService } from '@/infra/redis/redis.service';
 import {
@@ -23,7 +24,7 @@ export async function createSocketServer(httpServer: any) {
   });
 
   /* ---------------------------------------------------
-   * SOCKET AUTH (🔥 CRITICAL)
+   * SOCKET AUTH (🔥 LOCKED)
    * --------------------------------------------------- */
   io.use(socketAuthMiddleware);
 
@@ -44,14 +45,41 @@ export async function createSocketServer(httpServer: any) {
   io.on('connection', async (socket) => {
     const { userId } = socket as AuthenticatedSocket;
 
-    // 🔐 Global user room (Slack/Discord pattern)
+    /* ---------------------------------------------------
+     * GLOBAL USER ROOM
+     * --------------------------------------------------- */
     socket.join(`user:${userId}`);
 
-    // ✅ Mark user as active ONCE on connect
+    /* ---------------------------------------------------
+     * PRESENCE (Stage 2)
+     * --------------------------------------------------- */
     await redisService.updateLastSeen(userId);
-
-    // Helper for meaningful activity
     const markActive = () => redisService.updateLastSeen(userId);
+
+    /* ---------------------------------------------------
+     * SERVER-DRIVEN NOTIFICATIONS (Stage 3)
+     * --------------------------------------------------- */
+    const notifyUser = async (
+      targetUserId: string,
+      payload: {
+        type: string;
+        title: string;
+        body: string;
+      }
+    ) => {
+      const notification = {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        ...payload,
+      };
+
+      await redisService.pushNotification(targetUserId, notification);
+
+      io.to(`user:${targetUserId}`).emit(
+        'notification:new',
+        notification
+      );
+    };
 
     /* ---------------------------------------------------
      * CHAT ROOMS
@@ -80,11 +108,17 @@ export async function createSocketServer(httpServer: any) {
      * --------------------------------------------------- */
     socket.on(
       'chat:send',
-      async ({ chatId, message }: { chatId: string; message: ChatMessage }) => {
+      async ({
+        chatId,
+        message,
+      }: {
+        chatId: string;
+        message: ChatMessage;
+      }) => {
         markActive();
 
         const safeMessage: ChatMessage = {
-          senderId: userId,          // 🔐 server truth
+          senderId: userId,
           content: message.content,
           timestamp: Date.now(),
         };
@@ -95,6 +129,13 @@ export async function createSocketServer(httpServer: any) {
         );
 
         io.to(chatId).emit('chat:new', safeMessage);
+
+        // 🔔 Example notification hook (optional, but correct)
+        // notifyUser(otherUserId, {
+        //   type: 'chat',
+        //   title: 'New message',
+        //   body: safeMessage.content,
+        // });
       }
     );
 
@@ -104,47 +145,35 @@ export async function createSocketServer(httpServer: any) {
     socket.on('typing:start', async (chatId: string) => {
       markActive();
 
-      await redisService.client.sAdd(`typing:chat:${chatId}`, userId);
+      await redisService.client.sAdd(
+        `typing:chat:${chatId}`,
+        userId
+      );
 
       io.to(chatId).emit('typing:update', {
-        users: await redisService.client.sMembers(`typing:chat:${chatId}`),
+        users: await redisService.client.sMembers(
+          `typing:chat:${chatId}`
+        ),
       });
     });
 
     socket.on('typing:stop', async (chatId: string) => {
-      await redisService.client.sRem(`typing:chat:${chatId}`, userId);
+      await redisService.client.sRem(
+        `typing:chat:${chatId}`,
+        userId
+      );
 
       io.to(chatId).emit('typing:update', {
-        users: await redisService.client.sMembers(`typing:chat:${chatId}`),
+        users: await redisService.client.sMembers(
+          `typing:chat:${chatId}`
+        ),
       });
     });
-
-    /* ---------------------------------------------------
-     * NOTIFICATIONS (GLOBAL)
-     * --------------------------------------------------- */
-    socket.on(
-      'notification:send',
-      async ({
-        targetUserId,
-        notification,
-      }: {
-        targetUserId: string;
-        notification: string;
-      }) => {
-        await redisService.addNotification(targetUserId, notification);
-
-        io.to(`user:${targetUserId}`).emit('notification:new', {
-          id: Date.now(),
-          message: notification,
-        });
-      }
-    );
 
     /* ---------------------------------------------------
      * DISCONNECT
      * --------------------------------------------------- */
     socket.on('disconnect', () => {
-      // ✅ NO ACTION
       // Presence expires naturally via Redis TTL
     });
   });
