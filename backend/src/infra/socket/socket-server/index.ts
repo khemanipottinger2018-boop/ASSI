@@ -9,11 +9,14 @@ import {
   AuthenticatedSocket,
 } from './socket.auth';
 
-interface ChatMessage {
+type ChatMessageServer = {
+  id: string;
+  chatId: string;
   senderId: string;
   content: string;
-  timestamp: number;
-}
+  createdAt: number;
+  seq: number;
+};
 
 export async function createSocketServer(httpServer: any) {
   const io = new Server(httpServer, {
@@ -24,7 +27,7 @@ export async function createSocketServer(httpServer: any) {
   });
 
   /* ---------------------------------------------------
-   * SOCKET AUTH (🔥 LOCKED)
+   * SOCKET AUTH (LOCKED)
    * --------------------------------------------------- */
   io.use(socketAuthMiddleware);
 
@@ -46,96 +49,155 @@ export async function createSocketServer(httpServer: any) {
     const { userId } = socket as AuthenticatedSocket;
 
     /* ---------------------------------------------------
-     * GLOBAL USER ROOM
+     * GLOBAL USER ROOM (Slack/Discord pattern)
      * --------------------------------------------------- */
     socket.join(`user:${userId}`);
 
     /* ---------------------------------------------------
-     * PRESENCE (Stage 2)
+     * PRESENCE (Stage 2 – TTL based)
      * --------------------------------------------------- */
     await redisService.updateLastSeen(userId);
     const markActive = () => redisService.updateLastSeen(userId);
 
     /* ---------------------------------------------------
-     * SERVER-DRIVEN NOTIFICATIONS (Stage 3)
-     * --------------------------------------------------- */
-    const notifyUser = async (
-      targetUserId: string,
-      payload: {
-        type: string;
-        title: string;
-        body: string;
-      }
-    ) => {
-      const notification = {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        ...payload,
-      };
-
-      await redisService.pushNotification(targetUserId, notification);
-
-      io.to(`user:${targetUserId}`).emit(
-        'notification:new',
-        notification
-      );
-    };
-
-    /* ---------------------------------------------------
      * CHAT ROOMS
      * --------------------------------------------------- */
-    socket.on('chat:join', async (sessionId: string) => {
-      socket.join(sessionId);
+    socket.on('chat:join', async (chatId: string) => {
+      socket.join(chatId);
       markActive();
 
       await redisService.client.sAdd(
         `user:live_sessions:${userId}`,
-        sessionId
+        chatId
       );
     });
 
-    socket.on('chat:leave', async (sessionId: string) => {
-      socket.leave(sessionId);
+    socket.on('chat:leave', async (chatId: string) => {
+      socket.leave(chatId);
 
       await redisService.client.sRem(
         `user:live_sessions:${userId}`,
-        sessionId
+        chatId
       );
     });
 
     /* ---------------------------------------------------
-     * MESSAGES
+     * CHAT SEND (Stage 4 – reliable)
      * --------------------------------------------------- */
     socket.on(
       'chat:send',
-      async ({
-        chatId,
-        message,
-      }: {
-        chatId: string;
-        message: ChatMessage;
-      }) => {
-        markActive();
+      async (
+        payload: {
+          chatId: string;
+          content: string;
+          clientMsgId?: string;
+        },
+        ack?: (res: {
+          ok: boolean;
+          message?: ChatMessageServer;
+          error?: string;
+        }) => void
+      ) => {
+        try {
+          markActive();
 
-        const safeMessage: ChatMessage = {
-          senderId: userId,
-          content: message.content,
-          timestamp: Date.now(),
-        };
+          const chatId = payload?.chatId?.trim();
+          const content = payload?.content?.trim();
 
-        await redisService.client.rPush(
-          `chat:messages:${chatId}`,
-          JSON.stringify(safeMessage)
-        );
+          if (!chatId) return ack?.({ ok: false, error: 'chatId required' });
+          if (!content) return ack?.({ ok: false, error: 'Empty message' });
+          if (content.length > 4000)
+            return ack?.({ ok: false, error: 'Message too long' });
 
-        io.to(chatId).emit('chat:new', safeMessage);
+          // Optional dedupe
+          if (payload.clientMsgId) {
+            const dedupeKey = `chat:dedupe:${chatId}:${payload.clientMsgId}`;
+            const first = await redisService.client.set(
+              dedupeKey,
+              '1',
+              { NX: true, EX: 30 }
+            );
+            if (first === null) return ack?.({ ok: true });
+          }
 
-        // 🔔 Example notification hook (optional, but correct)
-        // notifyUser(otherUserId, {
-        //   type: 'chat',
-        //   title: 'New message',
-        //   body: safeMessage.content,
-        // });
+          const seq = await redisService.client.incr(
+            `chat:seq:${chatId}`
+          );
+
+          const message: ChatMessageServer = {
+            id: crypto.randomUUID(),
+            chatId,
+            senderId: userId,
+            content,
+            createdAt: Date.now(),
+            seq,
+          };
+
+          await redisService.client
+            .multi()
+            .rPush(
+              `chat:messages:${chatId}`,
+              JSON.stringify(message)
+            )
+            .lTrim(`chat:messages:${chatId}`, -500, -1)
+            .exec();
+
+          io.to(chatId).emit('chat:new', message);
+
+          return ack?.({ ok: true, message });
+        } catch (err) {
+          console.error('chat:send error', err);
+          return ack?.({ ok: false, error: 'Failed to send message' });
+        }
+      }
+    );
+
+    /* ---------------------------------------------------
+     * CHAT SYNC (Stage 4 – replay)
+     * --------------------------------------------------- */
+    socket.on(
+      'chat:sync',
+      async (
+        payload: {
+          chatId: string;
+          afterSeq?: number;
+          limit?: number;
+        },
+        ack?: (res: {
+          ok: boolean;
+          messages?: ChatMessageServer[];
+          error?: string;
+        }) => void
+      ) => {
+        try {
+          const chatId = payload?.chatId?.trim();
+          if (!chatId)
+            return ack?.({ ok: false, error: 'chatId required' });
+
+          const afterSeq = payload.afterSeq ?? 0;
+          const limit = Math.min(
+            Math.max(payload.limit ?? 100, 1),
+            500
+          );
+
+          const raw = await redisService.client.lRange(
+            `chat:messages:${chatId}`,
+            -limit,
+            -1
+          );
+
+          const messages = raw
+            .map((m) => JSON.parse(m))
+            .filter(
+              (m: ChatMessageServer) =>
+                typeof m.seq === 'number' && m.seq > afterSeq
+            );
+
+          return ack?.({ ok: true, messages });
+        } catch (err) {
+          console.error('chat:sync error', err);
+          return ack?.({ ok: false, error: 'Failed to sync messages' });
+        }
       }
     );
 
