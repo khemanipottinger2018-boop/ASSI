@@ -6,7 +6,13 @@ import { io, Socket } from 'socket.io-client';
 type UseChatSocketResult = {
   socket: Socket | null;
   isConnected: boolean;
-  emit: <T = any>(event: string, payload?: any) => void;
+
+  emit: <T = any, R = any>(
+    event: string,
+    payload?: T,
+    ack?: (response: R) => void
+  ) => void;
+
   on: (event: string, handler: (...args: any[]) => void) => void;
   off: (event: string, handler?: (...args: any[]) => void) => void;
 };
@@ -16,7 +22,7 @@ export function useChatSocket(): UseChatSocketResult {
   const [isConnected, setIsConnected] = useState(false);
 
   /* ---------------------------------------------------
-   * INIT SOCKET (once)
+   * INITIALIZE SOCKET (SINGLETON PER USER SESSION)
    * --------------------------------------------------- */
   useEffect(() => {
     if (socketRef.current) return;
@@ -54,19 +60,34 @@ export function useChatSocket(): UseChatSocketResult {
   }, []);
 
   /* ---------------------------------------------------
-   * SAFE EMITTER
+   * EMIT (ACK-SAFE)
    * --------------------------------------------------- */
-  const emit = useCallback(<T,>(event: string, payload?: T) => {
-    if (!socketRef.current || !socketRef.current.connected) return;
-    socketRef.current.emit(event, payload);
-  }, []);
+  const emit = useCallback(
+    <T = any, R = any>(
+      event: string,
+      payload?: T,
+      ack?: (response: R) => void
+    ) => {
+      if (!socketRef.current || !socketRef.current.connected) return;
+
+      if (ack) {
+        socketRef.current.emit(event, payload, ack);
+      } else {
+        socketRef.current.emit(event, payload);
+      }
+    },
+    []
+  );
 
   /* ---------------------------------------------------
-   * SAFE LISTENERS
+   * LISTENERS
    * --------------------------------------------------- */
-  const on = useCallback((event: string, handler: (...args: any[]) => void) => {
-    socketRef.current?.on(event, handler);
-  }, []);
+  const on = useCallback(
+    (event: string, handler: (...args: any[]) => void) => {
+      socketRef.current?.on(event, handler);
+    },
+    []
+  );
 
   const off = useCallback(
     (event: string, handler?: (...args: any[]) => void) => {
