@@ -1,7 +1,12 @@
 import { Server } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { redisService } from '@/infra/redis/redis.service';
 import { createClient } from 'redis';
+
+import { redisService } from '@/infra/redis/redis.service';
+import {
+  socketAuthMiddleware,
+  AuthenticatedSocket,
+} from './socket.auth';
 
 interface ChatMessage {
   senderId: string;
@@ -17,7 +22,14 @@ export async function createSocketServer(httpServer: any) {
     },
   });
 
-  // Redis adapter (horizontal scaling ready)
+  /* ---------------------------------------------------
+   * SOCKET AUTH (🔥 CRITICAL)
+   * --------------------------------------------------- */
+  io.use(socketAuthMiddleware);
+
+  /* ---------------------------------------------------
+   * REDIS ADAPTER
+   * --------------------------------------------------- */
   const pubClient = createClient({ url: process.env.REDIS_URL });
   const subClient = pubClient.duplicate();
 
@@ -26,40 +38,28 @@ export async function createSocketServer(httpServer: any) {
 
   io.adapter(createAdapter(pubClient, subClient));
 
+  /* ---------------------------------------------------
+   * CONNECTION
+   * --------------------------------------------------- */
   io.on('connection', async (socket) => {
-    const { userId } = socket.handshake.auth;
-    if (!userId) {
-      socket.disconnect();
-      return;
-    }
+    const { userId } = socket as AuthenticatedSocket;
+
+    // 🔐 Global user room (Slack/Discord pattern)
+    socket.join(`user:${userId}`);
+
+    // ✅ Mark user as active ONCE on connect
+    await redisService.updateLastSeen(userId);
+
+    // Helper for meaningful activity
+    const markActive = () => redisService.updateLastSeen(userId);
 
     /* ---------------------------------------------------
-     * PRESENCE
-     * --------------------------------------------------- */
-    await redisService.setUserStatus(userId, 'online');
-
-    const presenceInterval = setInterval(
-      () => redisService.setUserStatus(userId, 'online'),
-      15_000
-    );
-
-    let idleTimeout: NodeJS.Timeout | null = null;
-
-    socket.onAny(() => {
-      if (idleTimeout) clearTimeout(idleTimeout);
-      idleTimeout = setTimeout(
-        () => redisService.setUserStatus(userId, 'idle'),
-        15 * 60 * 1000
-      );
-    });
-
-    /* ---------------------------------------------------
-     * CHAT ROOMS / LIVE SESSION TRACKING
+     * CHAT ROOMS
      * --------------------------------------------------- */
     socket.on('chat:join', async (sessionId: string) => {
       socket.join(sessionId);
+      markActive();
 
-      // 🔑 CRITICAL: track live sessions per user
       await redisService.client.sAdd(
         `user:live_sessions:${userId}`,
         sessionId
@@ -69,7 +69,6 @@ export async function createSocketServer(httpServer: any) {
     socket.on('chat:leave', async (sessionId: string) => {
       socket.leave(sessionId);
 
-      // Optional cleanup (safe for explicit leaves)
       await redisService.client.sRem(
         `user:live_sessions:${userId}`,
         sessionId
@@ -81,32 +80,34 @@ export async function createSocketServer(httpServer: any) {
      * --------------------------------------------------- */
     socket.on(
       'chat:send',
-      async ({
-        chatId,
-        message,
-      }: {
-        chatId: string;
-        message: ChatMessage;
-      }) => {
+      async ({ chatId, message }: { chatId: string; message: ChatMessage }) => {
+        markActive();
+
+        const safeMessage: ChatMessage = {
+          senderId: userId,          // 🔐 server truth
+          content: message.content,
+          timestamp: Date.now(),
+        };
+
         await redisService.client.rPush(
           `chat:messages:${chatId}`,
-          JSON.stringify(message)
+          JSON.stringify(safeMessage)
         );
 
-        io.to(chatId).emit('chat:new', message);
+        io.to(chatId).emit('chat:new', safeMessage);
       }
     );
 
     /* ---------------------------------------------------
-     * TYPING INDICATORS
+     * TYPING
      * --------------------------------------------------- */
     socket.on('typing:start', async (chatId: string) => {
+      markActive();
+
       await redisService.client.sAdd(`typing:chat:${chatId}`, userId);
 
       io.to(chatId).emit('typing:update', {
-        users: await redisService.client.sMembers(
-          `typing:chat:${chatId}`
-        ),
+        users: await redisService.client.sMembers(`typing:chat:${chatId}`),
       });
     });
 
@@ -114,14 +115,12 @@ export async function createSocketServer(httpServer: any) {
       await redisService.client.sRem(`typing:chat:${chatId}`, userId);
 
       io.to(chatId).emit('typing:update', {
-        users: await redisService.client.sMembers(
-          `typing:chat:${chatId}`
-        ),
+        users: await redisService.client.sMembers(`typing:chat:${chatId}`),
       });
     });
 
     /* ---------------------------------------------------
-     * NOTIFICATIONS
+     * NOTIFICATIONS (GLOBAL)
      * --------------------------------------------------- */
     socket.on(
       'notification:send',
@@ -134,7 +133,7 @@ export async function createSocketServer(httpServer: any) {
       }) => {
         await redisService.addNotification(targetUserId, notification);
 
-        io.to(targetUserId).emit(`notification:${targetUserId}`, {
+        io.to(`user:${targetUserId}`).emit('notification:new', {
           id: Date.now(),
           message: notification,
         });
@@ -144,11 +143,9 @@ export async function createSocketServer(httpServer: any) {
     /* ---------------------------------------------------
      * DISCONNECT
      * --------------------------------------------------- */
-    socket.on('disconnect', async () => {
-      clearInterval(presenceInterval);
-      if (idleTimeout) clearTimeout(idleTimeout);
-
-      await redisService.setUserStatus(userId, 'offline');
+    socket.on('disconnect', () => {
+      // ✅ NO ACTION
+      // Presence expires naturally via Redis TTL
     });
   });
 
