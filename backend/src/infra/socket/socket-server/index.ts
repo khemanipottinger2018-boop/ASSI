@@ -46,7 +46,7 @@ export async function createSocketServer(httpServer: any) {
    * CONNECTION
    * --------------------------------------------------- */
   io.on('connection', async (socket) => {
-    const { userId } = socket as AuthenticatedSocket;
+    const { userId, role } = socket as AuthenticatedSocket;
 
     /* ---------------------------------------------------
      * GLOBAL USER ROOM (Slack/Discord pattern)
@@ -54,13 +54,13 @@ export async function createSocketServer(httpServer: any) {
     socket.join(`user:${userId}`);
 
     /* ---------------------------------------------------
-     * PRESENCE (Stage 2 – TTL based)
+     * PRESENCE (Stage 2 – TTL-based)
      * --------------------------------------------------- */
     await redisService.updateLastSeen(userId);
     const markActive = () => redisService.updateLastSeen(userId);
 
     /* ---------------------------------------------------
-     * CHAT ROOMS
+     * CHAT ROOMS (generic join)
      * --------------------------------------------------- */
     socket.on('chat:join', async (chatId: string) => {
       socket.join(chatId);
@@ -82,7 +82,7 @@ export async function createSocketServer(httpServer: any) {
     });
 
     /* ---------------------------------------------------
-     * CHAT SEND (Stage 4 – reliable)
+     * CHAT SEND (Stage 4 – reliable, ordered, acked)
      * --------------------------------------------------- */
     socket.on(
       'chat:send',
@@ -104,12 +104,14 @@ export async function createSocketServer(httpServer: any) {
           const chatId = payload?.chatId?.trim();
           const content = payload?.content?.trim();
 
-          if (!chatId) return ack?.({ ok: false, error: 'chatId required' });
-          if (!content) return ack?.({ ok: false, error: 'Empty message' });
+          if (!chatId)
+            return ack?.({ ok: false, error: 'chatId required' });
+          if (!content)
+            return ack?.({ ok: false, error: 'Empty message' });
           if (content.length > 4000)
             return ack?.({ ok: false, error: 'Message too long' });
 
-          // Optional dedupe
+          // Optional dedupe (double-send protection)
           if (payload.clientMsgId) {
             const dedupeKey = `chat:dedupe:${chatId}:${payload.clientMsgId}`;
             const first = await redisService.client.set(
@@ -147,13 +149,16 @@ export async function createSocketServer(httpServer: any) {
           return ack?.({ ok: true, message });
         } catch (err) {
           console.error('chat:send error', err);
-          return ack?.({ ok: false, error: 'Failed to send message' });
+          return ack?.({
+            ok: false,
+            error: 'Failed to send message',
+          });
         }
       }
     );
 
     /* ---------------------------------------------------
-     * CHAT SYNC (Stage 4 – replay)
+     * CHAT SYNC (Stage 4 – replay / reconnect safety)
      * --------------------------------------------------- */
     socket.on(
       'chat:sync',
@@ -196,7 +201,10 @@ export async function createSocketServer(httpServer: any) {
           return ack?.({ ok: true, messages });
         } catch (err) {
           console.error('chat:sync error', err);
-          return ack?.({ ok: false, error: 'Failed to sync messages' });
+          return ack?.({
+            ok: false,
+            error: 'Failed to sync messages',
+          });
         }
       }
     );
@@ -231,6 +239,88 @@ export async function createSocketServer(httpServer: any) {
         ),
       });
     });
+
+    /* ---------------------------------------------------
+     * TUTOR JOIN SESSION (Stage 5 – concurrency enforced)
+     * --------------------------------------------------- */
+    socket.on(
+      'tutor:join_session',
+      async (
+        payload: {
+          sessionId: string;
+          maxConcurrentChats: number;
+        },
+        ack?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        if (role !== 'tutor' && role !== 'admin') {
+          return ack?.({ ok: false, error: 'Not authorized' });
+        }
+
+        const sessionId = payload?.sessionId?.trim();
+        const max = payload?.maxConcurrentChats ?? 1;
+
+        if (!sessionId)
+          return ack?.({ ok: false, error: 'sessionId required' });
+
+        const lockKey = `tutor:${userId}`;
+        const locked = await redisService.acquireLock(lockKey, 5);
+
+        if (!locked)
+          return ack?.({ ok: false, error: 'Tutor is busy, retry' });
+
+        try {
+          const activeCount =
+            await redisService.getTutorActiveCount(userId);
+
+          if (activeCount >= max) {
+            return ack?.({
+              ok: false,
+              error: 'Tutor is at capacity',
+            });
+          }
+
+          await redisService.addTutorActiveSession(
+            userId,
+            sessionId
+          );
+
+          socket.join(sessionId);
+          markActive();
+
+          return ack?.({ ok: true });
+        } finally {
+          await redisService.releaseLock(lockKey);
+        }
+      }
+    );
+
+    /* ---------------------------------------------------
+     * TUTOR LEAVE SESSION (Stage 5)
+     * --------------------------------------------------- */
+    socket.on(
+      'tutor:leave_session',
+      async (
+        payload: { sessionId: string },
+        ack?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        if (role !== 'tutor' && role !== 'admin') {
+          return ack?.({ ok: false, error: 'Not authorized' });
+        }
+
+        const sessionId = payload?.sessionId?.trim();
+        if (!sessionId)
+          return ack?.({ ok: false, error: 'sessionId required' });
+
+        await redisService.removeTutorActiveSession(
+          userId,
+          sessionId
+        );
+
+        socket.leave(sessionId);
+
+        return ack?.({ ok: true });
+      }
+    );
 
     /* ---------------------------------------------------
      * DISCONNECT
