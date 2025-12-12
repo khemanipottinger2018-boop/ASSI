@@ -1,7 +1,7 @@
-// app/dashboard/admin/components/UsersTable.tsx
+// app/dashboard/adm./components/UsersTable.tsx
 import { useState } from 'react';
-import { Search, Filter, MoreVertical, Mail, Calendar, Edit3 } from 'lucide-react';
-import { User } from '../types/admin';
+import { Search, Filter, MoreVertical, Mail, Calendar, Edit3, Users } from 'lucide-react';
+import { User } from '../../types/admin';
 
 interface UsersTableProps {
   users: User[];

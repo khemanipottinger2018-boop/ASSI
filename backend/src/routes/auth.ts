@@ -1,355 +1,155 @@
-// backend/routes/auth.ts
+// routes/auth.ts
 import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { getPool } from '../config/database.js';
-import { authenticateToken, trackUserSession } from '../middleware/auth.js';
-import sql from 'mssql';
+import { authService, AuthUser } from '@/core/auth/auth.service';
+import { db } from '@/config/database';
+import { redisService } from '@/infra/redis/redis.service';
+import { authenticate, AuthRequest } from '@/middleware/auth';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET!; // Remove fallback for security
 
-// ✅ Constants for consistent error messages
-const AUTH_ERRORS = {
-  MISSING_FIELDS: 'Username, email, and password are required',
-  PASSWORD_LENGTH: 'Password must be at least 6 characters long',
-  USER_EXISTS: 'User with this email or username already exists',
-  INVALID_CREDENTIALS: 'Invalid email or password',
-  REGISTRATION_FAILED: 'Internal server error during registration',
-  LOGIN_FAILED: 'Internal server error during login',
-  USER_NOT_FOUND: 'User not found',
-  AUTH_REQUIRED: 'Authentication required',
-  PROFILE_UPDATE_FAILED: 'Failed to update profile',
-  LOGOUT_FAILED: 'Logout failed'
-} as const;
+// Constants
+const ACCESS_TOKEN_EXPIRY = '1h';
+const REFRESH_TOKEN_MAX_AGE = 365 * 24 * 60 * 60 * 1000; // 1 year in ms
 
-// ✅ Register
+// -------------------- REGISTER --------------------
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
+  if (!username || !email || !password)
+    return res.status(400).json({ success: false, error: 'All fields required' });
 
-  try {
-    // ✅ Enhanced validation
-    if (!username?.trim() || !email?.trim() || !password) {
-      return res.status(400).json({ 
-        success: false,
-        error: AUTH_ERRORS.MISSING_FIELDS
-      });
-    }
+  if (!authService.validateEmail(email))
+    return res.status(400).json({ success: false, error: 'Invalid email' });
 
-    if (password.length < 6) {
-      return res.status(400).json({ 
-        success: false,
-        error: AUTH_ERRORS.PASSWORD_LENGTH
-      });
-    }
+  if (password.length < 6)
+    return res.status(400).json({ success: false, error: 'Password too short' });
 
-    const pool = await getPool();
+  const existing = await db.queryOne(
+    `SELECT id FROM Users WHERE username=@username OR email=@email`,
+    { username, email: email.toLowerCase() }
+  );
+  if (existing) return res.status(400).json({ success: false, error: 'Username/email exists' });
 
-    // ✅ Check existing user with transaction safety
-    const existingUserResult = await pool.request()
-      .input('email', sql.VarChar, email.trim().toLowerCase())
-      .input('username', sql.VarChar, username.trim())
-      .query(`
-        SELECT id FROM Users 
-        WHERE email = @email OR username = @username
-      `);
+  const hashed = await authService.hashPassword(password);
+  const now = new Date();
 
-    if (existingUserResult.recordset.length > 0) {
-      return res.status(400).json({ 
-        success: false,
-        error: AUTH_ERRORS.USER_EXISTS
-      });
-    }
+  const result = await db.query(
+    `INSERT INTO Users (username,email,password_hash,role,created_at,updated_at,last_login,disclaimer_accepted)
+     OUTPUT INSERTED.id VALUES (@username,@email,@password_hash,'student',@now,@now,@now,0)`,
+    { username, email: email.toLowerCase(), password_hash: hashed, now }
+  );
 
-    // ✅ Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+  const userId = result[0]?.id;
+  const user: AuthUser = { id: userId, username, email, role: 'student' };
+  const accessToken = authService.generateAccessToken(user);
+  const refreshToken = authService.generateRefreshToken(user);
 
-    // ✅ Insert new user with transaction
-    const newUserResult = await pool.request()
-      .input('username', sql.VarChar, username.trim())
-      .input('email', sql.VarChar, email.trim().toLowerCase())
-      .input('password_hash', sql.VarChar, hashedPassword)
-      .query(`
-        INSERT INTO Users (username, email, password_hash, role, created_at) 
-        OUTPUT INSERTED.id, INSERTED.username, INSERTED.email, INSERTED.role, 
-               INSERTED.bio, INSERTED.phone_number, INSERTED.show_phone, 
-               INSERTED.created_at, INSERTED.is_online
-        VALUES (@username, @email, @password_hash, 'student', GETDATE())
-      `);
+  // Set cookies
+  res.cookie('access_token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000, // 1 hour
+  });
 
-    const user = newUserResult.recordset[0];
-    
-    // ✅ Enhanced profile completion check
-    const profile_completed = Boolean(user.bio?.trim() && user.phone_number?.trim());
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_MAX_AGE,
+  });
 
-    // ✅ Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        bio: user.bio,
-        phone_number: user.phone_number,
-        show_phone: user.show_phone,
-        profile_completed
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile_completed,
-        is_online: user.is_online
-      },
-      token
-    });
-
-  } catch (error: any) {
-    console.error('Registration error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: AUTH_ERRORS.REGISTRATION_FAILED
-    });
-  }
+  res.status(201).json({ success: true, user });
 });
 
-// ✅ Login
+// -------------------- LOGIN --------------------
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ success: false, error: 'Email/password required' });
 
-  try {
-    if (!email?.trim() || !password) {
-      return res.status(400).json({
-        success: false,
-        error: AUTH_ERRORS.MISSING_FIELDS
-      });
-    }
+  const userRow = await db.queryOne<any>(`SELECT * FROM Users WHERE email=@email`, {
+    email: email.toLowerCase(),
+  });
 
-    const pool = await getPool();
+  if (!userRow || !(await authService.comparePassword(password, userRow.password_hash)))
+    return res.status(401).json({ success: false, error: 'Invalid credentials' });
 
-    // ✅ Find user with case-insensitive email
-    const userResult = await pool.request()
-      .input('email', sql.VarChar, email.trim().toLowerCase())
-      .query(`
-        SELECT * FROM Users 
-        WHERE email = @email
-      `);
+  const user: AuthUser = {
+    id: userRow.id,
+    username: userRow.username,
+    email: userRow.email,
+    role: userRow.role as AuthUser['role'],
+  };
 
-    if (userResult.recordset.length === 0) {
-      return res.status(401).json({
-        success: false,
-        error: AUTH_ERRORS.INVALID_CREDENTIALS
-      });
-    }
+  const accessToken = authService.generateAccessToken(user);
+  const refreshToken = authService.generateRefreshToken(user);
 
-    const user = userResult.recordset[0];
+  const refreshMaxAge = rememberMe ? REFRESH_TOKEN_MAX_AGE : 7 * 24 * 60 * 60 * 1000; // 1 year or 7 days
 
-    // ✅ Check password
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        error: AUTH_ERRORS.INVALID_CREDENTIALS
-      });
-    }
+  // Set cookies
+  res.cookie('access_token', accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000,
+  });
 
-    // ✅ Enhanced profile completion
-    const profile_completed = Boolean(user.bio?.trim() && user.phone_number?.trim());
+  res.cookie('refresh_token', refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: refreshMaxAge,
+  });
 
-    // ✅ Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        bio: user.bio,
-        phone_number: user.phone_number,
-        show_phone: user.show_phone,
-        profile_completed
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // ✅ Track user session
-    const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
-    const userAgent = req.get('User-Agent') || 'unknown';
-    await trackUserSession(user.id, ipAddress, userAgent);
-
-    res.json({
-      success: true,
-      message: 'Login successful',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile_completed,
-        is_online: user.is_online,
-        last_login: user.last_login
-      },
-      token
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      error: AUTH_ERRORS.LOGIN_FAILED
-    });
-  }
+  res.json({ success: true, user });
 });
 
-// ✅ Get current user
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: AUTH_ERRORS.USER_NOT_FOUND
-      });
-    }
+// -------------------- REFRESH TOKEN --------------------
+router.post('/refresh', async (req, res) => {
+  const refreshToken = req.cookies['refresh_token'];
+  if (!refreshToken) return res.status(401).json({ success: false, error: 'No refresh token provided' });
 
-    res.json({
-      success: true,
-      user: req.user
-    });
-  } catch (error) {
-    console.error('Get current user error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get user profile'
-    });
-  }
+  const decoded = authService.verifyRefreshToken(refreshToken);
+  if (!decoded) return res.status(401).json({ success: false, error: 'Invalid refresh token' });
+
+  const storedToken = await redisService.getRefreshToken(decoded.id);
+  if (!storedToken || storedToken !== refreshToken)
+    return res.status(401).json({ success: false, error: 'Refresh token expired or invalid' });
+
+  const user = await authService.getUserById(decoded.id);
+  if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+  const newAccessToken = authService.generateAccessToken(user);
+  const newRefreshToken = authService.generateRefreshToken(user);
+
+  res.cookie('access_token', newAccessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000,
+  });
+
+  res.cookie('refresh_token', newRefreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: REFRESH_TOKEN_MAX_AGE,
+  });
+
+  res.json({ success: true, user });
 });
 
-// ✅ Update profile
-router.put('/profile', authenticateToken, async (req, res) => {
-  const { bio, phone_number, show_phone } = req.body;
-  const userId = req.user?.id;
+// -------------------- LOGOUT --------------------
+router.post('/logout', authenticate, async (req: AuthRequest, res) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
-  try {
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: AUTH_ERRORS.AUTH_REQUIRED
-      });
-    }
+  await redisService.deleteRefreshToken(req.user.id);
+  await authService.setUserOffline(req.user.id);
 
-    const pool = await getPool();
+  res.clearCookie('access_token');
+  res.clearCookie('refresh_token');
 
-    // ✅ Update user profile
-    await pool.request()
-      .input('id', sql.VarChar, userId)
-      .input('bio', sql.VarChar, bio?.trim() || null)
-      .input('phone_number', sql.VarChar, phone_number?.trim() || null)
-      .input('show_phone', sql.Bit, show_phone ? 1 : 0)
-      .query(`
-        UPDATE Users 
-        SET bio = @bio, 
-            phone_number = @phone_number, 
-            show_phone = @show_phone,
-            updated_at = GETDATE()
-        WHERE id = @id
-      `);
-
-    // ✅ Get updated user
-    const userResult = await pool.request()
-      .input('id', sql.VarChar, userId)
-      .query('SELECT * FROM Users WHERE id = @id');
-
-    const user = userResult.recordset[0];
-    const profile_completed = Boolean(user.bio?.trim() && user.phone_number?.trim());
-
-    // ✅ Generate new token with updated data
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        bio: user.bio,
-        phone_number: user.phone_number,
-        show_phone: user.show_phone,
-        profile_completed
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully!',
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profile_completed,
-        bio: user.bio,
-        phone_number: user.phone_number,
-        show_phone: user.show_phone,
-        is_online: user.is_online
-      },
-      token
-    });
-
-  } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({
-      success: false,
-      error: AUTH_ERRORS.PROFILE_UPDATE_FAILED
-    });
-  }
+  res.json({ success: true });
 });
 
-// ✅ Logout
-router.post('/logout', authenticateToken, async (req, res) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: AUTH_ERRORS.AUTH_REQUIRED
-      });
-    }
-
-    const pool = await getPool();
-    
-    // ✅ Mark session as logged out and update online status
-    await pool.request()
-      .input('user_id', sql.VarChar, req.user.id)
-      .query(`
-        UPDATE TOP (1) UserSessions 
-        SET logout_at = GETDATE() 
-        WHERE user_id = @user_id AND logout_at IS NULL
-        ORDER BY login_at DESC;
-        
-        UPDATE Users 
-        SET is_online = 0, last_seen = GETDATE()
-        WHERE id = @user_id;
-      `);
-
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error during logout:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: AUTH_ERRORS.LOGOUT_FAILED
-    });
-  }
-});
-
-export default router;
+export { router };

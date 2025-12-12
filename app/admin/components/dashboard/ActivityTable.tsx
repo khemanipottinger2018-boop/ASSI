@@ -1,5 +1,5 @@
-// app/dashboard/admin/components/ActivityTable.tsx
-import { UserActivity } from '../types/admin';
+// app/dashboard/adm./components/ActivityTable.tsx
+import { UserActivity } from '../../types/admin';
 import { Globe, Monitor, Clock, LogOut } from 'lucide-react';
 
 interface ActivityTableProps {
@@ -140,7 +140,7 @@ export default function ActivityTable({ activity }: ActivityTableProps) {
       {activity.length === 0 && (
         <div className="px-6 py-12 text-center">
           <div className="text-gray-400 mb-2">
-            <Activity className="mx-auto" size={48} />
+            <Clock className="mx-auto" size={48} />
           </div>
           <p className="text-gray-500 text-lg">No activity recorded</p>
           <p className="text-gray-400 text-sm mt-1">User sessions will appear here</p>

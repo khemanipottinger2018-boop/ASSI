@@ -1,65 +1,56 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
+import { User, Tutor } from '@/types/user.types';
+import ProfileCard from '@/frontend/ui/ProfileCard';
+import ProfileEditModal from '@/frontend/ui/ProfileEditModal';
 
-interface UserData {
-  id: string;
-  username: string;
-  email: string;
-  role: 'student' | 'tutor' | 'admin';
-  profile_completed: boolean;
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-export default function UniversalProfile() {
-  const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function ProfilePage() {
   const router = useRouter();
+  const { user: authUser, isLoading: authLoading, logout } = useAuth();
+  const [profile, setProfile] = useState<User | Tutor | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem('auth_token');
-        const userData = localStorage.getItem('user');
+    if (!authLoading && !authUser) router.push('/signin');
+    if (authUser) fetchProfile();
+  }, [authUser, authLoading, router]);
 
-        if (userData) {
-          setUser(JSON.parse(userData));
-        }
-
-        if (!token) {
-          router.push('/signin');
-          return;
-        }
-
-        const response = await fetch('http://localhost:3001/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.user) {
-            setUser(result.user);
-            localStorage.setItem('user', JSON.stringify(result.user));
-          }
-        }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router]);
-
-  if (loading) return <div>Loading...</div>;
-  if (!user) return <div>Not authenticated</div>;
-
-  // Redirect to role-specific profile view
-  useEffect(() => {
-    if (user) {
-      router.push(`/dashboard/${user.role}/profile`);
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/users/me`, { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) setProfile(data.user);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-  }, [user, router]);
+  };
 
-  return <div>Redirecting to your profile...</div>;
+  if (authLoading || loading) return <div>Loading profile...</div>;
+  if (!profile) return <div>Profile unavailable</div>;
+
+  return (
+    <>
+      <ProfileCard 
+        profile={profile} 
+        isPrivate={true} 
+        onEdit={() => setIsEditing(true)} 
+        onLogout={logout} 
+      />
+      {isEditing && profile && (
+        <ProfileEditModal 
+          profile={profile} 
+          onClose={() => setIsEditing(false)} 
+          onUpdate={(updated) => setProfile(updated)} 
+        />
+      )}
+    </>
+  );
 }

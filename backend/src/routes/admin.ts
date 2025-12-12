@@ -1,263 +1,313 @@
 // backend/src/routes/admin.ts
 import express from 'express';
-import { getPool } from '../config/database.js';
-import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
-import { Request, Response } from 'express';
-import sql from 'mssql';
+import { db } from '@/config/database';
+import { authenticate, AuthRequest, requireAdmin } from '@/middleware/auth';
+// import { io } from '@/socket-server'; // Make sure you export `io` from your socket-server
 
 const router = express.Router();
 
-// Get dashboard statistics
-router.get('/dashboard-stats', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
+// ==================== ADMIN DASHBOARD STATS ====================
+router.get('/dashboard-stats', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const pool = await getPool();
+    const [stats, recentSignups, activeSessions, pendingApps, onlineUsers] = await Promise.all([
+      // Overall platform stats
+      db.queryOne<{
+        total_users: number;
+        total_tutors: number;
+        total_students: number;
+        total_sessions: number;
+        active_sessions: number;
+      }>(
+        `SELECT 
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN role = 'tutor' THEN 1 END) as total_tutors,
+          COUNT(CASE WHEN role = 'student' THEN 1 END) as total_students,
+          (SELECT COUNT(*) FROM chat_sessions) as total_sessions,
+          (SELECT COUNT(*) FROM chat_sessions WHERE status = 'active') as active_sessions
+         FROM Users`,
+        {}
+      ),
 
-    // Get total users count
-    const usersResult = await pool.request().query(`
-      SELECT 
-        COUNT(*) as total_users,
-        COUNT(CASE WHEN role = 'tutor' THEN 1 END) as total_tutors,
-        COUNT(CASE WHEN role = 'student' THEN 1 END) as total_students,
-        COUNT(CASE WHEN created_at >= DATEADD(day, -30, GETDATE()) THEN 1 END) as new_users_30d
-      FROM Users
-    `);
+      // Recent signups (last 7 days)
+      db.query<{
+        id: string;
+        username: string;
+        email: string;
+        role: string;
+        created_at: Date;
+      }>(
+        `SELECT id, username, email, role, created_at
+         FROM Users 
+         WHERE created_at > DATEADD(DAY, -7, GETDATE())
+         ORDER BY created_at DESC
+         OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY`,
+        {}
+      ),
 
-    // Get tutor applications stats
-    const applicationsResult = await pool.request().query(`
-      SELECT 
-        COUNT(*) as total_applications,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_applications,
-        COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved_applications,
-        COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected_applications
-      FROM TutorApplications
-    `);
+      // Active chat sessions
+      db.query<{
+        id: string;
+        student_id: string;
+        tutor_id: string;
+        student_name: string;
+        tutor_name: string;
+        subject_name: string;
+        started_at: Date;
+      }>(
+        `SELECT 
+          cs.id,
+          cs.student_id,
+          cs.tutor_id,
+          stu.username as student_name,
+          tut.username as tutor_name,
+          s.name as subject_name,
+          cs.started_at
+         FROM chat_sessions cs
+         JOIN Users stu ON cs.student_id = stu.id
+         JOIN Users tut ON cs.tutor_id = tut.id
+         JOIN Subjects s ON cs.subject_id = s.subject_id
+         WHERE cs.status = 'active'
+         ORDER BY cs.started_at DESC`,
+        {}
+      ),
 
-    // Get recent activity (last 7 days)
-    const activityResult = await pool.request().query(`
-      SELECT 
-        COUNT(*) as logins_7d
-      FROM UserSessions 
-      WHERE login_at >= DATEADD(day, -7, GETDATE())
-    `);
+      // Pending tutor applications
+      db.query<{
+        application_id: string;
+        user_id: string;
+        username: string;
+        email: string;
+        applied_at: Date;
+      }>(
+        `SELECT 
+          ta.application_id,
+          ta.user_id,
+          u.username,
+          u.email,
+          ta.applied_at
+         FROM TutorApplications ta
+         JOIN Users u ON ta.user_id = u.id
+         WHERE ta.status = 'pending'
+         ORDER BY ta.applied_at ASC`,
+        {}
+      ),
 
-    // Get online users (active in last 15 minutes)
-    const onlineUsersResult = await pool.request().query(`
-      SELECT COUNT(DISTINCT user_id) as online_users
-      FROM UserSessions 
-      WHERE last_activity >= DATEADD(minute, -15, GETDATE())
-    `);
+      // Online users (legacy – disabled during refactor)
+      Promise.resolve(0)
 
-    const stats = {
-      users: usersResult.recordset[0],
-      applications: applicationsResult.recordset[0],
-      activity: activityResult.recordset[0],
-      online: onlineUsersResult.recordset[0]
-    };
+    ]);
 
     res.json({
       success: true,
-      data: stats
+      stats: {
+        totalUsers: stats?.total_users || 0,
+        totalTutors: stats?.total_tutors || 0,
+        totalStudents: stats?.total_students || 0,
+        totalSessions: stats?.total_sessions || 0,
+        activeSessions: stats?.active_sessions || 0,
+        onlineUsers: onlineUsers || 0,
+        pendingApplications: pendingApps.length
+      },
+      recentSignups: recentSignups.map(u => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        joined: u.created_at
+      })),
+      activeSessions: activeSessions.map(s => ({
+        id: s.id,
+        student: s.student_name,
+        tutor: s.tutor_name,
+        subject: s.subject_name,
+        started: s.started_at
+      })),
+      pendingApplications: pendingApps.map(a => ({
+        id: a.application_id,
+        userId: a.user_id,
+        username: a.username,
+        email: a.email,
+        applied: a.applied_at
+      }))
     });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching dashboard stats:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch dashboard statistics',
-      details: errorMessage
-    });
+  } catch (error: any) {
+    console.error('Dashboard stats error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard stats' });
   }
 });
 
-// Get all users with pagination
-router.get('/users', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
+// ==================== GET ALL USERS ====================
+router.get('/users', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const { page = 1, limit = 20, search = '', role = '' } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const { page = '1', limit = '20', role, search } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
 
-    const pool = await getPool();
-
-    let whereClause = 'WHERE 1=1';
-    if (search) {
-      whereClause += ` AND (username LIKE '%${search}%' OR email LIKE '%${search}%')`;
-    }
-    if (role) {
-      whereClause += ` AND role = '${role}'`;
-    }
-
-    const usersResult = await pool.request().query(`
-      SELECT 
-        id, username, email, role, created_at, last_login,
-        (SELECT COUNT(*) FROM TutorApplications WHERE user_id = Users.id) as application_count
+    let query = `
+      SELECT id, username, email, role, created_at, last_login, date_of_birth
       FROM Users 
-      ${whereClause}
-      ORDER BY created_at DESC
-      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-    `);
+      WHERE 1=1
+    `;
+    
+    const params: Record<string, any> = {};
 
-    const countResult = await pool.request().query(`
-      SELECT COUNT(*) as total
-      FROM Users 
-      ${whereClause}
-    `);
+    if (role && ['student','tutor','tutor-applicant','admin'].includes(role as string)) {
+      query += ` AND role = @role`;
+      params.role = role;
+    }
+
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      query += ` AND (username LIKE @search OR email LIKE @search)`;
+      params.search = `%${search}%`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const countQuery = query.replace(
+      'SELECT id, username, email, role, created_at, last_login, date_of_birth',
+      'SELECT COUNT(*) as total'
+    );
+
+    const totalResult = await db.queryOne<{ total: number }>(countQuery, params);
+
+    query += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
+    params.offset = offset;
+    params.limit = limitNum;
+
+    const users = await db.query(query, params);
 
     res.json({
       success: true,
-      data: {
-        users: usersResult.recordset,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total: countResult.recordset[0].total,
-          totalPages: Math.ceil(countResult.recordset[0].total / Number(limit))
-        }
+      users,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalResult?.total || 0,
+        totalPages: Math.ceil((totalResult?.total || 0) / limitNum)
       }
     });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching users:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch users',
-      details: errorMessage
-    });
+  } catch (error: any) {
+    console.error('Get users error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch users' });
   }
 });
 
-// Get user activity logs
-router.get('/user-activity', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
-  try {
-    const { page = 1, limit = 50, userId = '' } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
-
-    const pool = await getPool();
-
-    let whereClause = 'WHERE 1=1';
-    if (userId) {
-      whereClause += ` AND user_id = '${userId}'`;
-    }
-
-    const activityResult = await pool.request().query(`
-      SELECT 
-        us.session_id, us.user_id, u.username, u.email,
-        us.login_at, us.last_activity, us.ip_address,
-        us.user_agent, us.logout_at
-      FROM UserSessions us
-      INNER JOIN Users u ON us.user_id = u.id
-      ${whereClause}
-      ORDER BY us.login_at DESC
-      OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY
-    `);
-
-    const countResult = await pool.request().query(`
-      SELECT COUNT(*) as total
-      FROM UserSessions us
-      ${whereClause}
-    `);
-
-    res.json({
-      success: true,
-      data: {
-        activity: activityResult.recordset,
-        pagination: {
-          page: Number(page),
-          limit: Number(limit),
-          total: countResult.recordset[0].total,
-          totalPages: Math.ceil(countResult.recordset[0].total / Number(limit))
-        }
-      }
-    });
-
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching user activity:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch user activity',
-      details: errorMessage
-    });
-  }
-});
-
-// Get online users
-router.get('/online-users', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
-  try {
-    const pool = await getPool();
-
-    const onlineUsersResult = await pool.request().query(`
-      SELECT 
-        us.user_id, u.username, u.email, u.role,
-        us.last_activity, us.ip_address, us.login_at
-      FROM UserSessions us
-      INNER JOIN Users u ON us.user_id = u.id
-      WHERE us.last_activity >= DATEADD(minute, -15, GETDATE())
-      ORDER BY us.last_activity DESC
-    `);
-
-    res.json({
-      success: true,
-      data: onlineUsersResult.recordset
-    });
-
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching online users:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch online users',
-      details: errorMessage
-    });
-  }
-});
-
-// Update user role
-router.put('/users/:userId/role', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
+// ==================== UPDATE USER ROLE ====================
+router.put('/users/:userId/role', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
     const { role } = req.body;
 
-    if (!['student', 'tutor', 'admin'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid role. Must be student, tutor, or admin'
-      });
+    if (!role || !['student','tutor-applicant','tutor','admin'].includes(role)) {
+      return res.status(400).json({ success:false, error: 'Invalid role' });
     }
 
-    const pool = await getPool();
+    await db.query(`UPDATE Users SET role = @role WHERE id = @user_id`, { user_id: userId, role });
 
-    // Check if user exists
-    const userCheck = await pool.request()
-      .input('user_id', sql.VarChar, userId)
-      .query('SELECT id FROM Users WHERE id = @user_id');
-
-    if (userCheck.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
+    if (role === 'tutor') {
+      const exists = await db.queryOne<{ tutor_id: string }>(
+        `SELECT tutor_id FROM Tutors WHERE user_id=@user_id`, { user_id: userId }
+      );
+      if (!exists) {
+        await db.query(
+          `INSERT INTO Tutors (user_id, chat_mode, max_concurrent_chats, is_student_tutor) 
+           VALUES (@user_id, 'request', 1, 0)`,
+          { user_id: userId }
+        );
+      }
     }
 
-    // Update user role
-    await pool.request()
-      .input('user_id', sql.VarChar, userId)
-      .input('role', sql.VarChar, role)
-      .query('UPDATE Users SET role = @role WHERE id = @user_id');
+    res.json({ success:true, message: `User role updated to ${role}` });
+
+  } catch (error: any) {
+    console.error('Update role error:', error);
+    res.status(500).json({ success:false, error: 'Failed to update user role' });
+  }
+});
+
+// ==================== GET USER DETAILS ====================
+router.get('/users/:userId', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await db.queryOne<{
+      id: string;
+      username: string;
+      email: string;
+      role: string;
+      bio?: string;
+      phone_number?: string;
+      show_phone: boolean;
+      avatar_url?: string;
+      first_name?: string;
+      last_name?: string;
+      date_of_birth?: string;
+      created_at: Date;
+      updated_at?: Date;
+      last_login?: Date;
+      is_age_verified: boolean;
+    }>(`SELECT * FROM Users WHERE id=@user_id`, { user_id: userId });
+
+    if (!user) return res.status(404).json({ success:false, error:'User not found' });
+
+    const presence = await db.queryOne<{ status: string; last_activity: Date }>(
+      `SELECT status, last_activity FROM user_presence WHERE user_id=@user_id`,
+      { user_id: userId }
+    );
+
+    let tutorInfo: { id: string; hourlyRate: number } | null = null;
+    if (user.role === 'tutor') {
+      const t = await db.queryOne<{ tutor_id: string; hourly_rate: number }>(
+        `SELECT tutor_id, hourly_rate FROM Tutors WHERE user_id=@user_id`,
+        { user_id: userId }
+      );
+      if (t) tutorInfo = { id: t.tutor_id, hourlyRate: t.hourly_rate };
+    }
+
+    let applicationInfo: { id: string; status: string; appliedAt: Date } | null = null;
+    if (user.role === 'tutor-applicant') {
+      const a = await db.queryOne<{ application_id: string; status: string; applied_at: Date }>(
+        `SELECT application_id, status, applied_at FROM TutorApplications 
+         WHERE user_id=@user_id AND status='pending'`,
+        { user_id: userId }
+      );
+      if (a) applicationInfo = { id: a.application_id, status: a.status, appliedAt: a.applied_at };
+    }
 
     res.json({
       success: true,
-      message: `User role updated to ${role} successfully`
+      user: {
+        ...user,
+        presence: presence || { status: 'offline', last_activity: new Date() },
+        tutorInfo,
+        applicationInfo
+      }
     });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error updating user role:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to update user role',
-      details: errorMessage
-    });
+  } catch (error: any) {
+    console.error('Get user details error:', error);
+    res.status(500).json({ success:false, error:'Failed to fetch user details' });
+  }
+});
+
+// ==================== DELETE USER ====================
+router.delete('/users/:userId', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { userId } = req.params;
+    const adminId = req.user!.id;
+
+    if (userId === adminId) return res.status(400).json({ success:false, error:'Cannot delete your own account' });
+
+    await db.query(`DELETE FROM Users WHERE id=@user_id`, { user_id: userId });
+
+    res.json({ success:true, message:'User deleted successfully' });
+
+  } catch (error: any) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ success:false, error:'Failed to delete user' });
   }
 });
 

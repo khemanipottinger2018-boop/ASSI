@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Mail
 } from 'lucide-react';
-import StudentMessages from '@/app/chat/components/StudentMessages';
+// import StudentMessages from '@/app/chat/components/StudentMessages'; // TODO: Fix this import
 
 interface UserProfile {
   id: string;

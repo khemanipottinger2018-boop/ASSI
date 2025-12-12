@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/steps/PricingStep.tsx
+// app/dashboard/tutor/set./components/steps/PricingStep.tsx
 import { DollarSign } from 'lucide-react';
 
 interface PricingStepProps {

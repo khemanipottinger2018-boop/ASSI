@@ -1,8 +1,0 @@
-./components/tutors/common/AvailabilityBadge.tsx
-./components/tutors/common/TutorCard.tsx
-./components/tutors/live-chat/ChatRequestModal.tsx
-./components/tutors/live-chat/ChatRequestView.tsx
-./components/tutors/live-chat/LiveChatClient.tsx
-./components/tutors/live-chat/TutorLiveChatClient.tsx
-./app/tutors/components/TutorLiveChatWrapper.tsx
-./app/tutors/live-chat/page.tsx

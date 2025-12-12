@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/Header.tsx
+// app/dashboard/tutor/set./components/Header.tsx
 import { CheckCircle, Shield, Clock, Star } from 'lucide-react';
 
 interface UserData {

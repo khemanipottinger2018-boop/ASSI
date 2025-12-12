@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/steps/AvailabilityStep.tsx
+// app/dashboard/tutor/set./components/steps/AvailabilityStep.tsx
 import { Calendar } from 'lucide-react';
 
 interface AvailabilityStepProps {

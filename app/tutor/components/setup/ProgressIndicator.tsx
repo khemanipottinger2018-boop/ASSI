@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/ProgressIndicator.tsx
+// app/dashboard/tutor/set./components/ProgressIndicator.tsx
 interface ProgressIndicatorProps {
   currentStep: number;
   totalSteps: number;

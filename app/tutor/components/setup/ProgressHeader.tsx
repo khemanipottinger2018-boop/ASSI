@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/ProgressHeader.tsx
+// app/dashboard/tutor/set./components/ProgressHeader.tsx
 import { Shield, CheckCircle } from 'lucide-react';
 
 interface StepConfig {

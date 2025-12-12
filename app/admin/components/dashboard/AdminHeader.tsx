@@ -1,4 +1,4 @@
-// app/dashboard/admin/components/AdminHeader.tsx
+// app/dashboard/adm./components/AdminHeader.tsx
 import { Shield, Activity, Users, FileText, Clock, UserCheck } from 'lucide-react';
 
 interface AdminHeaderProps {

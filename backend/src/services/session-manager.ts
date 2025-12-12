@@ -1,325 +1,237 @@
-import { getPool, executeQuery, executeSingle } from '../config/database.js';
-import sql from 'mssql';
+// backend/src/services/session-manager.ts
+import { db } from '@/config/database';
 
-export type SessionStatus = 'requested' | 'accepted' | 'declined' | 'active' | 'completed' | 'expired';
-
-export interface SessionDetails {
+// Define interfaces locally since they're not exported from database.ts
+interface ChatSession {
   id: string;
   student_id: string;
   tutor_id: string;
   subject_id: string;
-  status: SessionStatus;
+  status: 'pending' | 'active' | 'ended' | 'declined';
   requested_at: Date;
-  expiry_time: Date;
   accepted_at?: Date;
   started_at?: Date;
   ended_at?: Date;
+  student_notes?: string;
   decline_reason?: string;
-  student_notes?: string;
-  student_name?: string;
-  student_avatar?: string;
-  tutor_name?: string;
-  tutor_avatar?: string;
-  subject_name?: string;
+  expiry_time?: Date;
+  ended_by?: string;
 }
 
-export interface CreateSessionData {
-  student_id: string;
-  tutor_id: string;
-  subject_id: string;
-  student_notes?: string;
+interface ChatSessionWithDetails extends ChatSession {
+  student_username: string;
+  tutor_username: string;
+  subject_name: string;
 }
-
-const DEFAULT_EXPIRY_MINUTES = 30;
-const SESSION_ERRORS = {
-  DUPLICATE_REQUEST: 'DUPLICATE_REQUEST',
-  SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
-  UNAUTHORIZED: 'UNAUTHORIZED'
-} as const;
 
 export class SessionManager {
-  constructor(private presenceService?: any, private io?: any) {}
-
-  /**
-   * Create chat session with duplicate prevention
-   */
-  async createChatSession(data: CreateSessionData): Promise<SessionDetails> {
-    // Check for duplicate pending requests
-    const duplicate = await executeSingle<{ id: string }>(`
-      SELECT id FROM chat_sessions 
-      WHERE student_id = @studentId 
-        AND subject_id = @subjectId 
-        AND status = 'requested' 
-        AND expiry_time > GETDATE()
-    `, {
-      studentId: { value: data.student_id },
-      subjectId: { value: data.subject_id }
-    });
-
-    if (duplicate) {
-      throw new Error(SESSION_ERRORS.DUPLICATE_REQUEST);
-    }
-
-    const result = await executeQuery<{ id: string }>(`
-      INSERT INTO chat_sessions 
+  // Create chat session
+  async createChatSession(data: {
+    student_id: string;
+    tutor_id: string;
+    subject_id: string;
+    student_notes?: string;
+  }): Promise<string> {
+    const result = await db.query<{ id: string }>(
+      `INSERT INTO chat_sessions 
         (student_id, tutor_id, subject_id, status, requested_at, expiry_time, student_notes)
-      OUTPUT INSERTED.id
-      VALUES (@studentId, @tutorId, @subjectId, 'requested', GETDATE(), 
-             DATEADD(MINUTE, @expiryMinutes, GETDATE()), @studentNotes)
-    `, {
-      studentId: { value: data.student_id },
-      tutorId: { value: data.tutor_id },
-      subjectId: { value: data.subject_id },
-      studentNotes: { value: data.student_notes || '' },
-      expiryMinutes: { value: DEFAULT_EXPIRY_MINUTES, type: sql.Int }
-    });
+       OUTPUT INSERTED.id
+       VALUES (@student_id, @tutor_id, @subject_id, 'pending', GETDATE(), 
+              DATEADD(MINUTE, 30, GETDATE()), @student_notes)`,
+      {
+        student_id: data.student_id,
+        tutor_id: data.tutor_id,
+        subject_id: data.subject_id,
+        student_notes: data.student_notes || ''
+      }
+    );
 
-    const sessionId = result[0].id;
-    return await this.getSessionDetails(sessionId);
+    return result[0]?.id || '';
   }
 
-  /**
-   * Accept chat session and update tutor presence to "busy"
-   */
-  async acceptChatSession(sessionId: string, tutorId: string): Promise<SessionDetails> {
-    const session = await executeSingle<SessionDetails>(`
-      SELECT * FROM chat_sessions WHERE id = @sessionId AND tutor_id = @tutorId
-    `, { sessionId: { value: sessionId }, tutorId: { value: tutorId } });
-
-    if (!session) {
-      throw new Error(SESSION_ERRORS.SESSION_NOT_FOUND);
+  // Accept chat session
+  async acceptChatSession(sessionId: string, tutorId: string): Promise<boolean> {
+    try {
+      await db.query(
+        `UPDATE chat_sessions 
+         SET status = 'accepted', accepted_at = GETDATE()
+         WHERE id = @session_id AND tutor_id = @tutor_id AND status = 'pending'`,
+        { 
+          session_id: sessionId,
+          tutor_id: tutorId
+        }
+      );
+      
+      // Verify update worked
+      const check = await db.queryOne<{ id: string }>(
+        `SELECT id FROM chat_sessions 
+         WHERE id = @session_id AND status = 'accepted'`,
+        { session_id: sessionId }
+      );
+      
+      return !!check;
+    } catch (error) {
+      console.error('Accept chat session error:', error);
+      return false;
     }
+  }
 
-    if (session.status !== 'requested') {
-      throw new Error('Session cannot be accepted in current status');
+  // Start chat session
+  async startChatSession(sessionId: string): Promise<boolean> {
+    try {
+      await db.query(
+        `UPDATE chat_sessions 
+         SET status = 'active', started_at = GETDATE()
+         WHERE id = @session_id AND status = 'accepted'`,
+        { session_id: sessionId }
+      );
+      
+      // Verify update
+      const check = await db.queryOne<{ id: string }>(
+        `SELECT id FROM chat_sessions 
+         WHERE id = @session_id AND status = 'active'`,
+        { session_id: sessionId }
+      );
+      
+      return !!check;
+    } catch (error) {
+      console.error('Start chat session error:', error);
+      return false;
     }
+  }
 
-    await executeQuery(`
-      UPDATE chat_sessions 
-      SET status = 'accepted', accepted_at = GETDATE()
-      WHERE id = @sessionId
-    `, { sessionId: { value: sessionId } });
-
-    const details = await this.getSessionDetails(sessionId);
-
-    // Update tutor presence to "busy" for the session
-    if (this.presenceService) {
-      await this.presenceService.userJoinedSession(tutorId, sessionId);
+  // End chat session
+  async endChatSession(sessionId: string, endedBy: string): Promise<boolean> {
+    try {
+      await db.query(
+        `UPDATE chat_sessions 
+         SET status = 'ended', ended_at = GETDATE(), ended_by = @ended_by
+         WHERE id = @session_id AND status IN ('active', 'accepted')`,
+        { 
+          session_id: sessionId,
+          ended_by: endedBy
+        }
+      );
+      
+      // Verify update
+      const check = await db.queryOne<{ id: string }>(
+        `SELECT id FROM chat_sessions 
+         WHERE id = @session_id AND status = 'ended'`,
+        { session_id: sessionId }
+      );
+      
+      return !!check;
+    } catch (error) {
+      console.error('End chat session error:', error);
+      return false;
     }
+  }
 
-    // Notify student via Socket.IO
-    if (this.io) {
-      this.io.to(`user:${details.student_id}`).emit('chat_request_accepted', {
+  // Decline chat session
+  async declineChatSession(sessionId: string, tutorId: string, reason?: string): Promise<boolean> {
+    try {
+      await db.query(
+        `UPDATE chat_sessions 
+         SET status = 'declined', decline_reason = @reason
+         WHERE id = @session_id AND tutor_id = @tutor_id AND status = 'pending'`,
+        { 
+          session_id: sessionId,
+          tutor_id: tutorId,
+          reason: reason || ''
+        }
+      );
+      
+      // Verify update
+      const check = await db.queryOne<{ id: string }>(
+        `SELECT id FROM chat_sessions 
+         WHERE id = @session_id AND status = 'declined'`,
+        { session_id: sessionId }
+      );
+      
+      return !!check;
+    } catch (error) {
+      console.error('Decline chat session error:', error);
+      return false;
+    }
+  }
+
+  // Check if user can access session
+  async canAccessSession(sessionId: string, userId: string): Promise<boolean> {
+    const result = await db.queryOne<{ id: string }>(
+      `SELECT id FROM chat_sessions 
+       WHERE id = @session_id AND (student_id = @user_id OR tutor_id = @user_id)`,
+      { 
         session_id: sessionId,
-        tutor_id: tutorId,
-        tutor_name: details.tutor_name,
-        accepted_at: details.accepted_at
-      });
-    }
-
-    return details;
-  }
-
-  /**
-   * Start active chat session
-   */
-  async startChatSession(sessionId: string, userId: string): Promise<SessionDetails> {
-    const canAccess = await this.canUserAccessSession(sessionId, userId);
-    if (!canAccess) {
-      throw new Error(SESSION_ERRORS.UNAUTHORIZED);
-    }
-
-    await executeQuery(`
-      UPDATE chat_sessions 
-      SET status = 'active', started_at = GETDATE()
-      WHERE id = @sessionId AND status = 'accepted'
-    `, { sessionId: { value: sessionId } });
-
-    const details = await this.getSessionDetails(sessionId);
-
-    // Notify both users via Socket.IO
-    if (this.io) {
-      this.io.to(`chat:${sessionId}`).emit('chat_session_started', {
-        session_id: sessionId,
-        started_at: details.started_at
-      });
-    }
-
-    return details;
-  }
-
-  /**
-   * End chat session and update tutor presence back to "online"
-   */
-  async endChatSession(sessionId: string, userId: string): Promise<SessionDetails> {
-    const canAccess = await this.canUserAccessSession(sessionId, userId);
-    if (!canAccess) {
-      throw new Error(SESSION_ERRORS.UNAUTHORIZED);
-    }
-
-    const session = await this.getSessionDetails(sessionId);
+        user_id: userId
+      }
+    );
     
-    await executeQuery(`
-      UPDATE chat_sessions 
-      SET status = 'completed', ended_at = GETDATE()
-      WHERE id = @sessionId
-    `, { sessionId: { value: sessionId } });
-
-    const details = await this.getSessionDetails(sessionId);
-
-    // Update tutor presence back to "online"
-    if (this.presenceService && session.tutor_id) {
-      await this.presenceService.userLeftSession(session.tutor_id);
-    }
-
-    // Notify both users via Socket.IO
-    if (this.io) {
-      this.io.to(`chat:${sessionId}`).emit('chat_session_ended', {
-        session_id: sessionId,
-        ended_at: details.ended_at
-      });
-    }
-
-    return details;
-  }
-
-  /**
-   * Decline chat session
-   */
-  async declineChatSession(sessionId: string, declineReason: string, tutorId: string): Promise<SessionDetails> {
-    const session = await executeSingle<SessionDetails>(`
-      SELECT * FROM chat_sessions WHERE id = @sessionId AND tutor_id = @tutorId
-    `, { sessionId: { value: sessionId }, tutorId: { value: tutorId } });
-
-    if (!session) {
-      throw new Error(SESSION_ERRORS.SESSION_NOT_FOUND);
-    }
-
-    await executeQuery(`
-      UPDATE chat_sessions 
-      SET status = 'declined', decline_reason = @declineReason
-      WHERE id = @sessionId
-    `, { 
-      sessionId: { value: sessionId },
-      declineReason: { value: declineReason }
-    });
-
-    const details = await this.getSessionDetails(sessionId);
-
-    // Notify student via Socket.IO
-    if (this.io) {
-      this.io.to(`user:${details.student_id}`).emit('chat_request_declined', {
-        session_id: sessionId,
-        tutor_id: tutorId,
-        decline_reason: declineReason
-      });
-    }
-
-    return details;
-  }
-
-  /**
-   * Get session details with user information
-   */
-  private async getSessionDetails(sessionId: string): Promise<SessionDetails> {
-    const result = await executeQuery<SessionDetails>(`
-      SELECT 
-        cs.*,
-        stu.username as student_name,
-        stu.profile_pic as student_avatar,
-        tut.username as tutor_name,
-        tut.profile_pic as tutor_avatar,
-        s.name as subject_name
-      FROM chat_sessions cs
-      INNER JOIN Users stu ON cs.student_id = stu.id
-      INNER JOIN Users tut ON cs.tutor_id = tut.id
-      INNER JOIN Subjects s ON cs.subject_id = s.subject_id
-      WHERE cs.id = @sessionId
-    `, { sessionId: { value: sessionId } });
-
-    if (result.length === 0) {
-      throw new Error(SESSION_ERRORS.SESSION_NOT_FOUND);
-    }
-
-    return result[0];
-  }
-
-  /**
-   * Check if user can access session
-   */
-  private async canUserAccessSession(sessionId: string, userId: string): Promise<boolean> {
-    const result = await executeSingle<{ id: string }>(`
-      SELECT id FROM chat_sessions 
-      WHERE id = @sessionId AND (student_id = @userId OR tutor_id = @userId)
-    `, { 
-      sessionId: { value: sessionId },
-      userId: { value: userId }
-    });
-
     return !!result;
   }
 
-  /**
-   * Get pending requests for tutor
-   */
-  async getTutorPendingRequests(tutorId: string): Promise<SessionDetails[]> {
-    return await executeQuery<SessionDetails>(`
-      SELECT 
-        cs.id,
-        cs.student_id,
-        cs.subject_id,
-        cs.student_notes,
-        cs.requested_at,
-        cs.expiry_time,
-        u.username as student_name,
-        u.profile_pic as student_avatar,
-        s.name as subject_name
-      FROM chat_sessions cs
-      INNER JOIN Users u ON cs.student_id = u.id
-      INNER JOIN Subjects s ON cs.subject_id = s.subject_id
-      WHERE cs.tutor_id = @tutorId 
-        AND cs.status = 'requested'
-        AND cs.expiry_time > GETDATE()
-      ORDER BY cs.requested_at ASC
-    `, { tutorId: { value: tutorId } });
-  }
-
-  /**
-   * Get active sessions for user
-   */
-  async getUserActiveSessions(userId: string): Promise<SessionDetails[]> {
-    return await executeQuery<SessionDetails>(`
-      SELECT 
+  // Get session details
+  async getSession(sessionId: string): Promise<ChatSessionWithDetails | null> {
+    const session = await db.queryOne<ChatSessionWithDetails>(
+      `SELECT 
         cs.*,
-        u.username as student_name,
-        u.profile_pic as student_avatar,
-        tut.username as tutor_name,
-        tut.profile_pic as tutor_avatar,
-        s.name as subject_name
-      FROM chat_sessions cs
-      INNER JOIN Users u ON cs.student_id = u.id
-      INNER JOIN Users tut ON cs.tutor_id = tut.id
-      INNER JOIN Subjects s ON cs.subject_id = s.subject_id
-      WHERE (cs.student_id = @userId OR cs.tutor_id = @userId)
-        AND cs.status IN ('accepted', 'active')
-      ORDER BY cs.requested_at DESC
-    `, { userId: { value: userId } });
+        s.username as student_username,
+        t.username as tutor_username,
+        sub.name as subject_name
+       FROM chat_sessions cs
+       JOIN Users s ON cs.student_id = s.id
+       JOIN Users t ON cs.tutor_id = t.id
+       JOIN Subjects sub ON cs.subject_id = sub.subject_id
+       WHERE cs.id = @session_id`,
+      { session_id: sessionId }
+    );
+    
+    return session;
   }
 
-  /**
-   * Clean up expired sessions
-   */
-  async cleanupExpiredSessions(): Promise<number> {
-    const result = await executeQuery<{ expired_count: number }>(`
-      UPDATE chat_sessions 
-      SET status = 'expired' 
-      WHERE status = 'requested' 
-        AND expiry_time <= GETDATE()
-      SELECT @@ROWCOUNT as expired_count
-    `);
+  // Get tutor's pending requests
+  async getTutorPendingRequests(tutorId: string): Promise<Array<{
+    id: string;
+    student_id: string;
+    subject_id: string;
+    student_notes?: string;
+    requested_at: Date;
+    student_username: string;
+    subject_name: string;
+  }>> {
+    return await db.query(
+      `SELECT 
+        cs.id, cs.student_id, cs.subject_id, cs.student_notes, cs.requested_at,
+        u.username as student_username, s.name as subject_name
+       FROM chat_sessions cs
+       JOIN Users u ON cs.student_id = u.id
+       JOIN Subjects s ON cs.subject_id = s.subject_id
+       WHERE cs.tutor_id = @tutor_id AND cs.status = 'pending'
+       ORDER BY cs.requested_at ASC`,
+      { tutor_id: tutorId }
+    );
+  }
 
-    return result[0]?.expired_count || 0;
+  // Get active session for user
+  async getActiveSessionForUser(userId: string): Promise<ChatSession | null> {
+    return await db.queryOne<ChatSession>(
+      `SELECT * FROM chat_sessions 
+       WHERE (student_id = @user_id OR tutor_id = @user_id) 
+         AND status = 'active'
+       ORDER BY started_at DESC`,
+      { user_id: userId }
+    );
+  }
+
+  // Get session participants
+  async getSessionParticipants(sessionId: string): Promise<{ studentId: string; tutorId: string } | null> {
+    const result = await db.queryOne<{ student_id: string; tutor_id: string }>(
+      `SELECT student_id, tutor_id FROM chat_sessions WHERE id = @session_id`,
+      { session_id: sessionId }
+    );
+    
+    return result ? { studentId: result.student_id, tutorId: result.tutor_id } : null;
   }
 }
 
-export default SessionManager;
+// Export singleton instance
+export const sessionManager = new SessionManager();

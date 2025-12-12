@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/steps/SubjectsStep.tsx
+// app/dashboard/tutor/set./components/steps/SubjectsStep.tsx
 import { BookOpen } from 'lucide-react';
 
 interface Subject {

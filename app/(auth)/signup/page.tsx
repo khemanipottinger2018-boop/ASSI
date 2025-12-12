@@ -3,8 +3,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import LavalampBackground from 'frontend/ui/LavalampBackground';
-import FloatingShapes from 'frontend/ui/LavalampBackground';
-import { BookOpen, GraduationCap, CheckCircle, Shield } from 'lucide-react';
+import FloatingShapes from '@/frontend/ui/themes/FloatingBlobs';
+import { BookOpen, GraduationCap, CheckCircle } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 type UserRole = 'student' | 'tutor-applicant';
 
@@ -27,7 +29,7 @@ export default function SignUp() {
     setError('');
     setSuccess('');
 
-    // Enhanced validation
+    // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       setIsLoading(false);
@@ -35,7 +37,7 @@ export default function SignUp() {
     }
 
     if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError('Password must be at least 6 characters');
       setIsLoading(false);
       return;
     }
@@ -47,55 +49,50 @@ export default function SignUp() {
     }
     
     try {
-      const payload = {
-        username: formData.username.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        // Don't send role - backend will default to 'student'
-      };
-
-      const response = await fetch('http://localhost:3001/api/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
         },
-        body: JSON.stringify(payload),
+        credentials: 'include',
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          email: formData.email.trim().toLowerCase(),
+          password: formData.password
+        }),
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        if (selectedRole === 'tutor-applicant') {
-          // For tutor applicants, redirect to tutor application page
-          setSuccess('Student account created! Redirecting to tutor application...');
-          setTimeout(() => {
-            router.push('/dashboard/apply-tutor');
-          }, 2000);
-        } else {
-          // For regular students, redirect to login
-          setSuccess('Account created successfully! Redirecting to login...');
-          setTimeout(() => {
-            router.push('/signin');
-          }, 2000);
-        }
-        
-        // Clear form
-        setFormData({
-          username: '',
-          email: '',
-          password: '',
-          confirmPassword: ''
-        });
-      } else {
-        // Enhanced error handling
-        setError(result.error || result.message || 'Registration failed. Please try again.');
+      if (!response.ok) {
+        throw new Error(result.error || 'Registration failed');
       }
-    } catch (error) {
+
+      if (!result.success) {
+        throw new Error(result.error || 'Registration failed');
+      }
+
+      setSuccess('✅ Account created! Redirecting to login...');
+      
+      // Clear form
+      setFormData({
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      });
+      
+      // Redirect to login after 2 seconds
+      setTimeout(() => {
+        router.push('/signin');
+      }, 2000);
+
+    } catch (error: any) {
       console.error('Registration error:', error);
-      setError('Unable to connect to server. Please try again later.');
+      setError(error.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const roleInfo = {
@@ -103,10 +100,10 @@ export default function SignUp() {
       title: 'Student',
       description: 'Access courses and learning resources',
       features: [
-        'All course materials',
-        'Learning dashboard',
-        'Study sessions',
-        'Tutor support'
+        'AI Chat Assistant',
+        'Live tutor support',
+        'Assignment dropbox',
+        'Learning dashboard'
       ],
       icon: BookOpen,
       color: 'blue',
@@ -117,7 +114,7 @@ export default function SignUp() {
       description: 'Start as a student and apply to tutor',
       features: [
         'Start learning immediately',
-        'Apply to tutor anytime',
+        'Apply to tutor after signup',
         'Verified status upon approval',
         'Earn while teaching'
       ],
@@ -143,7 +140,7 @@ export default function SignUp() {
           layout
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
-          {/* Left Side - Compact Form */}
+          {/* Left Side - Form */}
           <div className="w-72 p-6">
             {/* Header */}
             <div className="text-center mb-6">
@@ -155,7 +152,7 @@ export default function SignUp() {
               </p>
             </div>
 
-            {/* Role Selection - Compact */}
+            {/* Role Selection */}
             <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
               <button
                 type="button"
@@ -179,7 +176,7 @@ export default function SignUp() {
                 }`}
               >
                 <GraduationCap className="w-3 h-3 inline mr-1" />
-                Tutor
+                Tutor Applicant
               </button>
             </div>
 
@@ -204,121 +201,119 @@ export default function SignUp() {
               </motion.div>
             )}
 
-            {/* Student & Tutor Applicant Signup Form */}
-            <AnimatePresence mode="wait">
-              {(selectedRole === 'student' || selectedRole === 'tutor-applicant') && (
-                <motion.form
-                  key="signup-form"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  onSubmit={handleSubmit}
-                  className="space-y-3"
-                >
-                  <div>
-                    <input
-                      type="text"
-                      value={formData.username}
-                      onChange={(e) => setFormData({...formData, username: e.target.value})}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Username"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Email"
-                      disabled={isLoading}
-                    />
-                  </div>
-                  
-                  <div>
-                    <input
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Password (min. 6 characters)"
-                      minLength={6}
-                      disabled={isLoading}
-                    />
-                  </div>
+            {/* Signup Form */}
+            <motion.form
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleSubmit}
+              className="space-y-3"
+            >
+              <div>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Username"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Email"
+                  disabled={isLoading}
+                />
+              </div>
+              
+              <div>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  required
+                  minLength={6}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Password (min. 6 characters)"
+                  disabled={isLoading}
+                />
+              </div>
 
-                  <div>
-                    <input
-                      type="password"
-                      value={formData.confirmPassword}
-                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                      required
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Confirm Password"
-                      minLength={6}
-                      disabled={isLoading}
-                    />
-                  </div>
+              <div>
+                <input
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                  required
+                  minLength={6}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm Password"
+                  disabled={isLoading}
+                />
+              </div>
 
-                  <motion.button 
-                    type="submit" 
-                    disabled={isLoading}
-                    whileTap={{ scale: 0.95 }}
-                    className={`w-full ${
-                      selectedRole === 'student' 
-                        ? 'bg-blue-600 hover:bg-blue-700' 
-                        : 'bg-purple-600 hover:bg-purple-700'
-                    } text-white py-2 px-4 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-xs`}
-                  >
-                    {isLoading ? (
+              <motion.button 
+                type="submit" 
+                disabled={isLoading}
+                whileTap={{ scale: 0.95 }}
+                className={`w-full ${
+                  selectedRole === 'student' 
+                    ? 'bg-blue-600 hover:bg-blue-700' 
+                    : 'bg-purple-600 hover:bg-purple-700'
+                } text-white py-2 px-4 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-xs`}
+              >
+                {isLoading ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
+                    />
+                    Creating Account...
+                  </>
+                ) : (
+                  <>
+                    {selectedRole === 'student' ? (
                       <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
-                        />
-                        Creating Account...
+                        <BookOpen className="w-3 h-3" />
+                        Create Student Account
                       </>
                     ) : (
                       <>
-                        {selectedRole === 'student' ? (
-                          <>
-                            <BookOpen className="w-3 h-3" />
-                            Create Student Account
-                          </>
-                        ) : (
-                          <>
-                            <GraduationCap className="w-3 h-3" />
-                            Create Account & Apply to Tutor
-                          </>
-                        )}
+                        <GraduationCap className="w-3 h-3" />
+                        Create Account & Apply
                       </>
                     )}
-                  </motion.button>
-                </motion.form>
-              )}
-            </AnimatePresence>
+                  </>
+                )}
+              </motion.button>
+            </motion.form>
 
             {/* Sign in link */}
-            {(selectedRole === 'student' || selectedRole === 'tutor-applicant') && (
-              <div className="mt-4 pt-3 border-t border-gray-200 text-center">
-                <p className="text-gray-600 text-xs">
-                  Have an account?{' '}
-                  <a href="/signin" className="text-blue-600 hover:text-blue-700 font-medium">
-                    Sign in
-                  </a>
-                </p>
-              </div>
-            )}
+            <div className="mt-4 pt-3 border-t border-gray-200 text-center">
+              <p className="text-gray-600 text-xs">
+                Have an account?{' '}
+                <a href="/signin" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Sign in
+                </a>
+              </p>
+            </div>
+
+            {/* Note about role selection */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
+              <p className="font-medium mb-1">Note about Tutor Applicant:</p>
+              <p>Everyone starts as a student. After signing up, you can apply to become a tutor from your dashboard.</p>
+            </div>
           </div>
 
-          {/* Right Side - Compact Info Panel */}
-          <AnimatePresence>
+          {/* Right Side - Info Panel */}
+          <AnimatePresence mode="wait">
             <motion.div
               key={selectedRole}
               initial={{ opacity: 0, width: 0 }}
@@ -333,12 +328,16 @@ export default function SignUp() {
                   <motion.div
                     animate={{ y: [0, -10, 0] }}
                     transition={{ duration: 4, repeat: Infinity }}
-                    className={`absolute top-4 left-4 w-12 h-12 rounded-full bg-${currentRole.color}-300 blur-md`}
+                    className={`absolute top-4 left-4 w-12 h-12 rounded-full ${
+                      currentRole.color === 'blue' ? 'bg-blue-300' : 'bg-purple-300'
+                    } blur-md`}
                   />
                   <motion.div
                     animate={{ y: [0, 8, 0] }}
                     transition={{ duration: 5, repeat: Infinity, delay: 1 }}
-                    className={`absolute bottom-6 right-6 w-10 h-10 rounded-full bg-${currentRole.color}-400 blur-sm`}
+                    className={`absolute bottom-6 right-6 w-10 h-10 rounded-full ${
+                      currentRole.color === 'blue' ? 'bg-blue-400' : 'bg-purple-400'
+                    } blur-sm`}
                   />
                 </div>
 
@@ -351,16 +350,22 @@ export default function SignUp() {
                       animate={{ scale: 1 }}
                       className="inline-flex p-2 rounded-lg bg-white/20 backdrop-blur-sm border border-white/30"
                     >
-                      <IconComponent className={`w-6 h-6 text-${currentRole.color}-600`} />
+                      <IconComponent className={`w-6 h-6 ${
+                        currentRole.color === 'blue' ? 'text-blue-600' : 'text-purple-600'
+                      }`} />
                     </motion.div>
                   </div>
 
                   {/* Title & Description */}
                   <div className="text-center mb-4">
-                    <h2 className={`text-sm font-bold text-${currentRole.color}-900 mb-1`}>
+                    <h2 className={`text-sm font-bold ${
+                      currentRole.color === 'blue' ? 'text-blue-900' : 'text-purple-900'
+                    } mb-1`}>
                       {currentRole.title}
                     </h2>
-                    <p className={`text-${currentRole.color}-800 text-xs leading-relaxed`}>
+                    <p className={`${
+                      currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
+                    } text-xs leading-relaxed`}>
                       {currentRole.description}
                     </p>
                   </div>
@@ -375,8 +380,12 @@ export default function SignUp() {
                         transition={{ delay: index * 0.1 }}
                         className="flex items-start gap-2"
                       >
-                        <CheckCircle className={`w-3 h-3 text-${currentRole.color}-500 mt-0.5 flex-shrink-0`} />
-                        <span className={`text-${currentRole.color}-800 text-xs leading-tight`}>
+                        <CheckCircle className={`w-3 h-3 ${
+                          currentRole.color === 'blue' ? 'text-blue-500' : 'text-purple-500'
+                        } mt-0.5 flex-shrink-0`} />
+                        <span className={`${
+                          currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
+                        } text-xs leading-tight`}>
                           {feature}
                         </span>
                       </motion.div>
@@ -389,10 +398,12 @@ export default function SignUp() {
                     animate={{ opacity: 1 }}
                     className={`p-2 rounded-lg bg-white/30 backdrop-blur-sm border border-white/40`}
                   >
-                    <p className={`text-${currentRole.color}-800 text-xs text-center`}>
+                    <p className={`${
+                      currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
+                    } text-xs text-center`}>
                       {selectedRole === 'student' 
-                        ? 'Start learning immediately'
-                        : 'Apply to tutor after signup'
+                        ? 'Sign up → Login → Access dashboard'
+                        : 'Sign up → Login → Apply to tutor'
                       }
                     </p>
                   </motion.div>

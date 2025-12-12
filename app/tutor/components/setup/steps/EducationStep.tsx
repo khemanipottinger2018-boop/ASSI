@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/steps/EducationStep.tsx
+// app/dashboard/tutor/set./components/steps/EducationStep.tsx
 import { GraduationCap } from 'lucide-react';
 
 interface EducationStepProps {

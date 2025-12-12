@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/ErrorState.tsx
+// app/dashboard/tutor/set./components/ErrorState.tsx
 import { Shield } from 'lucide-react';
 
 interface ErrorStateProps {

@@ -1,287 +1,192 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { 
-  Home, Book, Users, MessageCircle, Menu, 
-  User, Settings, Bell, LogOut, LogIn, UserPlus 
-} from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Home, Book, Users, MessageCircle, Menu, User, Bell, LogOut, LogIn, UserPlus, Settings, LayoutDashboard, Shield, CheckCircle, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import LoginModal from '../ui/LoginModal';
-
-interface NavItem {
-  icon: React.ReactNode;
-  label: string;
-  href?: string;
-  onClick?: () => void;
-}
-
-interface UserData {
-  id: string;
-  username: string;
-  email: string;
-  role: 'student' | 'tutor' | 'admin';
-  profile_completed: boolean;
-}
+import SignupModal from '../ui/SignupModal';
 
 export default function Navbar() {
   const router = useRouter();
-  const pathname = usePathname();
+  const { user, logout, isLoading } = useAuth();
+
+  // State
   const [navOpen, setNavOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [user, setUser] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loginModalOpen, setLoginModalOpen] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
 
+  // Refs
   const navRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    checkAuth();
-    // Simulate notification count - replace with actual socket/data
-    setNotificationCount(3);
-  }, [pathname]);
-
-  const checkAuth = async () => {
-    try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user');
-
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-
-      if (!token) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      const response = await fetch('http://localhost:3001/api/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.user) {
-          setUser(result.user);
-          localStorage.setItem('user', JSON.stringify(result.user));
-        }
-      } else {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        setUser(null);
-      }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      setUser(null);
-    } finally {
-      setLoading(false);
+  // User helpers
+  const getUserInitial = useCallback(() => user?.username?.charAt(0).toUpperCase() || 'U', [user]);
+  const getUserColor = useCallback(() => {
+    if (!user) return 'from-blue-400 to-cyan-400';
+    switch (user.role) {
+      case 'admin': return 'from-orange-400 to-amber-400';
+      case 'tutor': return 'from-purple-400 to-violet-400';
+      case 'tutor-applicant': return 'from-gray-500 to-gray-600';
+      default: return 'from-green-400 to-emerald-400';
     }
-  };
+  }, [user]);
 
-  const handleLoginSuccess = () => {
-    checkAuth();
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-    setUser(null);
-    setUserMenuOpen(false);
-    router.push('/');
-  };
-
-  const handleNotificationsClick = () => {
-    // TODO: Implement notification panel or redirect
-    console.log('Notifications clicked');
-  };
-
-  // Navigation items for left dropdown
-  const navItems: NavItem[] = [
-    { icon: <Home size={18} />, label: 'Home', href: '/' },
-    { icon: <Book size={18} />, label: 'Browse Tutors', href: '/tutors/browse' },
-    { icon: <Users size={18} />, label: 'Live Chat', href: user ? '/tutors/browse' : '#', 
-      onClick: user ? undefined : () => setLoginModalOpen(true) },
-    { icon: <MessageCircle size={18} />, label: 'My Sessions', href: user ? `/dashboard/${user.role}` : '#',
-      onClick: user ? undefined : () => setLoginModalOpen(true) },
-  ];
-
-  // User menu items for right dropdown
-  const userMenuItems: NavItem[] = user ? [
-    { icon: <User size={18} />, label: 'Profile', href: `/dashboard/${user.role}/profile` },
-    { icon: <Settings size={18} />, label: 'Settings', href: `/dashboard/${user.role}/profile/edit` },
-    { icon: <Bell size={18} />, label: 'Notifications', href: '#' },
-    { icon: <LogOut size={18} />, label: 'Logout', onClick: handleLogout },
-  ] : [
-    { icon: <LogIn size={18} />, label: 'Login', onClick: () => setLoginModalOpen(true) },
-    { icon: <UserPlus size={18} />, label: 'Sign Up', href: '/signup' },
-  ];
-
-  // Close dropdowns when clicking outside
+  // Close menus on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (navRef.current && !navRef.current.contains(event.target as Node)) {
-        setNavOpen(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setUserMenuOpen(false);
-      }
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!navRef.current?.contains(target)) setNavOpen(false);
+      if (!userMenuRef.current?.contains(target)) setUserMenuOpen(false);
+      if (!notificationRef.current?.contains(target)) setNotificationOpen(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleNavClick = (item: NavItem) => {
-    if (item.onClick) item.onClick();
-    else if (item.href) router.push(item.href);
+  // Unified nav click handler
+  const handleNavClick = (path: string, requiresAuth = false) => {
+    if (requiresAuth && !user) {
+      setShowLoginModal(true);
+    } else {
+      router.push(path);
+    }
     setNavOpen(false);
   };
 
-  const handleUserMenuClick = (item: NavItem) => {
-    if (item.onClick) item.onClick();
-    else if (item.href) router.push(item.href);
+  // User menu click handler
+  const handleUserMenuClick = (path: string, requiresAuth = true) => {
+    if (requiresAuth && !user) {
+      setShowLoginModal(true);
+    } else {
+      router.push(path);
+    }
     setUserMenuOpen(false);
   };
 
-  // Smart background and text color detection
-  const isLightBackground = () => {
-    // Pages with light backgrounds
-    const lightBackgroundPages = [
-      '/tutors', '/tutors/browse', '/dashboard', '/signin', '/signup'
-    ];
-    return lightBackgroundPages.some(page => pathname.startsWith(page));
-  };
-
-  const getNavbarStyle = () => {
-    if (isLightBackground()) {
-      return {
-        background: 'bg-white/95 backdrop-blur-md',
-        text: 'text-gray-900',
-        border: 'border-b border-gray-200',
-        hover: 'hover:bg-gray-100 hover:text-gray-900'
-      };
-    } else {
-      return {
-        background: 'bg-black/20 backdrop-blur-md',
-        text: 'text-white',
-        border: 'border-b border-white/20',
-        hover: 'hover:bg-white/20 hover:text-white'
-      };
-    }
-  };
-
-  const style = getNavbarStyle();
+  if (isLoading) {
+    return (
+      <nav className="sticky top-0 z-50">
+        <div className="relative h-14 bg-white/5 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-4 max-w-7xl mx-auto">
+          <div className="w-6 h-6 bg-white/10 rounded animate-pulse" />
+          <div className="text-2xl font-bold text-white">ASSI</div>
+          <div className="w-8 h-8 bg-white/10 rounded-full animate-pulse" />
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <>
-      <nav className={`${style.background} ${style.border} sticky top-0 z-40 transition-all duration-300`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14">
-            
-            {/* Left Navigation Dropdown */}
-            <div className="relative" ref={navRef}>
-              <button
-                onClick={() => setNavOpen(!navOpen)}
-                className={`p-2 rounded-lg transition-colors duration-200 ${style.text} ${style.hover}`}
-              >
-                <Menu size={20} />
-              </button>
+      <nav className="sticky top-0 z-50 bg-white/8 backdrop-blur-xl">
+        <div className="relative h-14 max-w-7xl mx-auto px-4 flex items-center justify-between">
 
-              <AnimatePresence>
-                {navOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, x: -10 }}
-                    animate={{ opacity: 1, y: 0, x: 0 }}
-                    exit={{ opacity: 0, y: -10, x: -10 }}
-                    className="absolute left-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                  >
-                    {navItems.map((item, index) => (
-                      <button
-                        key={item.label}
-                        onClick={() => handleNavClick(item)}
-                        className="flex items-center space-x-3 w-full px-4 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 text-sm"
-                      >
-                        {item.icon}
-                        <span className="font-medium">{item.label}</span>
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+          {/* LEFT: Hamburger Menu */}
+          <div className="relative" ref={navRef}>
+            <motion.button
+              whileHover={{ scale: 1.05, y: -1 }}
+              whileTap={{ scale: 0.95, y: 0 }}
+              onClick={() => setNavOpen(!navOpen)}
+              className="relative p-2 rounded-lg"
+            >
+              <Menu size={20} className="text-white" />
+            </motion.button>
 
-            {/* Center Logo - ASSI */}
-            <Link href="/" className="flex items-center">
-              <span className={`text-xl font-semibold ${style.text} tracking-tight`}>
-                ASSI
-              </span>
-            </Link>
-
-            {/* Right User Menu */}
-            <div className="relative" ref={userMenuRef}>
-              {loading ? (
-                <div className="w-8 h-8 bg-gray-300 rounded-full animate-pulse" />
-              ) : user ? (
-                <div className="flex items-center space-x-2">
-                  {/* Notification Bell */}
-                  <button 
-                    onClick={handleNotificationsClick}
-                    className={`p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover} relative`}
-                  >
-                    <Bell size={18} />
-                    {/* Notification Badge */}
-                    {notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                        {notificationCount}
-                      </span>
-                    )}
-                  </button>
-                  
-                  {/* User Avatar */}
-                  <button
-                    onClick={() => setUserMenuOpen(!userMenuOpen)}
-                    className={`flex items-center space-x-2 p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover}`}
-                  >
-                    <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-sm">
-                      <User size={14} className="text-white" />
-                    </div>
-                    <span className={`font-medium text-sm hidden sm:block ${style.text}`}>
-                      {user.username}
-                    </span>
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className={`p-1.5 rounded-lg transition-colors duration-200 ${style.text} ${style.hover}`}
+            <AnimatePresence>
+              {navOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="absolute left-0 top-full mt-2 w-56 rounded-lg shadow-2xl z-50 overflow-hidden bg-white/12 backdrop-blur-xl border border-white/15"
                 >
-                  <User size={20} />
-                </button>
+                  <button onClick={() => handleNavClick('/')} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                    <div className="flex items-center space-x-3"><Home size={18} className="text-white" /><span className="text-white font-medium">Home</span></div>
+                    <ChevronRight size={14} className="text-white/70" />
+                  </button>
+
+                  <button onClick={() => handleNavClick('/tutors')} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                    <div className="flex items-center space-x-3"><Users size={18} className="text-white" /><span className="text-white font-medium">Tutors</span></div>
+                    <ChevronRight size={14} className="text-white/70" />
+                  </button>
+
+                  <button onClick={() => handleNavClick('/live-chat', true)} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                    <div className="flex items-center space-x-3"><MessageCircle size={18} className="text-white" /><span className="text-white font-medium">Live Chat</span></div>
+                    <ChevronRight size={14} className="text-white/70" />
+                  </button>
+                </motion.div>
               )}
+            </AnimatePresence>
+          </div>
+
+          {/* CENTER: Logo */}
+          <Link href="/">
+            <motion.h1 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="text-2xl font-bold text-white tracking-tight cursor-pointer">
+              ASSI
+            </motion.h1>
+          </Link>
+
+          {/* RIGHT: User + Notifications */}
+          <div className="flex items-center space-x-2">
+            {/* Notifications */}
+            {user && (
+              <div className="relative" ref={notificationRef}>
+                <motion.button onClick={() => setNotificationOpen(!notificationOpen)} className="relative p-2 rounded-lg">
+                  <Bell size={18} className="text-white" />
+                </motion.button>
+                {/* Notification panel omitted for brevity */}
+              </div>
+            )}
+
+            {/* User Menu */}
+            <div className="relative" ref={userMenuRef}>
+              <motion.button onClick={() => setUserMenuOpen(!userMenuOpen)} className="relative p-2 rounded-lg">
+                {user ? (
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-r ${getUserColor()} flex items-center justify-center`}>
+                    <span className="text-white font-bold text-sm">{getUserInitial()}</span>
+                  </div>
+                ) : <User size={18} className="text-white" />}
+              </motion.button>
 
               <AnimatePresence>
                 {userMenuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, x: 10 }}
-                    animate={{ opacity: 1, y: 0, x: 0 }}
-                    exit={{ opacity: 0, y: -10, x: 10 }}
-                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50"
-                  >
-                    {userMenuItems.map((item, index) => (
-                      <button
-                        key={item.label}
-                        onClick={() => handleUserMenuClick(item)}
-                        className="flex items-center space-x-3 w-full px-4 py-2.5 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-200 text-sm"
-                      >
-                        {item.icon}
-                        <span className="font-medium">{item.label}</span>
-                      </button>
-                    ))}
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute right-0 top-full mt-2 w-56 rounded-lg shadow-2xl z-50 overflow-hidden bg-white/12 backdrop-blur-xl border border-white/15">
+                    {!user ? (
+                      <>
+                        <button onClick={() => { setShowLoginModal(true); setUserMenuOpen(false); }} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                          <div className="flex items-center space-x-3"><LogIn size={18} className="text-white" /><span className="text-white font-medium">Login</span></div>
+                          <ChevronRight size={14} className="text-white/70" />
+                        </button>
+                        <button onClick={() => { setShowSignupModal(true); setUserMenuOpen(false); }} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                          <div className="flex items-center space-x-3"><UserPlus size={18} className="text-white" /><span className="text-white font-medium">Sign Up</span></div>
+                          <ChevronRight size={14} className="text-white/70" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {/* Dashboard */}
+                        <button onClick={() => handleUserMenuClick(user.role === 'admin' ? '/admin/dashboard' : user.role === 'tutor' ? '/dashboard/tutor' : '/dashboard/student')} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                          <div className="flex items-center space-x-3">{user.role === 'admin' ? <Shield size={18} className="text-white" /> : <LayoutDashboard size={18} className="text-white" />}<span className="text-white font-medium">Dashboard</span></div>
+                          <ChevronRight size={14} className="text-white/70" />
+                        </button>
+
+                        {/* Profile */}
+                        <button onClick={() => handleUserMenuClick('/profile')} className="flex items-center justify-between w-full px-4 py-3 hover:bg-white/10">
+                          <div className="flex items-center space-x-3"><User size={14} className="text-white" /><span className="text-white font-medium">Profile</span></div>
+                          <ChevronRight size={14} className="text-white/70" />
+                        </button>
+
+                        {/* Logout */}
+                        <button onClick={() => { logout(); setUserMenuOpen(false); }} className="flex items-center justify-between w-full px-4 py-3 text-red-600 hover:text-red-700 hover:bg-white/5">
+                          <div className="flex items-center space-x-3"><LogOut size={18} className="text-red-400" /><span className="font-medium">Logout</span></div>
+                          <ChevronRight size={14} className="text-red-400/70" />
+                        </button>
+                      </>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -290,12 +195,9 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Login Modal */}
-      <LoginModal 
-        isOpen={loginModalOpen} 
-        onClose={() => setLoginModalOpen(false)}
-        onSuccess={handleLoginSuccess}
-      />
+      {/* Modals */}
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} onSuccess={() => setShowLoginModal(false)} switchToSignup={() => { setShowLoginModal(false); setTimeout(() => setShowSignupModal(true), 200); }} />
+      <SignupModal isOpen={showSignupModal} onClose={() => setShowSignupModal(false)} switchToLogin={() => { setShowSignupModal(false); setTimeout(() => setShowLoginModal(true), 200); }} />
     </>
   );
 }

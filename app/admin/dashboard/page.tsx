@@ -8,14 +8,14 @@ import {
   UserActivity, 
   OnlineUser, 
   AdminTab 
-} from './types/admin';
-import AdminHeader from './components/AdminHeader';
-import StatsGrid from './components/StatsGrid';
-import QuickActions from './components/QuickActions';
-import UsersTable from './components/UsersTable';
-import ActivityTable from './components/ActivityTable';
-import OnlineUsersTable from './components/OnlineUsersTable';
-import ApplicationsPanel from './components/ApplicationsPanel';
+} from '../types/admin';
+import AdminHeader from '../components/dashboard/AdminHeader';
+import StatsGrid from '../components/dashboard/StatsGrid';
+import QuickActions from '../components/dashboard/QuickActions';
+import UsersTable from '../components/dashboard/UsersTable';
+import ActivityTable from '../components/dashboard/ActivityTable';
+import OnlineUsersTable from '../components/dashboard/OnlineUsersTable';
+import ApplicationsPanel from '../components/dashboard/ApplicationsPanel';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');

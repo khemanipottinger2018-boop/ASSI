@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useChat } from '../../../../contexts/chat/ChatContext';
-import LiveChatSession from '../../../../shared/components/live-chat/LiveChatSession';
+import LiveChatSession from '../../../shared/components/live-chat/LiveChatSession';
 import ChatRequestNotification from '../../components/live-chat/ChatRequestNotification';
 
 export default function TutorLiveChatPage() {
@@ -11,15 +11,15 @@ export default function TutorLiveChatPage() {
 
   // Auto-join the first active session if available
   useEffect(() => {
-    const activeSession = chatSessions.find(session => 
+    const firstActiveSession = chatSessions.find(session => 
       session.status === 'active' || session.status === 'accepted'
     );
     
-    if (activeSession && !activeSession) {
-      setActiveSession(activeSession);
-      joinChatSession(activeSession.session_id);
+    if (firstActiveSession && !activeSession) {
+      setActiveSession(firstActiveSession);
+      joinChatSession(firstActiveSession.session_id);
     }
-  }, [chatSessions, joinChatSession]);
+  }, [chatSessions, joinChatSession, activeSession]);
 
   const handleJoinSession = (session: any) => {
     setActiveSession(session);
@@ -92,7 +92,7 @@ export default function TutorLiveChatPage() {
                     >
                       <div className="flex items-center space-x-2 mb-2">
                         <div className="w-6 h-6 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                          {request.student_name.charAt(0)}
+                          {request.student_name?.charAt(0)}
                         </div>
                         <span className="text-white text-sm font-medium">
                           {request.student_name}
@@ -142,7 +142,7 @@ export default function TutorLiveChatPage() {
                       >
                         <div className="flex items-center space-x-2 mb-1">
                           <div className="w-6 h-6 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                            {session.student_name.charAt(0)}
+                            {session.student_name?.charAt(0)}
                           </div>
                           <span className="text-white text-sm font-medium">
                             {session.student_name}

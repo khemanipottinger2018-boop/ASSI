@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/NavigationButtons.tsx
+// app/dashboard/tutor/set./components/NavigationButtons.tsx
 import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
 
 interface NavigationButtonsProps {

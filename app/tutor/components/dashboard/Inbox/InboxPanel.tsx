@@ -1,7 +1,5 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { useChat } from '../../../../contexts/chat/ChatContext';
+import { useChat } from '../../../../../contexts/chat/ChatContext';
 
 interface Conversation {
   id: string;
@@ -17,7 +15,7 @@ export default function InboxPanel() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const { activeSession, chatMessages, sendMessage } = useChat();
+  const { activeSession, messages, sendMessage } = useChat();
 
   // Fetch conversations for inbox
   useEffect(() => {

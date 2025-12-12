@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useChat } from '../../../contexts/chat/ChatContext';
+import { useChat } from '../../contexts/chat/ChatContext';
 
 interface Tutor {
   tutor_id: string;

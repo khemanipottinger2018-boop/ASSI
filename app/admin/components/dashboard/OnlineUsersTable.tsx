@@ -1,5 +1,5 @@
-// app/dashboard/admin/components/OnlineUsersTable.tsx
-import { OnlineUser } from '../types/admin';
+// app/dashboard/adm./components/OnlineUsersTable.tsx
+import { OnlineUser } from '../../types/admin';
 import { Wifi, Globe, Clock, User } from 'lucide-react';
 
 interface OnlineUsersTableProps {

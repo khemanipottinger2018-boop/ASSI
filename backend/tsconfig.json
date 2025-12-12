@@ -1,29 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "allowJs": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "noImplicitAny": false,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
+    "target": "ES2022",                       
+    "lib": ["ES2022"],                        
+    "module": "ESNext",            
+    "moduleResolution": "node",               // Use Node resolution for imports
+    "allowSyntheticDefaultImports": true,     
+    "esModuleInterop": true,                  // Required for commonjs interop
+    "allowJs": false,                          // Keep strict TS only for backend
+    "outDir": "./dist",                        // Build output folder
+    "rootDir": "./src",                        // Source folder
+    "strict": true,                            // Enable all strict checks
+    "noImplicitAny": false,                    // Optional, relax if needed
+    "resolveJsonModule": true,                 // Allow importing JSON
+    "skipLibCheck": true,                      // Skip types check for node_modules
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "baseUrl": "./src",  // ✅ Add this for cleaner imports
-    "paths": {           // ✅ Optional: path aliases
-      "@/*": ["./*"],
-      "@/config/*": ["./config/*"],
-      "@/routes/*": ["./routes/*"],
-      "@/middleware/*": ["./middleware/*"]
-    }
+    "declaration": true,                       // Generate .d.ts files
+    "declarationMap": true,                    // Map declarations
+    "sourceMap": true,                          // Enable source maps
+    "baseUrl": ".",                             // For paths
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["node"],                         // Node types
+    "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": [
     "src/**/*"

@@ -1,4 +1,4 @@
-// app/dashboard/admin/components/QuickActions.tsx
+// app/dashboard/adm./components/QuickActions.tsx
 import { Users, FileText, UserCheck, Settings, Shield, Rocket } from 'lucide-react';
 
 interface QuickActionsProps {

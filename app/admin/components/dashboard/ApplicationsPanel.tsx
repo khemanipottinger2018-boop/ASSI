@@ -1,4 +1,4 @@
-// app/dashboard/admin/components/ApplicationsPanel.tsx
+// app/dashboard/adm./components/ApplicationsPanel.tsx
 import { useState, useEffect } from 'react';
 import { FileText, Clock, CheckCircle, XCircle, User, Calendar, Mail, BookOpen, GraduationCap, Award } from 'lucide-react';
 

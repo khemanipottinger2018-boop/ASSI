@@ -1,258 +1,380 @@
-// backend/src/routes/tutorApplications.ts
+// backend/src/routes/tutor-applications.ts
 import express from 'express';
-import { getPool } from '../config/database.js';
-import { authenticateToken, authorizeRoles } from '../middleware/auth.js';
-import { Request, Response } from 'express';
-import sql from 'mssql';
+import { db } from '@/config/database';
+import { authenticate, AuthRequest, requireAdmin } from '@/middleware/auth';
 
 const router = express.Router();
 
-// Age verification utility function
-const calculateAgeFromDOB = (birthDate: string): number => {
-  const today = new Date();
-  const birth = new Date(birthDate);
-  let age = today.getFullYear() - birth.getFullYear();
-  const monthDiff = today.getMonth() - birth.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-    age--;
-  }
-  return age;
-};
-
-// Age verification middleware
-const verifyAgeMiddleware = (req: Request, res: Response, next: Function) => {
-  const { birth_date } = req.body;
-
-  if (!birth_date) {
-    return res.status(400).json({
-      success: false,
-      error: 'Date of birth is required for age verification'
-    });
-  }
-
-  const age = calculateAgeFromDOB(birth_date);
-  
-  if (age < 18) {
-    return res.status(403).json({
-      success: false,
-      error: 'You must be 18 years or older to become a tutor. Current age: ' + age
-    });
-  }
-
-  next();
-};
-
-// Apply to become a tutor - UPDATED WITH AGE VERIFICATION
-router.post('/apply', authenticateToken, verifyAgeMiddleware, async (req: Request, res: Response) => {
+// ==================== SUBMIT APPLICATION ====================
+router.post('/submit', authenticate, async (req: AuthRequest, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required'
-      });
-    }
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
     
-    const userId = req.user.id;
     const { 
-      subjects, 
-      education_background, 
+      education_background,
       teaching_experience,
       why_tutor,
       qualifications,
-      birth_date  // NEW: Added birth_date from request body
+      birth_date,
+      subjects // Array of subject UUIDs
     } = req.body;
 
-    const pool = await getPool();
-
-    // Check if user already has an application
-    const existingApp = await pool.request()
-      .input('user_id', sql.VarChar, userId)
-      .query('SELECT application_id FROM TutorApplications WHERE user_id = @user_id AND status IN (\'pending\', \'approved\')');
-
-    if (existingApp.recordset.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'You already have a pending or approved tutor application'
+    // Validation
+    if (!education_background || !teaching_experience || !why_tutor || !birth_date) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'All required fields: education_background, teaching_experience, why_tutor, birth_date' 
       });
     }
 
-    // Calculate age for database storage
-    const age = calculateAgeFromDOB(birth_date);
+    // Check if already a tutor
+    if (userRole === 'tutor') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Already a tutor' 
+      });
+    }
 
-    // Create tutor application - UPDATED WITH BIRTH_DATE AND AGE
-    const result = await pool.request()
-      .input('user_id', sql.VarChar, userId)
-      .input('education_background', sql.VarChar, education_background)
-      .input('teaching_experience', sql.VarChar, teaching_experience)
-      .input('why_tutor', sql.VarChar, why_tutor)
-      .input('qualifications', sql.VarChar, qualifications)
-      .input('birth_date', sql.Date, birth_date)  // NEW
-      .input('age', sql.Int, age)  // NEW
-      .query(`
-        INSERT INTO TutorApplications (
-          user_id, education_background, teaching_experience, 
-          why_tutor, qualifications, birth_date, age, status, applied_at
-        ) 
-        OUTPUT INSERTED.application_id
-        VALUES (
-          @user_id, @education_background, @teaching_experience,
-          @why_tutor, @qualifications, @birth_date, @age, 'pending', GETDATE()
-        )
-      `);
+    // Check if already applied
+    const existingApp = await db.queryOne<{ application_id: string }>(
+      `SELECT application_id FROM TutorApplications 
+       WHERE user_id = @user_id AND status = 'pending'`,
+      { user_id: userId }
+    );
 
-    const applicationId = result.recordset[0].application_id;
+    if (existingApp) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Already applied. Please wait for review.' 
+      });
+    }
 
-    // Add subjects to application (existing code)
+    // Submit application
+    const result = await db.query<{ application_id: string }>(
+      `INSERT INTO TutorApplications (
+        user_id, education_background, teaching_experience, 
+        why_tutor, qualifications, birth_date, status, applied_at
+      ) 
+      OUTPUT INSERTED.application_id
+      VALUES (
+        @user_id, @education_background, @teaching_experience,
+        @why_tutor, @qualifications, @birth_date, 'pending', GETDATE()
+      )`,
+      {
+        user_id: userId,
+        education_background: education_background || '',
+        teaching_experience: teaching_experience || '',
+        why_tutor: why_tutor || '',
+        qualifications: qualifications || '',
+        birth_date: birth_date
+      }
+    );
+
+    const applicationId = result[0]?.application_id;
+
+    // Add subjects (if provided)
     if (subjects && Array.isArray(subjects)) {
       for (const subjectId of subjects) {
-        await pool.request()
-          .input('application_id', sql.VarChar, applicationId)
-          .input('subject_id', sql.VarChar, subjectId)
-          .query(`
-            INSERT INTO ApplicationSubjects (application_id, subject_id)
-            VALUES (@application_id, @subject_id)
-          `);
+        await db.query(
+          `INSERT INTO ApplicationSubjects (application_id, subject_id) 
+           VALUES (@application_id, @subject_id)`,
+          {
+            application_id: applicationId,
+            subject_id: subjectId
+          }
+        );
       }
     }
 
-    res.json({
-      success: true,
-      message: 'Tutor application submitted successfully',
-      data: { 
-        application_id: applicationId,
-        age_verified: true,
-        age: age
-      }
-    });
-
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error creating tutor application:', errorMessage);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to submit tutor application',
-      details: errorMessage
-    });
-  }
-});
-
-// Update other routes to include age information in responses...
-
-// Get all pending applications (admin only) - UPDATED
-router.get('/pending', authenticateToken, authorizeRoles(['admin']), async (req: Request, res: Response) => {
-  try {
-    const pool = await getPool();
-
-    const result = await pool.request().query(`
-      SELECT 
-        ta.application_id, ta.user_id, ta.education_background,
-        ta.teaching_experience, ta.why_tutor, ta.qualifications,
-        ta.birth_date, ta.age,  -- NEW
-        ta.applied_at, ta.reviewed_at, ta.review_notes,
-        u.username, u.email, u.created_at as user_joined
-      FROM TutorApplications ta
-      INNER JOIN Users u ON ta.user_id = u.id
-      WHERE ta.status = 'pending'
-      ORDER BY ta.applied_at ASC
-    `);
-
-    // Get subjects for each application (existing code)
-    const applicationsWithSubjects = await Promise.all(
-      result.recordset.map(async (app: any) => {
-        const subjectsResult = await pool.request()
-          .input('application_id', sql.VarChar, app.application_id)
-          .query(`
-            SELECT s.subject_id, s.name, s.level
-            FROM ApplicationSubjects aps
-            INNER JOIN Subjects s ON aps.subject_id = s.subject_id
-            WHERE aps.application_id = @application_id
-          `);
-
-        return {
-          ...app,
-          subjects: subjectsResult.recordset
-        };
-      })
+    // Update user role to tutor-applicant
+    await db.query(
+      `UPDATE Users SET role = 'tutor-applicant' WHERE id = @user_id`,
+      { user_id: userId }
     );
 
     res.json({
       success: true,
-      data: applicationsWithSubjects,
-      count: applicationsWithSubjects.length
+      applicationId,
+      message: 'Tutor application submitted! Admins will review it soon.'
     });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching pending applications:', errorMessage);
+  } catch (error: any) {
+    console.error('Submit application error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to fetch pending applications',
-      details: errorMessage
+      error: 'Failed to submit application' 
     });
   }
 });
 
-// Check user's application status - UPDATED
-router.get('/my-application', authenticateToken, async (req: Request, res: Response) => {
+// ==================== GET MY APPLICATION ====================
+router.get('/my-application', authenticate, async (req: AuthRequest, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required'
+    const userId = req.user!.id;
+
+    const application = await db.queryOne<{
+      application_id: string;
+      status: string;
+      education_background?: string;
+      teaching_experience?: string;
+      why_tutor?: string;
+      qualifications?: string;
+      birth_date: string;
+      age_verified: boolean;
+      applied_at: Date;
+      reviewed_at?: Date;
+      review_notes?: string;
+    }>(
+      `SELECT application_id, status, education_background, teaching_experience,
+              why_tutor, qualifications, birth_date, age_verified, age_verified_at,
+              applied_at, reviewed_at, review_notes
+       FROM TutorApplications 
+       WHERE user_id = @user_id
+       ORDER BY applied_at DESC`,
+      { user_id: userId }
+    );
+
+    if (!application) {
+      return res.json({ 
+        success: true, 
+        hasApplication: false 
       });
     }
-    
-    const userId = req.user.id;
-    const pool = await getPool();
 
-    const result = await pool.request()
-      .input('user_id', sql.VarChar, userId)
-      .query(`
-        SELECT 
-          application_id, status, education_background,
-          teaching_experience, why_tutor, qualifications,
-          birth_date, age,  -- NEW
-          applied_at, reviewed_at, review_notes
-        FROM TutorApplications 
-        WHERE user_id = @user_id
-        ORDER BY applied_at DESC
-      `);
-
-    if (result.recordset.length === 0) {
-      return res.json({
-        success: true,
-        data: null
-      });
-    }
-
-    const application = result.recordset[0];
-
-    // Get subjects for the application
-    const subjectsResult = await pool.request()
-      .input('application_id', sql.VarChar, application.application_id)
-      .query(`
-        SELECT s.subject_id, s.name, s.level
-        FROM ApplicationSubjects aps
-        INNER JOIN Subjects s ON aps.subject_id = s.subject_id
-        WHERE aps.application_id = @application_id
-      `);
+    // Get subjects for this application
+    const subjects = await db.query<{
+      subject_id: string;
+      name: string;
+      level: string;
+    }>(
+      `SELECT s.subject_id, s.name, s.level
+       FROM ApplicationSubjects aps
+       JOIN Subjects s ON aps.subject_id = s.subject_id
+       WHERE aps.application_id = @application_id`,
+      { application_id: application.application_id }
+    );
 
     res.json({
       success: true,
-      data: {
+      hasApplication: true,
+      application: {
         ...application,
-        subjects: subjectsResult.recordset
+        subjects: subjects.map(s => ({
+          id: s.subject_id,
+          name: s.name,
+          level: s.level
+        }))
       }
     });
 
-  } catch (err: unknown) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-    console.error('Error fetching user application:', errorMessage);
+  } catch (error: any) {
+    console.error('Get my application error:', error);
     res.status(500).json({ 
       success: false, 
-      error: 'Failed to fetch application status',
-      details: errorMessage
+      error: 'Failed to fetch application' 
+    });
+  }
+});
+
+// ==================== ADMIN: GET PENDING APPLICATIONS ====================
+router.get('/admin/pending', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const applications = await db.query<{
+      application_id: string;
+      user_id: string;
+      username: string;
+      email: string;
+      education_background?: string;
+      teaching_experience?: string;
+      why_tutor?: string;
+      qualifications?: string;
+      birth_date: string;
+      applied_at: Date;
+    }>(
+      `SELECT 
+        ta.application_id, ta.user_id, ta.education_background,
+        ta.teaching_experience, ta.why_tutor, ta.qualifications,
+        ta.birth_date, ta.applied_at,
+        u.username, u.email
+       FROM TutorApplications ta
+       JOIN Users u ON ta.user_id = u.id
+       WHERE ta.status = 'pending'
+       ORDER BY ta.applied_at ASC`,
+      {}
+    );
+
+    res.json({
+      success: true,
+      applications
+    });
+
+  } catch (error: any) {
+    console.error('Get pending applications error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to fetch applications' 
+    });
+  }
+});
+
+// ==================== ADMIN: APPROVE APPLICATION ====================
+router.post('/admin/approve/:applicationId', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { review_notes } = req.body;
+
+    // Get application
+    const application = await db.queryOne<{
+      user_id: string;
+      status: string;
+    }>(
+      `SELECT user_id, status FROM TutorApplications 
+       WHERE application_id = @application_id`,
+      { application_id: applicationId }
+    );
+
+    if (!application) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Application not found' 
+      });
+    }
+
+    if (application.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Application already reviewed' 
+      });
+    }
+
+    // Update application
+    await db.query(
+      `UPDATE TutorApplications 
+       SET status = 'approved', reviewed_at = GETDATE(), 
+           review_notes = @review_notes, age_verified = 1, age_verified_at = GETDATE()
+       WHERE application_id = @application_id`,
+      {
+        application_id: applicationId,
+        review_notes: review_notes || 'Application approved'
+      }
+    );
+
+    // Change user role to tutor
+    await db.query(
+      `UPDATE Users SET role = 'tutor' WHERE id = @user_id`,
+      { user_id: application.user_id }
+    );
+
+    // Create tutor profile
+    await db.query(
+      `INSERT INTO Tutors (user_id, is_available, is_student_tutor, chat_mode, max_concurrent_chats)
+       VALUES (@user_id, 0, 1, 'request', 1)`,
+      { user_id: application.user_id }
+    );
+
+    // Get subjects from application and add to TutorSubjects
+    const subjects = await db.query<{ subject_id: string }>(
+      `SELECT subject_id FROM ApplicationSubjects WHERE application_id = @application_id`,
+      { application_id: applicationId }
+    );
+
+    const tutor = await db.queryOne<{ tutor_id: string }>(
+      `SELECT tutor_id FROM Tutors WHERE user_id = @user_id`,
+      { user_id: application.user_id }
+    );
+
+    if (tutor && subjects.length > 0) {
+      for (const subject of subjects) {
+        await db.query(
+          `INSERT INTO TutorSubjects (tutor_id, subject_id) 
+           VALUES (@tutor_id, @subject_id)`,
+          {
+            tutor_id: tutor.tutor_id,
+            subject_id: subject.subject_id
+          }
+        );
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Application approved successfully'
+    });
+
+  } catch (error: any) {
+    console.error('Approve application error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to approve application' 
+    });
+  }
+});
+
+// ==================== ADMIN: REJECT APPLICATION ====================
+router.post('/admin/reject/:applicationId', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { review_notes } = req.body;
+
+    if (!review_notes || review_notes.trim().length < 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Review notes required (min 5 characters)' 
+      });
+    }
+
+    // Get application
+    const application = await db.queryOne<{
+      user_id: string;
+      status: string;
+    }>(
+      `SELECT user_id, status FROM TutorApplications 
+       WHERE application_id = @application_id`,
+      { application_id: applicationId }
+    );
+
+    if (!application) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Application not found' 
+      });
+    }
+
+    if (application.status !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Application already reviewed' 
+      });
+    }
+
+    // Update application
+    await db.query(
+      `UPDATE TutorApplications 
+       SET status = 'rejected', reviewed_at = GETDATE(), review_notes = @review_notes
+       WHERE application_id = @application_id`,
+      {
+        application_id: applicationId,
+        review_notes: review_notes
+      }
+    );
+
+    // Change user role back to student
+    await db.query(
+      `UPDATE Users SET role = 'student' WHERE id = @user_id`,
+      { user_id: application.user_id }
+    );
+
+    res.json({
+      success: true,
+      message: 'Application rejected'
+    });
+
+  } catch (error: any) {
+    console.error('Reject application error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to reject application' 
     });
   }
 });

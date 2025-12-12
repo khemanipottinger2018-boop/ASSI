@@ -1,4 +1,4 @@
-// app/dashboard/tutor/setup/components/steps/ProfileStep.tsx
+// app/dashboard/tutor/set./components/steps/ProfileStep.tsx
 import { User } from 'lucide-react';
 
 interface ProfileStepProps {

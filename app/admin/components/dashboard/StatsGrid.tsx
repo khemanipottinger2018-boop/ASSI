@@ -1,6 +1,6 @@
-// app/dashboard/admin/components/StatsGrid.tsx
+// app/dashboard/adm./components/StatsGrid.tsx
 import { Users, UserCheck, TrendingUp, FileText, Clock, Zap } from 'lucide-react';
-import { DashboardStats } from '../types/admin';
+import { DashboardStats } from '../../types/admin';
 
 interface StatsGridProps {
   stats: DashboardStats;

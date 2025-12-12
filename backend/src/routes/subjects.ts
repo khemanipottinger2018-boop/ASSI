@@ -1,131 +1,199 @@
-import express, { Request, Response } from 'express';
-import { getPool } from '../config/database.js';
+import express from 'express';
+import { db } from '@/config/database';
 
 const router = express.Router();
 
-console.log('📚 Subjects route file executed!');
-
-interface Subject {
-  subject_id: string;
-  name: string;
-  level: 'CSEC' | 'CAPE';
-}
-
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  count?: number;
-}
-
-// GET /api/subjects - Get all subjects
-router.get('/', async (req: Request, res: Response<ApiResponse<Subject[]>>) => {
-  console.log('📚 Fetching all subjects from database...');
-  
+// ==================== PUBLIC ROUTE (NO AUTH) ====================
+router.get('/public', async (req, res) => {
   try {
-    const pool = await getPool();
-    
-    // Test database connection first
-    const healthCheck = await pool.request().query('SELECT 1 as health_check');
-    if (!healthCheck.recordset[0]?.health_check) {
-      throw new Error('Database health check failed');
-    }
-    
-    console.log('✅ Database connection healthy, querying subjects...');
-    
-    const query = `
-      SELECT subject_id, name, level 
-      FROM subjects 
-      ORDER BY name
+    const subjects = await db.query<{
+      subject_id: string;
+      name: string;
+      level: string;
+      tutorCount: number;
+    }>(
+      `SELECT 
+          s.subject_id, 
+          s.name, 
+          s.level, 
+          COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       GROUP BY s.subject_id, s.name, s.level
+       ORDER BY s.level, s.name`,
+      {}
+    );
+
+    res.json({
+      success: true,
+      subjects,
+      count: subjects.length
+    });
+
+  } catch (error: any) {
+    console.error('Get public subjects error:', error);
+    res.json({ success: true, subjects: [], count: 0 });
+  }
+});
+
+// ==================== PROTECTED ROUTES ====================
+
+// GET /api/subjects - All subjects (optional level filter)
+router.get('/', async (req, res) => {
+  try {
+    const { level } = req.query;
+
+    let query = `
+      SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+      FROM Subjects s
+      LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+      WHERE 1=1
     `;
-    
-    const result = await pool.request().query(query);
-    
-    console.log(`✅ Found ${result.recordset.length} subjects`);
-    
-    // Validate we have subjects
-    if (!result.recordset || result.recordset.length === 0) {
-      console.warn('⚠️ No subjects found in database');
-      return res.json({
-        success: true,
-        data: [],
-        count: 0
-      });
+    const params: Record<string, any> = {};
+
+    if (level && (level === 'CSEC' || level === 'CAPE')) {
+      query += ' AND s.level = @level';
+      params.level = level;
     }
-    
-    res.json({
-      success: true,
-      data: result.recordset,
-      count: result.recordset.length
-    });
-    
+
+    query += ' GROUP BY s.subject_id, s.name, s.level ORDER BY s.level, s.name';
+
+    const subjects = await db.query(query, params);
+
+    res.json({ success: true, subjects, count: subjects.length });
+
   } catch (error: any) {
-    console.error('❌ Error fetching subjects:', error);
-    
-    // More specific error messages
-    let errorMessage = 'Failed to fetch subjects from database';
-    if (error.message?.includes('health check failed')) {
-      errorMessage = 'Database connection failed';
-    } else if (error.message?.includes('Invalid object name')) {
-      errorMessage = 'Subjects table does not exist';
-    } else if (error.message?.includes('Login failed')) {
-      errorMessage = 'Database authentication failed';
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: errorMessage
-    });
+    console.error('Get subjects error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch subjects' });
   }
 });
 
-// Test endpoint with detailed diagnostics
-router.get('/test', async (req: Request, res: Response) => {
-  console.log('✅ /api/subjects/test endpoint called');
-  
+// GET /api/subjects/by-level/:level
+router.get('/by-level/:level', async (req, res) => {
   try {
-    const pool = await getPool();
-    const healthResult = await pool.request().query('SELECT 1 as health_check');
-    const tableCheck = await pool.request().query(`
-      SELECT COUNT(*) as subject_count FROM information_schema.tables 
-      WHERE table_name = 'subjects'
-    `);
-    
-    const tableExists = tableCheck.recordset[0]?.subject_count > 0;
-    
-    res.json({ 
-      success: true, 
-      message: 'Subjects test endpoint is working!',
-      database: {
-        connected: healthResult.recordset[0]?.health_check === 1,
-        subjects_table_exists: tableExists
-      },
-      timestamp: new Date().toISOString()
-    });
+    const { level } = req.params;
+    if (level !== 'CSEC' && level !== 'CAPE') {
+      return res.status(400).json({ success: false, error: 'Invalid level' });
+    }
+
+    const subjects = await db.query(
+      `SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       WHERE s.level = @level
+       GROUP BY s.subject_id, s.name, s.level
+       ORDER BY s.name`,
+      { level }
+    );
+
+    res.json({ success: true, subjects, level, count: subjects.length });
+
   } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: 'Test failed: ' + error.message
-    });
+    console.error('Get subjects by level error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch subjects' });
   }
 });
 
-// Health check endpoint
-router.get('/health', async (req: Request, res: Response) => {
+// GET /api/subjects/:subjectId
+router.get('/:subjectId', async (req, res) => {
   try {
-    const pool = await getPool();
-    const result = await pool.request().query('SELECT 1 as health_check');
-    
-    res.json({
-      success: true,
-      database: result.recordset[0]?.health_check === 1 ? 'connected' : 'disconnected',
-      timestamp: new Date().toISOString()
-    });
+    const { subjectId } = req.params;
+
+    const subject = await db.queryOne(
+      `SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       WHERE s.subject_id = @subjectId
+       GROUP BY s.subject_id, s.name, s.level`,
+      { subjectId }
+    );
+
+    if (!subject) return res.status(404).json({ success: false, error: 'Subject not found' });
+
+    res.json({ success: true, subject });
+
   } catch (error: any) {
-    res.status(503).json({
-      success: false,
-      error: 'Database health check failed: ' + error.message
-    });
+    console.error('Get subject by ID error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch subject' });
+  }
+});
+
+// GET /api/subjects/grouped/by-level
+router.get('/grouped/by-level', async (req, res) => {
+  try {
+    const subjects = await db.query(
+      `SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       GROUP BY s.subject_id, s.name, s.level
+       ORDER BY s.level, s.name`,
+      {}
+    );
+
+    const grouped = subjects.reduce((acc: Record<string, any[]>, subject) => {
+      if (!acc[subject.level]) acc[subject.level] = [];
+      acc[subject.level].push(subject);
+      return acc;
+    }, {});
+
+    res.json({ success: true, subjects: grouped, total: subjects.length });
+
+  } catch (error: any) {
+    console.error('Get grouped subjects error:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch subjects' });
+  }
+});
+
+// GET /api/subjects/search/:query
+router.get('/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ success: false, error: 'Query too short' });
+    }
+
+    const subjects = await db.query(
+      `SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       WHERE s.name LIKE @query
+       GROUP BY s.subject_id, s.name, s.level
+       ORDER BY s.level, s.name`,
+      { query: `%${query}%` }
+    );
+
+    res.json({ success: true, subjects, query, count: subjects.length });
+
+  } catch (error: any) {
+    console.error('Search subjects error:', error);
+    res.status(500).json({ success: false, error: 'Failed to search subjects' });
+  }
+});
+
+// GET /api/subjects/popular
+router.get('/popular', async (req, res) => {
+  try {
+    const popularSubjects = await db.query(
+      `SELECT 
+          s.subject_id, s.name, s.level, COUNT(ts.tutor_id) AS tutorCount
+       FROM Subjects s
+       LEFT JOIN TutorSubjects ts ON s.subject_id = ts.subject_id
+       GROUP BY s.subject_id, s.name, s.level
+       ORDER BY tutorCount DESC
+       LIMIT 10`,
+      {}
+    );
+
+    res.json({ success: true, subjects: popularSubjects });
+
+  } catch (error: any) {
+    console.error('Get popular subjects error:', error);
+    res.json({ success: true, subjects: [] });
   }
 });
 
