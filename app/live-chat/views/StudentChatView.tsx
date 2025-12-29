@@ -10,7 +10,7 @@ import { useChatSocket } from '../hooks/useChatSocket';
 import { useChatMessages } from '../hooks/useChatMessages';
 import { useTyping } from '../hooks/useTyping';
 
-export default function StudentChatView() {
+export default function StudentChatView({ chatId }: { chatId: string }) {
   const { user } = useAuth();
 
   if (!user) {
@@ -21,7 +21,6 @@ export default function StudentChatView() {
     );
   }
 
-  const chatId = 'demo-session';
   const currentUserId = user.id;
 
   /* -------------------------------------------

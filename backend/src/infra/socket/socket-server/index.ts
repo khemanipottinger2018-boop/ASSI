@@ -26,14 +26,14 @@ export async function createSocketServer(httpServer: any) {
     },
   });
 
-  /* ---------------------------------------------------
-   * SOCKET AUTH (LOCKED)
-   * --------------------------------------------------- */
+  /* =====================================================
+   * SOCKET AUTH
+   * ===================================================== */
   io.use(socketAuthMiddleware);
 
-  /* ---------------------------------------------------
+  /* =====================================================
    * REDIS ADAPTER
-   * --------------------------------------------------- */
+   * ===================================================== */
   const pubClient = createClient({ url: process.env.REDIS_URL });
   const subClient = pubClient.duplicate();
 
@@ -42,14 +42,14 @@ export async function createSocketServer(httpServer: any) {
 
   io.adapter(createAdapter(pubClient, subClient));
 
-  /* ---------------------------------------------------
+  /* =====================================================
    * CONNECTION
-   * --------------------------------------------------- */
+   * ===================================================== */
   io.on('connection', async (socket) => {
     const { userId, role } = socket as AuthenticatedSocket;
 
     /* ---------------------------------------------------
-     * GLOBAL USER ROOM (Slack / Discord pattern)
+     * GLOBAL USER ROOM
      * --------------------------------------------------- */
     socket.join(`user:${userId}`);
 
@@ -60,6 +60,13 @@ export async function createSocketServer(httpServer: any) {
     const markActive = () => redisService.updateLastSeen(userId);
 
     socket.emit('presence:self', { userId, role });
+
+    /* ---------------------------------------------------
+     * STAGE 8.2 — TUTOR AVAILABILITY REGISTRY
+     * --------------------------------------------------- */
+    if (role === 'tutor') {
+      await redisService.client.sAdd('tutors:online', userId);
+    }
 
     /* ---------------------------------------------------
      * CHAT JOIN
@@ -84,6 +91,25 @@ export async function createSocketServer(httpServer: any) {
         chatId,
         participants,
       });
+
+      /* -----------------------------------------------
+       * STAGE 8.2 — STUDENT TRIGGERS TUTOR NOTIFICATION
+       * ----------------------------------------------- */
+      if (role === 'student') {
+        const tutors = await redisService.client.sMembers(
+          'tutors:online'
+        );
+
+        for (const tutorId of tutors) {
+          io.to(`user:${tutorId}`).emit(
+            'tutor:chat_available',
+            {
+              chatId,
+              studentId: userId,
+            }
+          );
+        }
+      }
     });
 
     /* ---------------------------------------------------
@@ -138,7 +164,10 @@ export async function createSocketServer(httpServer: any) {
           if (!content)
             return ack?.({ ok: false, error: 'Empty message' });
           if (content.length > 4000)
-            return ack?.({ ok: false, error: 'Message too long' });
+            return ack?.({
+              ok: false,
+              error: 'Message too long',
+            });
 
           if (payload.clientMsgId) {
             const dedupeKey = `chat:dedupe:${chatId}:${payload.clientMsgId}`;
@@ -185,7 +214,7 @@ export async function createSocketServer(httpServer: any) {
     );
 
     /* ---------------------------------------------------
-     * CHAT SYNC (Reconnect safety)
+     * CHAT SYNC
      * --------------------------------------------------- */
     socket.on(
       'chat:sync',
@@ -204,7 +233,10 @@ export async function createSocketServer(httpServer: any) {
         try {
           const chatId = payload?.chatId?.trim();
           if (!chatId)
-            return ack?.({ ok: false, error: 'chatId required' });
+            return ack?.({
+              ok: false,
+              error: 'chatId required',
+            });
 
           const afterSeq = payload.afterSeq ?? 0;
           const limit = Math.min(
@@ -232,6 +264,73 @@ export async function createSocketServer(httpServer: any) {
             ok: false,
             error: 'Failed to sync messages',
           });
+        }
+      }
+    );
+
+    /* ---------------------------------------------------
+     * TUTOR ACCEPT CHAT (Stage 8.2)
+     * --------------------------------------------------- */
+    socket.on(
+      'tutor:accept_chat',
+      async (
+        payload: { chatId: string },
+        ack?: (res: { ok: boolean; error?: string }) => void
+      ) => {
+        if (role !== 'tutor') {
+          return ack?.({
+            ok: false,
+            error: 'Not authorized',
+          });
+        }
+
+        const chatId = payload?.chatId?.trim();
+        if (!chatId) {
+          return ack?.({
+            ok: false,
+            error: 'chatId required',
+          });
+        }
+
+        const lockKey = `chat:assign:${chatId}`;
+        const locked = await redisService.acquireLock(
+          lockKey,
+          5
+        );
+
+        if (!locked) {
+          return ack?.({
+            ok: false,
+            error: 'Chat already being assigned',
+          });
+        }
+
+        try {
+          const assigned = await redisService.client.get(
+            `chat:assignedTutor:${chatId}`
+          );
+
+          if (assigned) {
+            return ack?.({
+              ok: false,
+              error: 'Chat already assigned',
+            });
+          }
+
+          await redisService.client.set(
+            `chat:assignedTutor:${chatId}`,
+            userId
+          );
+
+          socket.join(chatId);
+
+          io.to(chatId).emit('chat:tutor_joined', {
+            tutorId: userId,
+          });
+
+          return ack?.({ ok: true });
+        } finally {
+          await redisService.releaseLock(lockKey);
         }
       }
     );
@@ -268,7 +367,7 @@ export async function createSocketServer(httpServer: any) {
     });
 
     /* ---------------------------------------------------
-     * DISCONNECT (Stage 8.1 FINAL)
+     * DISCONNECT
      * --------------------------------------------------- */
     socket.on('disconnect', async () => {
       const chatIds = await redisService.client.sMembers(
@@ -281,9 +380,10 @@ export async function createSocketServer(httpServer: any) {
           userId
         );
 
-        const participants = await redisService.client.sMembers(
-          `chat:participants:${chatId}`
-        );
+        const participants =
+          await redisService.client.sMembers(
+            `chat:participants:${chatId}`
+          );
 
         io.to(chatId).emit('chat:presence', {
           chatId,
@@ -294,6 +394,13 @@ export async function createSocketServer(httpServer: any) {
       await redisService.client.del(
         `user:live_sessions:${userId}`
       );
+
+      if (role === 'tutor') {
+        await redisService.client.sRem(
+          'tutors:online',
+          userId
+        );
+      }
     });
   });
 

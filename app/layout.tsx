@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./styles/globals.css";
-import { SocketProvider } from "../contexts/SocketContext";
 import { AuthProvider } from "../contexts/AuthContext";
 import Navbar from "../frontend/components/Navbar";
-import LavalampBackground from "../frontend/ui/LavalampBackground";
 import AnimatedGradient from "../frontend/ui/themes/AnimatedGradient";
 import FloatingShapes from "../frontend/ui/themes/FloatingBlobs";
 
@@ -44,14 +42,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${inter.variable} font-sans antialiased min-h-screen relative`}>
         {/* ================= BACKGROUNDS ================= */}
-        <LavalampBackground />
         <AnimatedGradient />
         <FloatingShapes />
 
         {/* ================= CONTENT ================= */}
         <div className="relative z-10 min-h-screen flex flex-col">
           <AuthProvider>
-            <SocketProvider>
               {/* Navbar */}
               <Navbar />
 
@@ -78,7 +74,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </div>
                 </div>
               </footer>
-            </SocketProvider>
           </AuthProvider>
         </div>
       </body>

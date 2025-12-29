@@ -216,7 +216,6 @@ export default function StudentDashboard() {
               <h2 className="text-lg font-semibold text-gray-900">Messages</h2>
               <Mail className="h-5 w-5 text-gray-400" />
             </div>
-            <StudentMessages />
           </div>
         </div>
       </div>
