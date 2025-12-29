@@ -49,40 +49,69 @@ export async function createSocketServer(httpServer: any) {
     const { userId, role } = socket as AuthenticatedSocket;
 
     /* ---------------------------------------------------
-     * GLOBAL USER ROOM (Slack/Discord pattern)
+     * GLOBAL USER ROOM (Slack / Discord pattern)
      * --------------------------------------------------- */
     socket.join(`user:${userId}`);
 
     /* ---------------------------------------------------
-     * PRESENCE (Stage 2 – TTL-based)
+     * PRESENCE (TTL + realtime)
      * --------------------------------------------------- */
     await redisService.updateLastSeen(userId);
     const markActive = () => redisService.updateLastSeen(userId);
 
+    socket.emit('presence:self', { userId, role });
+
     /* ---------------------------------------------------
-     * CHAT ROOMS (generic join)
+     * CHAT JOIN
      * --------------------------------------------------- */
     socket.on('chat:join', async (chatId: string) => {
+      if (!chatId) return;
+
       socket.join(chatId);
       markActive();
 
-      await redisService.client.sAdd(
-        `user:live_sessions:${userId}`,
-        chatId
-      );
-    });
+      await redisService.client
+        .multi()
+        .sAdd(`user:live_sessions:${userId}`, chatId)
+        .sAdd(`chat:participants:${chatId}`, userId)
+        .exec();
 
-    socket.on('chat:leave', async (chatId: string) => {
-      socket.leave(chatId);
-
-      await redisService.client.sRem(
-        `user:live_sessions:${userId}`,
-        chatId
+      const participants = await redisService.client.sMembers(
+        `chat:participants:${chatId}`
       );
+
+      io.to(chatId).emit('chat:presence', {
+        chatId,
+        participants,
+      });
     });
 
     /* ---------------------------------------------------
-     * CHAT SEND (Stage 4 – reliable, ordered, acked)
+     * CHAT LEAVE
+     * --------------------------------------------------- */
+    socket.on('chat:leave', async (chatId: string) => {
+      if (!chatId) return;
+
+      socket.leave(chatId);
+
+      await redisService.client
+        .multi()
+        .sRem(`user:live_sessions:${userId}`, chatId)
+        .sRem(`chat:participants:${chatId}`, userId)
+        .exec();
+
+      const participants = await redisService.client.sMembers(
+        `chat:participants:${chatId}`
+      );
+
+      io.to(chatId).emit('chat:presence', {
+        chatId,
+        participants,
+      });
+    });
+
+    /* ---------------------------------------------------
+     * CHAT SEND (Reliable, ordered, ACKed)
      * --------------------------------------------------- */
     socket.on(
       'chat:send',
@@ -111,7 +140,6 @@ export async function createSocketServer(httpServer: any) {
           if (content.length > 4000)
             return ack?.({ ok: false, error: 'Message too long' });
 
-          // Optional dedupe (double-send protection)
           if (payload.clientMsgId) {
             const dedupeKey = `chat:dedupe:${chatId}:${payload.clientMsgId}`;
             const first = await redisService.client.set(
@@ -145,7 +173,6 @@ export async function createSocketServer(httpServer: any) {
             .exec();
 
           io.to(chatId).emit('chat:new', message);
-
           return ack?.({ ok: true, message });
         } catch (err) {
           console.error('chat:send error', err);
@@ -158,7 +185,7 @@ export async function createSocketServer(httpServer: any) {
     );
 
     /* ---------------------------------------------------
-     * CHAT SYNC (Stage 4 – replay / reconnect safety)
+     * CHAT SYNC (Reconnect safety)
      * --------------------------------------------------- */
     socket.on(
       'chat:sync',
@@ -241,92 +268,32 @@ export async function createSocketServer(httpServer: any) {
     });
 
     /* ---------------------------------------------------
-     * TUTOR JOIN SESSION (Stage 5 – concurrency enforced)
+     * DISCONNECT (Stage 8.1 FINAL)
      * --------------------------------------------------- */
-    socket.on(
-      'tutor:join_session',
-      async (
-        payload: {
-          sessionId: string;
-          maxConcurrentChats: number;
-        },
-        ack?: (res: { ok: boolean; error?: string }) => void
-      ) => {
-        if (role !== 'tutor' && role !== 'admin') {
-          return ack?.({ ok: false, error: 'Not authorized' });
-        }
+    socket.on('disconnect', async () => {
+      const chatIds = await redisService.client.sMembers(
+        `user:live_sessions:${userId}`
+      );
 
-        const sessionId = payload?.sessionId?.trim();
-        const max = payload?.maxConcurrentChats ?? 1;
-
-        if (!sessionId)
-          return ack?.({ ok: false, error: 'sessionId required' });
-
-        const lockKey = `tutor:${userId}`;
-        const locked = await redisService.acquireLock(lockKey, 5);
-
-        if (!locked)
-          return ack?.({ ok: false, error: 'Tutor is busy, retry' });
-
-        try {
-          const activeCount =
-            await redisService.getTutorActiveCount(userId);
-
-          if (activeCount >= max) {
-            return ack?.({
-              ok: false,
-              error: 'Tutor is at capacity',
-            });
-          }
-
-          await redisService.addTutorActiveSession(
-            userId,
-            sessionId
-          );
-
-          socket.join(sessionId);
-          markActive();
-
-          return ack?.({ ok: true });
-        } finally {
-          await redisService.releaseLock(lockKey);
-        }
-      }
-    );
-
-    /* ---------------------------------------------------
-     * TUTOR LEAVE SESSION (Stage 5)
-     * --------------------------------------------------- */
-    socket.on(
-      'tutor:leave_session',
-      async (
-        payload: { sessionId: string },
-        ack?: (res: { ok: boolean; error?: string }) => void
-      ) => {
-        if (role !== 'tutor' && role !== 'admin') {
-          return ack?.({ ok: false, error: 'Not authorized' });
-        }
-
-        const sessionId = payload?.sessionId?.trim();
-        if (!sessionId)
-          return ack?.({ ok: false, error: 'sessionId required' });
-
-        await redisService.removeTutorActiveSession(
-          userId,
-          sessionId
+      for (const chatId of chatIds) {
+        await redisService.client.sRem(
+          `chat:participants:${chatId}`,
+          userId
         );
 
-        socket.leave(sessionId);
+        const participants = await redisService.client.sMembers(
+          `chat:participants:${chatId}`
+        );
 
-        return ack?.({ ok: true });
+        io.to(chatId).emit('chat:presence', {
+          chatId,
+          participants,
+        });
       }
-    );
 
-    /* ---------------------------------------------------
-     * DISCONNECT
-     * --------------------------------------------------- */
-    socket.on('disconnect', () => {
-      // Presence expires naturally via Redis TTL
+      await redisService.client.del(
+        `user:live_sessions:${userId}`
+      );
     });
   });
 
