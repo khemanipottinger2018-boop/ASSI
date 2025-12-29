@@ -5,6 +5,8 @@ import { ReactNode } from 'react';
 interface ChatShellProps {
   children: ReactNode;
   connected: boolean;
+  participants?: string[];
+  tutorJoined?: boolean;
 }
 
 export default function ChatShell({
