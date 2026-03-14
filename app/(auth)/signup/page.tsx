@@ -1,418 +1,310 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import LavalampBackground from 'frontend/ui/LavalampBackground';
-import FloatingShapes from '@/frontend/ui/themes/FloatingBlobs';
-import { BookOpen, GraduationCap, CheckCircle } from 'lucide-react';
+import { BookOpen, Sparkles } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-type UserRole = 'student' | 'tutor-applicant';
+type DemoCredentials = {
+  username: string;
+  email: string;
+  password: string;
+};
 
 export default function SignUp() {
-  const [selectedRole, setSelectedRole] = useState<UserRole>('student');
-  const [formData, setFormData] = useState({
+  const router = useRouter();
+  const { user } = useAuth();
+
+  const [form, setForm] = useState({
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (user) router.replace('/');
+  }, [user, router]);
+
+  const update = (key: keyof typeof form, value: string) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsLoading(true);
+    if (loading || demoLoading) return;
+
     setError('');
     setSuccess('');
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setIsLoading(false);
+    const username = form.username.trim();
+    const email = form.email.trim().toLowerCase();
+
+    if (!username) {
+      setError('Username is required.');
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      setIsLoading(false);
+    if (!email) {
+      setError('Email is required.');
       return;
     }
 
-    if (!formData.username.trim() || !formData.email.trim()) {
-      setError('Username and email are required');
-      setIsLoading(false);
+    if (form.password !== form.confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
-    
+
+    if (form.password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      const response = await fetch(`${API_URL}/api/auth/register`, {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          username: formData.username.trim(),
-          email: formData.email.trim().toLowerCase(),
-          password: formData.password
+          username,
+          email,
+          password: form.password,
         }),
       });
 
-      const result = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Registration failed');
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Registration failed.');
       }
 
-      if (!result.success) {
-        throw new Error(result.error || 'Registration failed');
-      }
+      setSuccess('Account created successfully. Redirecting to sign in…');
 
-      setSuccess('✅ Account created! Redirecting to login...');
-      
-      // Clear form
-      setFormData({
-        username: '',
-        email: '',
-        password: '',
-        confirmPassword: ''
-      });
-      
-      // Redirect to login after 2 seconds
       setTimeout(() => {
-        router.push('/signin');
-      }, 2000);
-
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      setError(error.message || 'Registration failed. Please try again.');
+        router.replace('/signin');
+      }, 900);
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }
 
-  const roleInfo = {
-    student: {
-      title: 'Student',
-      description: 'Access courses and learning resources',
-      features: [
-        'AI Chat Assistant',
-        'Live tutor support',
-        'Assignment dropbox',
-        'Learning dashboard'
-      ],
-      icon: BookOpen,
-      color: 'blue',
-      gradient: 'from-blue-500/10 to-cyan-500/10'
-    },
-    'tutor-applicant': {
-      title: 'Tutor Applicant',
-      description: 'Start as a student and apply to tutor',
-      features: [
-        'Start learning immediately',
-        'Apply to tutor after signup',
-        'Verified status upon approval',
-        'Earn while teaching'
-      ],
-      icon: GraduationCap,
-      color: 'purple',
-      gradient: 'from-purple-500/10 to-pink-500/10'
+  async function handleGenerateDemo() {
+    if (loading || demoLoading) return;
+
+    setError('');
+    setSuccess('');
+
+    setDemoLoading(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          isDemo: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Demo account generation failed.');
+      }
+
+      const creds = data.credentials as DemoCredentials | undefined;
+
+      if (!creds?.email || !creds?.password || !creds?.username) {
+        throw new Error('Demo credentials were not returned.');
+      }
+
+      sessionStorage.setItem(
+        'assi_demo_credentials',
+        JSON.stringify({
+          username: creds.username,
+          email: creds.email,
+          password: creds.password,
+          expiresAt: data.expiresAt ?? null,
+        })
+      );
+
+      setSuccess('Demo account generated. Redirecting to sign in…');
+
+      setTimeout(() => {
+        router.push('/signin?demo=1');
+      }, 700);
+    } catch (err: any) {
+      setError(err?.message || 'Could not generate demo account.');
+    } finally {
+      setDemoLoading(false);
     }
-  };
-
-  const currentRole = roleInfo[selectedRole];
-  const IconComponent = currentRole.icon;
+  }
 
   return (
-    <main className="min-h-screen relative overflow-hidden pt-16">
-      <LavalampBackground theme="caribbean-vibrant" />
-      <FloatingShapes theme="caribbean-vibrant" />
-      
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex gap-0 bg-white/95 backdrop-blur-sm rounded-xl border border-gray-100 shadow-xl overflow-hidden"
-          layout
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        >
-          {/* Left Side - Form */}
-          <div className="w-72 p-6">
-            {/* Header */}
-            <div className="text-center mb-6">
-              <h1 className="text-xl font-bold text-gray-900 mb-1">
-                Join ASSI
-              </h1>
-              <p className="text-gray-500 text-xs">
-                Choose your path
-              </p>
-            </div>
+    <main className="app-background min-h-screen overflow-y-auto flex items-start justify-center px-4 py-16">
+      <div className="animate-blob fixed top-[-10%] left-[-10%] w-96 h-96 bg-white/10 blur-3xl pointer-events-none" />
+      <div className="animate-blob-reverse fixed bottom-[-10%] right-[-10%] w-80 h-80 bg-white/10 blur-3xl pointer-events-none" />
 
-            {/* Role Selection */}
-            <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setSelectedRole('student')}
-                className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                  selectedRole === 'student'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <BookOpen className="w-3 h-3 inline mr-1" />
-                Student
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedRole('tutor-applicant')}
-                className={`flex-1 py-2 px-3 rounded-md text-xs font-medium transition-all ${
-                  selectedRole === 'tutor-applicant'
-                    ? 'bg-white text-purple-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <GraduationCap className="w-3 h-3 inline mr-1" />
-                Tutor Applicant
-              </button>
-            </div>
-
-            {/* Messages */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg mb-4 text-xs"
-              >
-                ⚠️ {error}
-              </motion.div>
-            )}
-
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg mb-4 text-xs"
-              >
-                ✅ {success}
-              </motion.div>
-            )}
-
-            {/* Signup Form */}
-            <motion.form
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              onSubmit={handleSubmit}
-              className="space-y-3"
-            >
-              <div>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Username"
-                  disabled={isLoading}
-                />
-              </div>
-              
-              <div>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Email"
-                  disabled={isLoading}
-                />
-              </div>
-              
-              <div>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  required
-                  minLength={6}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Password (min. 6 characters)"
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div>
-                <input
-                  type="password"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  required
-                  minLength={6}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Confirm Password"
-                  disabled={isLoading}
-                />
-              </div>
-
-              <motion.button 
-                type="submit" 
-                disabled={isLoading}
-                whileTap={{ scale: 0.95 }}
-                className={`w-full ${
-                  selectedRole === 'student' 
-                    ? 'bg-blue-600 hover:bg-blue-700' 
-                    : 'bg-purple-600 hover:bg-purple-700'
-                } text-white py-2 px-4 rounded-lg font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-xs`}
-              >
-                {isLoading ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-3 h-3 border-2 border-white border-t-transparent rounded-full"
-                    />
-                    Creating Account...
-                  </>
-                ) : (
-                  <>
-                    {selectedRole === 'student' ? (
-                      <>
-                        <BookOpen className="w-3 h-3" />
-                        Create Student Account
-                      </>
-                    ) : (
-                      <>
-                        <GraduationCap className="w-3 h-3" />
-                        Create Account & Apply
-                      </>
-                    )}
-                  </>
-                )}
-              </motion.button>
-            </motion.form>
-
-            {/* Sign in link */}
-            <div className="mt-4 pt-3 border-t border-gray-200 text-center">
-              <p className="text-gray-600 text-xs">
-                Have an account?{' '}
-                <a href="/signin" className="text-blue-600 hover:text-blue-700 font-medium">
-                  Sign in
-                </a>
-              </p>
-            </div>
-
-            {/* Note about role selection */}
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-              <p className="font-medium mb-1">Note about Tutor Applicant:</p>
-              <p>Everyone starts as a student. After signing up, you can apply to become a tutor from your dashboard.</p>
-            </div>
+      <motion.div
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="glass rounded-3xl p-8 w-full max-w-md"
+      >
+        <div className="flex flex-col items-center mb-8 gap-3">
+          <div className="glass-soft w-12 h-12 rounded-2xl flex items-center justify-center">
+            <BookOpen size={20} className="text-white/80" />
           </div>
+          <div className="text-center">
+            <h1 className="text-white font-semibold text-xl tracking-tight">
+              Create your account
+            </h1>
+            <p className="text-white/50 text-sm mt-1">
+              Start learning in a calm, supportive space
+            </p>
+          </div>
+        </div>
 
-          {/* Right Side - Info Panel */}
-          <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
+          {error && (
             <motion.div
-              key={selectedRole}
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 240 }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="overflow-hidden"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="mb-5 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs"
             >
-              <div className={`w-60 h-full relative overflow-hidden bg-gradient-to-br ${currentRole.gradient}`}>
-                {/* Abstract Background */}
-                <div className="absolute inset-0 opacity-15">
-                  <motion.div
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 4, repeat: Infinity }}
-                    className={`absolute top-4 left-4 w-12 h-12 rounded-full ${
-                      currentRole.color === 'blue' ? 'bg-blue-300' : 'bg-purple-300'
-                    } blur-md`}
-                  />
-                  <motion.div
-                    animate={{ y: [0, 8, 0] }}
-                    transition={{ duration: 5, repeat: Infinity, delay: 1 }}
-                    className={`absolute bottom-6 right-6 w-10 h-10 rounded-full ${
-                      currentRole.color === 'blue' ? 'bg-blue-400' : 'bg-purple-400'
-                    } blur-sm`}
-                  />
-                </div>
-
-                {/* Content */}
-                <div className="relative z-10 p-4 h-full flex flex-col">
-                  {/* Icon */}
-                  <div className="text-center mb-4">
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="inline-flex p-2 rounded-lg bg-white/20 backdrop-blur-sm border border-white/30"
-                    >
-                      <IconComponent className={`w-6 h-6 ${
-                        currentRole.color === 'blue' ? 'text-blue-600' : 'text-purple-600'
-                      }`} />
-                    </motion.div>
-                  </div>
-
-                  {/* Title & Description */}
-                  <div className="text-center mb-4">
-                    <h2 className={`text-sm font-bold ${
-                      currentRole.color === 'blue' ? 'text-blue-900' : 'text-purple-900'
-                    } mb-1`}>
-                      {currentRole.title}
-                    </h2>
-                    <p className={`${
-                      currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
-                    } text-xs leading-relaxed`}>
-                      {currentRole.description}
-                    </p>
-                  </div>
-
-                  {/* Features */}
-                  <div className="flex-1 space-y-2 mb-3">
-                    {currentRole.features.map((feature, index) => (
-                      <motion.div
-                        key={feature}
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="flex items-start gap-2"
-                      >
-                        <CheckCircle className={`w-3 h-3 ${
-                          currentRole.color === 'blue' ? 'text-blue-500' : 'text-purple-500'
-                        } mt-0.5 flex-shrink-0`} />
-                        <span className={`${
-                          currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
-                        } text-xs leading-tight`}>
-                          {feature}
-                        </span>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* Bottom Note */}
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className={`p-2 rounded-lg bg-white/30 backdrop-blur-sm border border-white/40`}
-                  >
-                    <p className={`${
-                      currentRole.color === 'blue' ? 'text-blue-800' : 'text-purple-800'
-                    } text-xs text-center`}>
-                      {selectedRole === 'student' 
-                        ? 'Sign up → Login → Access dashboard'
-                        : 'Sign up → Login → Apply to tutor'
-                      }
-                    </p>
-                  </motion.div>
-                </div>
-              </div>
+              {error}
             </motion.div>
-          </AnimatePresence>
-        </motion.div>
-      </div>
+          )}
+
+          {success && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              className="mb-5 px-3 py-2.5 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-xs"
+            >
+              {success}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <input
+            required
+            disabled={loading || demoLoading}
+            placeholder="Username"
+            value={form.username}
+            onChange={(e) => update('username', e.target.value)}
+            autoComplete="username"
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
+          />
+
+          <input
+            required
+            type="email"
+            disabled={loading || demoLoading}
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => update('email', e.target.value)}
+            autoComplete="email"
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
+          />
+
+          <input
+            required
+            type="password"
+            disabled={loading || demoLoading}
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => update('password', e.target.value)}
+            autoComplete="new-password"
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
+          />
+
+          <input
+            required
+            type="password"
+            disabled={loading || demoLoading}
+            placeholder="Confirm password"
+            value={form.confirmPassword}
+            onChange={(e) => update('confirmPassword', e.target.value)}
+            autoComplete="new-password"
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
+          />
+
+          <motion.button
+            type="submit"
+            disabled={loading || demoLoading}
+            whileTap={{ scale: 0.98 }}
+            className="w-full py-3 rounded-xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 disabled:opacity-50 transition flex items-center justify-center gap-2 mt-1"
+          >
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                Creating account…
+              </>
+            ) : (
+              'Create account'
+            )}
+          </motion.button>
+        </form>
+
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[10px] uppercase tracking-[0.18em] text-white/25">
+            Or explore first
+          </span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGenerateDemo}
+          disabled={loading || demoLoading}
+          className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white/80 hover:text-white transition disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10"
+        >
+          {demoLoading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+              Generating demo account…
+            </>
+          ) : (
+            <>
+              <Sparkles size={16} className="text-white/70" />
+              Generate demo account
+            </>
+          )}
+        </button>
+
+        <div className="mt-4 glass-soft rounded-xl px-3 py-2.5 text-xs text-white/35 text-center leading-relaxed">
+          Everyone starts as a student. Tutor applications are available from your dashboard.
+        </div>
+
+        <p className="mt-5 text-center text-xs text-white/30">
+          Already have an account?{' '}
+          <Link
+            href="/signin"
+            className="text-white/60 hover:text-white font-medium transition"
+          >
+            Sign in
+          </Link>
+        </p>
+      </motion.div>
     </main>
   );
 }
