@@ -1,152 +1,149 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import FloatingShapes from '../frontend/ui/themes/FloatingBlobs';
-import AnimatedQuote from '../frontend/ui/AnimatedQuote';
-import ServiceSelector from '../frontend/ui/service-selector/ServiceSelector';
+import { ArrowRight, MessageCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import ServiceSelector from '@/components/service-selector/ServiceSelector';
+import TutorHomeSelector from '@/components/tutor/TutorHomeSelector';
 
-export default function Home() {
-  const [currentPhase, setCurrentPhase] = useState<'loading' | 'quote' | 'selection'>('loading');
-  const [currentTheme, setCurrentTheme] = useState('caribbean-vibrant');
+const UNDERCOVER_KEY = 'sentinel:undercover';
 
-  // Initial loading -> quote
+/* ── Landing ── */
+const stagger = {
+  container: { hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } } },
+  item: {
+    hidden: { opacity: 0, y: 14 },
+    show:   { opacity: 1, y: 0, transition: { duration: 0.45, ease: 'easeOut' as const } },
+  },
+};
+
+function LandingView() {
+  const router = useRouter();
+  return (
+    <motion.div variants={stagger.container} initial="hidden" animate="show"
+      className="w-full max-w-[520px] mx-auto">
+      <div className="panel rounded-2xl px-10 py-12 text-center">
+        <motion.p variants={stagger.item} className="text-white/50 text-xs font-semibold tracking-widest uppercase mb-5">
+          Welcome to
+        </motion.p>
+        <motion.h1 variants={stagger.item} className="text-5xl font-bold text-white mb-3 tracking-tight">
+          ASSI
+        </motion.h1>
+        <motion.p variants={stagger.item} className="text-white/70 text-sm leading-relaxed mb-10 max-w-xs mx-auto">
+          Your all-in-one study platform. AI Assistants, Live Tutors, and Assignment Support.
+          Built for Caribbean students.
+        </motion.p>
+        <motion.div variants={stagger.item} className="border-t border-white/10 mb-8" />
+        <motion.div variants={stagger.item} className="flex gap-3 justify-center mb-6">
+          <button onClick={() => router.push('/signup')}
+            className="flex items-center gap-2 px-7 py-3 rounded-xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition shadow-lg shadow-black/20">
+            Get started <ArrowRight size={14} />
+          </button>
+          <button onClick={() => router.push('/signin')}
+            className="flex items-center gap-2 px-7 py-3 rounded-xl glass-soft text-white font-medium text-sm hover:bg-white/10 transition">
+            Sign in
+          </button>
+        </motion.div>
+        <motion.button variants={stagger.item}
+          onClick={() => window.dispatchEvent(new CustomEvent('assi:open'))}
+          className="flex items-center gap-2 mx-auto text-white/50 text-xs hover:text-white/80 transition group">
+          <MessageCircle size={13} className="group-hover:text-white/80 transition" />
+          Not sure what ASSI is? Ask the assistant →
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
+   PAGE ROOT
+   ══════════════════════════════════════════════════ */
+
+export default function HomePage() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  // Admins need localStorage check — doesn't block tutor/student renders at all
+  const [undercover,    setUndercover]    = useState<string | null>(null);
+  const [adminChecked,  setAdminChecked]  = useState(false);
+
   useEffect(() => {
-    const timer = setTimeout(() => setCurrentPhase('quote'), 1800);
-    return () => clearTimeout(timer);
+    setUndercover(localStorage.getItem(UNDERCOVER_KEY));
+    setAdminChecked(true);
   }, []);
 
-  const displayTheme = currentPhase === 'loading' || currentPhase === 'quote' 
-    ? 'caribbean-vibrant' 
-    : currentTheme;
+  // Admin redirect — only after localStorage has been read
+  useEffect(() => {
+    if (isLoading || !adminChecked) return;
+    if (user?.role === 'admin' && !undercover) {
+      router.replace('/admin');
+    }
+  }, [user, isLoading, router, undercover, adminChecked]);
+
+  /* ── Auth loading ── */
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
+        <motion.p animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.4, repeat: Infinity }}
+          className="text-white/50 text-xs tracking-widest uppercase">
+          Loading…
+        </motion.p>
+      </div>
+    );
+  }
+
+  /* ── Not logged in ── */
+  if (!user) {
+    return (
+      <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-10">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }} className="w-full flex justify-center">
+          <LandingView />
+        </motion.div>
+      </div>
+    );
+  }
+
+  /* ── Admin: wait for localStorage check before deciding ── */
+  if (user.role === 'admin' && !adminChecked) {
+    return (
+      <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
+        <motion.p animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.4, repeat: Infinity }}
+          className="text-white/50 text-xs tracking-widest uppercase">Loading…</motion.p>
+      </div>
+    );
+  }
+
+  /* ── Admin not undercover: redirect in flight, render nothing ── */
+  if (user.role === 'admin' && !undercover) return null;
+
+  /* ── Determine selector ── */
+  const showTutor =
+    user.role === 'tutor' ||
+    user.role === 'tutor-applicant' ||
+    (user.role === 'admin' && undercover === 'tutor');
 
   return (
-    <main className="min-h-screen relative overflow-hidden bg-black">
-      <h1 className="sr-only">ASSI - Your Warm, Soulful Study Sidekick</h1>
-      
-      {/* Background */}
-      <div className="fixed inset-0 w-full h-full">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={displayTheme}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ 
-              duration: 1.2,
-              ease: "easeInOut"
-            }}
-            className="w-full h-full"
-          >
-            <FloatingShapes theme={displayTheme} />
+    <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-10">
+      <AnimatePresence mode="wait">
+        {showTutor ? (
+          <motion.div key="tutor"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full flex justify-center">
+            <TutorHomeSelector />
           </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 md:p-6">
-        <AnimatePresence mode="wait">
-          {currentPhase === 'loading' && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.1 }}
-              className="text-center text-white drop-shadow-2xl"
-            >
-              {/* ASSI Logo */}
-              <motion.div
-                className="relative"
-                initial={{ rotateY: 0 }}
-                animate={{ rotateY: 360 }}
-                transition={{ 
-                  duration: 2.5, 
-                  ease: "easeInOut"
-                }}
-              >
-                <motion.h1
-                  className="text-7xl md:text-8xl font-bold mb-4 bg-gradient-to-r from-amber-300 via-pink-400 to-orange-400 bg-clip-text text-transparent"
-                  animate={{ 
-                    scale: [1, 1.08, 1]
-                  }}
-                  transition={{ 
-                    duration: 2.8, 
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
-                >
-                  ASSI
-                </motion.h1>
-              </motion.div>
-              
-              {/* Loading text */}
-              <motion.p
-                className="text-white/90 mt-6 text-lg md:text-xl font-light"
-                animate={{ opacity: [0.7, 1, 0.7] }}
-                transition={{ 
-                  duration: 2.2, 
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              >
-                Your study sanctuary is preparing...
-              </motion.p>
-
-              {/* Loading dots */}
-              <motion.div className="flex justify-center mt-8 space-x-3">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-3 h-3 rounded-full bg-gradient-to-br from-amber-400 to-pink-500"
-                    animate={{ 
-                      scale: [1, 1.6, 1],
-                      opacity: [0.4, 1, 0.4]
-                    }}
-                    transition={{
-                      duration: 1.8,
-                      repeat: Infinity,
-                      delay: i * 0.2,
-                      ease: "easeInOut"
-                    }}
-                  />
-                ))}
-              </motion.div>
-            </motion.div>
-          )}
-
-          {currentPhase === 'quote' && (
-            <motion.div
-              key="quote"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-              className="w-full max-w-3xl px-4"
-            >
-              <AnimatedQuote
-                text="Education is the most powerful weapon which you can use to change the world."
-                onComplete={() => setCurrentPhase('selection')}
-                className="text-white"
-              />
-            </motion.div>
-          )}
-
-          {currentPhase === 'selection' && (
-            <motion.div
-              key="selection"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ 
-                duration: 0.6,
-                ease: "easeOut"
-              }}
-              className="flex flex-col items-center w-full"
-            >
-              {/* Just the Service Selector - no extra text */}
-              <ServiceSelector onThemeChange={setCurrentTheme} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </main>
+        ) : (
+          <motion.div key="student"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full flex justify-center">
+            <ServiceSelector />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
