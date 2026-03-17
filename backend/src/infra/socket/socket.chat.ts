@@ -2,7 +2,10 @@
 import { Server, Socket } from 'socket.io';
 import { redisRuntimeService } from '@/infra/redis/redis.runtime.service';
 
-const MAX_PARTICIPANTS = 4;
+const MAX_PARTICIPANTS  = 4;
+const MAX_MESSAGE_LEN   = 4000;    // chars — prevents Redis memory abuse
+const MAX_ID_LEN        = 128;     // sanity cap on any ID field
+
 const toRoom   = (sessionId: string) => `session:${sessionId}`;
 const isMember = (userId: string, state: { studentId: string; tutorId?: string }) =>
   state.studentId === userId || state.tutorId === userId;
@@ -19,7 +22,7 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:join', async (sessionId: string) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
@@ -46,7 +49,7 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:leave', async (sessionId: string) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
@@ -72,7 +75,22 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:message', async ({ sessionId, content, messageId }) => {
       try {
-        if (!sessionId || !content?.trim() || !messageId) return;
+        // Input validation — all three fields required and sane
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
+        if (!messageId || typeof messageId !== 'string' || messageId.length > MAX_ID_LEN) return;
+        if (!content   || typeof content   !== 'string') return;
+
+        const trimmed = content.trim();
+        if (!trimmed) return;
+
+        // Hard cap — prevents Redis memory abuse from large payloads
+        if (trimmed.length > MAX_MESSAGE_LEN) {
+          socket.emit('chat:error', {
+            code:    'MESSAGE_TOO_LONG',
+            message: `Messages cannot exceed ${MAX_MESSAGE_LEN} characters`,
+          });
+          return;
+        }
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
@@ -87,7 +105,7 @@ export function attachChatHandlers(io: Server) {
         await redisRuntimeService.saveMessage(sessionId, {
           messageId,
           senderId:  userId,
-          content:   content.trim(),
+          content:   trimmed,
           timestamp: Date.now(),
         });
 
@@ -95,7 +113,7 @@ export function attachChatHandlers(io: Server) {
           messageId,
           sessionId,
           senderId:  userId,
-          content:   content.trim(),
+          content:   trimmed,
           timestamp: Date.now(),
         });
       } catch (err) {
@@ -108,7 +126,7 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:typing:start', async ({ sessionId }) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
 
@@ -126,7 +144,7 @@ export function attachChatHandlers(io: Server) {
 
     socket.on('chat:typing:stop', async ({ sessionId }) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
 
@@ -147,7 +165,8 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:invite_request', async ({ sessionId, fromUsername, inviteeUsername }) => {
       try {
-        if (!sessionId || !inviteeUsername) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
+        if (!inviteeUsername || typeof inviteeUsername !== 'string') return;
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state) return;
@@ -182,7 +201,7 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:invite_accept', async ({ sessionId, responderUsername }) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state || state.status !== 'active') return;
@@ -215,7 +234,7 @@ export function attachChatHandlers(io: Server) {
        ===================== */
     socket.on('chat:invite_decline', async ({ sessionId, responderUsername }) => {
       try {
-        if (!sessionId) return;
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.length > MAX_ID_LEN) return;
 
         const state = await redisRuntimeService.getSessionState(sessionId);
         if (!state || state.status !== 'active') return;

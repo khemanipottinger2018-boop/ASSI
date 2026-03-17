@@ -2,7 +2,7 @@
 import { Server, Socket } from 'socket.io';
 
 import { redisRuntimeService } from '@/infra/redis/redis.runtime.service';
-import { redisPresenceService } from '@/infra/redis';
+import { redisPresenceService, redisCooldownService } from '@/infra/redis';
 
 const toRoom = (sessionId: string) => `session:${sessionId}`;
 

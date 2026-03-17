@@ -1,39 +1,44 @@
 {
   "compilerOptions": {
-    "target": "ES2022",                       
-    "lib": ["ES2022"],                        
-    "module": "ESNext",            
-    "moduleResolution": "node",               // Use Node resolution for imports
-    "allowSyntheticDefaultImports": true,     
-    "esModuleInterop": true,                  // Required for commonjs interop
-    "allowJs": false,                          // Keep strict TS only for backend
-    "outDir": "./dist",                        // Build output folder
-    "rootDir": "./src",                        // Source folder
-    "strict": true,                            // Enable all strict checks
-    "noImplicitAny": false,                    // Optional, relax if needed
-    "resolveJsonModule": true,                 // Allow importing JSON
-    "skipLibCheck": true,                      // Skip types check for node_modules
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+
+    "allowJs": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    "strict": true,
+    "noImplicitAny": false,
+
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true,                       // Generate .d.ts files
-    "declarationMap": true,                    // Map declarations
-    "sourceMap": true,                          // Enable source maps
-    "baseUrl": ".",                             // For paths
+
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    "baseUrl": "./src",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["*"]
     },
-    "types": ["node"],                         // Node types
+
+    "types": ["node"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
+
   "include": [
     "src/**/*"
   ],
+
   "exclude": [
     "node_modules",
     "dist",
     "**/*.test.ts"
-  ],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  }
+  ]
 }

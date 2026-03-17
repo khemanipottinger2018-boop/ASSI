@@ -13,6 +13,10 @@ const router = Router();
 
 /* ── Helpers ─────────────────────────────────────── */
 
+const USERNAME_REGEX = /^[a-zA-Z0-9_]+$/;
+const USERNAME_MIN   = 3;
+const USERNAME_MAX   = 30;
+
 function generateDemoUsername() {
   return `ASSI_student_${Math.floor(10000 + Math.random() * 90000)}`;
 }
@@ -35,26 +39,40 @@ router.post('/', async (req, res) => {
     const { email, username, password } = req.body || {};
     const isDemo = req.body?.isDemo === true || req.body?.demo === true;
 
-    const finalUsername = isDemo ? generateDemoUsername()              : username?.trim();
-    const finalEmail    = isDemo ? generateDemoEmail()                 : email?.trim().toLowerCase();
-    const rawPassword   = isDemo ? generateStrongPassword()            : password;
-    const expiresAt     = isDemo ? demoExpiry(7)                       : null;
+    const finalUsername = isDemo ? generateDemoUsername()   : username?.trim();
+    const finalEmail    = isDemo ? generateDemoEmail()      : email?.trim().toLowerCase();
+    const rawPassword   = isDemo ? generateStrongPassword() : password;
+    const expiresAt     = isDemo ? demoExpiry(7)            : null;
 
     /* ── Validation (real users only) ── */
     if (!isDemo) {
       if (!finalEmail || !finalUsername || !rawPassword) {
         return res.status(400).json({ success: false, error: 'Missing required fields' });
       }
+
+      // Username: length + allowed characters
+      if (
+        finalUsername.length < USERNAME_MIN ||
+        finalUsername.length > USERNAME_MAX ||
+        !USERNAME_REGEX.test(finalUsername)
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:   `Username must be ${USERNAME_MIN}–${USERNAME_MAX} characters and contain only letters, numbers, and underscores`,
+        });
+      }
+
       if (!AuthService.validateEmail(finalEmail)) {
         return res.status(400).json({ success: false, error: 'Invalid email address' });
       }
+
       const pwCheck = AuthService.validatePasswordStrength(rawPassword);
       if (!pwCheck.valid) {
         return res.status(400).json({ success: false, error: pwCheck.message });
       }
     }
 
-    /* ── Duplicate username check (Supabase handles email uniqueness) ── */
+    /* ── Duplicate username check ── */
     const existingProfile = await prisma.userProfile.findFirst({
       where: { username: finalUsername },
     });
@@ -65,16 +83,16 @@ router.post('/', async (req, res) => {
     /* ── Create Supabase Auth user ── */
     const admin = getSupabaseAdmin();
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
-      email:             finalEmail,
-      password:          rawPassword,
-      email_confirm:     true,   // skip email verification for now
+      email:         finalEmail,
+      password:      rawPassword,
+      email_confirm: true,
     });
 
     if (authError || !authData.user) {
-      // Supabase returns a specific error if email already exists
       if (authError?.message?.toLowerCase().includes('already')) {
         return res.status(409).json({ success: false, error: 'Email already in use' });
       }
+      // Log the real error server-side, never send it to the client
       console.error('[register] Supabase Auth error:', authError);
       return res.status(500).json({ success: false, error: 'Registration failed' });
     }
@@ -121,9 +139,11 @@ router.post('/', async (req, res) => {
     }
 
     return res.status(201).json({ success: true });
-  } catch (err: any) {
-    console.error('[register] error:', err?.message ?? err);
-    return res.status(500).json({ success: false, error: err?.message ?? 'Registration failed' });
+
+  } catch (err) {
+    // Log internally, never expose raw error to client
+    console.error('[register] error:', err);
+    return res.status(500).json({ success: false, error: 'Registration failed' });
   }
 });
 

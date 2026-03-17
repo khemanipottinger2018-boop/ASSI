@@ -16,23 +16,21 @@ const REQUIRED_VARS = [
   // Prisma (Supabase Postgres connection string)
   'DATABASE_URL',
 
-  // Auth
-  'JWT_SECRET',
-
   // App
   'NODE_ENV',
-  'CLIENT_URL',
 ] as const;
 
 // Optional but warned about in production
 const PRODUCTION_RECOMMENDED = [
-  'REDIS_URL',       // Required for Socket.io scaling + session cache
-  'CLAUDE_API_KEY',  // Required for AI layer (assi-intelligence)
+  'REDIS_URL',        // Required for Socket.io + session cache
+  'FRONTEND_URL',     // Required for CORS in production
+  'OPENAI_API_KEY',   // Required for ASSI AI + Sentinel
+  'CLAUDE_API_KEY',   // Future Claude API layer
   'PORT',
 ] as const;
 
 // ─────────────────────────────────────────────
-// VALIDATE  (call once in server entry point)
+// VALIDATE  (called once at startup in app.ts)
 // ─────────────────────────────────────────────
 
 export function validateEnv(): void {
@@ -56,7 +54,7 @@ export function validateEnv(): void {
   }
 
   // 3. Port sanity
-  const port = parseInt(process.env.PORT || '3000');
+  const port = parseInt(process.env.PORT || '5000');
   if (isNaN(port) || port < 1 || port > 65535) {
     console.error(`❌ Invalid PORT: ${process.env.PORT}`);
     process.exit(1);
@@ -66,21 +64,18 @@ export function validateEnv(): void {
   if (process.env.NODE_ENV === 'production') {
     const warnings: string[] = [];
 
-    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-      warnings.push('JWT_SECRET is too short — minimum 32 characters');
+    if (!process.env.FRONTEND_URL) {
+      warnings.push('FRONTEND_URL is not set — CORS will allow all origins');
     }
 
-    if (process.env.CORS_ORIGIN === '*') {
-      warnings.push('CORS_ORIGIN is wildcard ("*") — lock this down');
-    }
-
-    if (!process.env.DATABASE_URL?.includes('sslmode=require')) {
-      warnings.push('DATABASE_URL should include sslmode=require for production');
+    if (!process.env.DATABASE_URL?.includes('sslmode=require') &&
+        !process.env.DATABASE_URL?.includes('supabase.com')) {
+      warnings.push('DATABASE_URL should point to Supabase for production');
     }
 
     PRODUCTION_RECOMMENDED.forEach((key) => {
       if (!process.env[key]) {
-        warnings.push(`${key} is not set — some features will be unavailable`);
+        warnings.push(`${key} is not set — some features may be unavailable`);
       }
     });
 
@@ -96,8 +91,6 @@ export function validateEnv(): void {
 // ─────────────────────────────────────────────
 // TYPED ACCESSORS
 // Use these instead of process.env[key] directly.
-// They throw immediately if a var is missing,
-// giving you a clear stack trace instead of a silent undefined.
 // ─────────────────────────────────────────────
 
 export function getEnv(key: string): string {
@@ -111,18 +104,18 @@ export function getEnvOrDefault(key: string, fallback: string): string {
 }
 
 export function getPort(): number {
-  return parseInt(getEnvOrDefault('PORT', '3000'));
+  return parseInt(getEnvOrDefault('PORT', '5000'));
 }
 
 // ─────────────────────────────────────────────
-// TYPED ENV OBJECT  (import this anywhere for autocomplete)
+// TYPED ENV OBJECT
 // ─────────────────────────────────────────────
 
 export const env = {
-  nodeEnv:                process.env.NODE_ENV as 'development' | 'production' | 'test',
-  port:                   parseInt(process.env.PORT || '3000'),
-  isProduction:           process.env.NODE_ENV === 'production',
-  isDevelopment:          process.env.NODE_ENV === 'development',
+  nodeEnv:       process.env.NODE_ENV as 'development' | 'production' | 'test',
+  port:          parseInt(process.env.PORT || '5000'),
+  isProduction:  process.env.NODE_ENV === 'production',
+  isDevelopment: process.env.NODE_ENV === 'development',
 
   // Supabase
   supabaseUrl:            process.env.SUPABASE_URL!,
@@ -130,17 +123,13 @@ export const env = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
 
   // Database
-  databaseUrl:            process.env.DATABASE_URL!,
-
-  // Auth
-  jwtSecret:              process.env.JWT_SECRET!,
-  jwtExpiresIn:           process.env.JWT_EXPIRES_IN || '7d',
+  databaseUrl: process.env.DATABASE_URL!,
 
   // App
-  clientUrl:              process.env.CLIENT_URL!,
-  corsOrigin:             process.env.CORS_ORIGIN || process.env.CLIENT_URL!,
+  frontendUrl: process.env.FRONTEND_URL,
 
-  // Optional services
-  redisUrl:               process.env.REDIS_URL,
-  claudeApiKey:           process.env.CLAUDE_API_KEY,
+  // Services
+  redisUrl:      process.env.REDIS_URL,
+  openaiApiKey:  process.env.OPENAI_API_KEY,
+  claudeApiKey:  process.env.CLAUDE_API_KEY,
 } as const;

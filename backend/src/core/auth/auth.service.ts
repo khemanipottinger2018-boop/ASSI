@@ -1,10 +1,10 @@
 // src/core/auth/auth.service.ts
 // ASSI Platform — Auth Service
-// Handles password hashing, session lifecycle, and user lookup.
-// All DB queries go through Prisma (no raw SQL).
+// Session lifecycle, user lookup, and validation helpers.
+// Password hashing/verification is handled entirely by Supabase Auth —
+// we never touch raw passwords after they leave the auth routes.
 
-import bcrypt   from 'bcryptjs';
-import crypto   from 'crypto';
+import crypto from 'crypto';
 
 import { prisma }              from '@/config/database';
 import { redisSessionService } from '@/infra/redis';
@@ -30,16 +30,6 @@ export interface AuthUser {
 
 export class AuthService {
 
-  // ── Password ────────────────────────────────
-
-  static async hashPassword(password: string): Promise<string> {
-    return bcrypt.hash(password, 12);
-  }
-
-  static async comparePassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
-  }
-
   // ── Session ─────────────────────────────────
 
   static async createSession(userId: string, role: UserRole): Promise<string> {
@@ -57,31 +47,25 @@ export class AuthService {
   }
 
   // ── User Lookup ─────────────────────────────
-  // Single Prisma query with tutor profile included.
-  // Previously: 2 separate raw SQL round trips.
 
   static async getUserById(userId: string): Promise<AuthUser | null> {
-    // Supabase pattern: auth.users holds identity, user_profiles holds app data.
-    // userId is the auth.users uuid — user_profiles.user_id is the FK.
     const profile = await prisma.userProfile.findUnique({
       where:  { userId },
       select: {
-        userId:             true,
-        username:           true,
-        role:               true,
-        disclaimerAccepted: true,
-        dateOfBirth:        true,   // requires migration (see notes)
-        parentalConsentGiven: true, // requires migration (see notes)
-        // Pull email from the related auth user via Supabase admin if needed,
-        // or join via the relation once Prisma schema reflects auth.users.
+        userId:               true,
+        username:             true,
+        role:                 true,
+        disclaimerAccepted:   true,
+        dateOfBirth:          true,   // requires migration
+        parentalConsentGiven: true,   // requires migration
         tutor: {
           select: {
-            id:           true,
-            bio:          true,
-            hourlyRate:   true,
-            isAvailable:  true,
-            isVerified:   true,
-            rating:       true,
+            id:            true,
+            bio:           true,
+            hourlyRate:    true,
+            isAvailable:   true,
+            isVerified:    true,
+            rating:        true,
             totalSessions: true,
           },
         },
@@ -97,7 +81,7 @@ export class AuthService {
     return {
       id:                 profile.userId,
       username:           profile.username,
-      email:              '',   // fetched separately via getSupabaseAdmin().auth.admin.getUserById(userId)
+      email:              '',   // fetched separately via getEmailById()
       role:               profile.role as UserRole,
       disclaimerAccepted: profile.disclaimerAccepted ?? false,
       isMinor,
@@ -136,11 +120,10 @@ export class AuthService {
   }
 
   // ── Minor Check (App Store compliance) ──────
-  // ASSI High School serves under-18 users.
-  // This is used to gate features and enforce parental consent flows.
+  // ASSI serves under-18 users — gates features and parental consent flows.
 
   static calculateIsMinor(dateOfBirth: Date): boolean {
-    const today    = new Date();
+    const today     = new Date();
     const birthDate = new Date(dateOfBirth);
     const age =
       today.getFullYear() - birthDate.getFullYear() -

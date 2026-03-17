@@ -28,8 +28,8 @@ function parseOrigins(raw?: string): string[] {
 }
 
 export async function createSocketServer(httpServer: HttpServer): Promise<Server> {
-  // CLIENT_URL is the canonical frontend origin — defined in env.ts
-  const allowedOrigins = parseOrigins(env.clientUrl);
+  // FRONTEND_URL is the canonical frontend origin — defined in env.ts
+  const allowedOrigins = parseOrigins(env.frontendUrl);
 
   const io = new Server(httpServer, {
     cors: {
