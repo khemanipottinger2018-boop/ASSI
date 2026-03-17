@@ -1,14 +1,19 @@
-// backend/src/infra/socket/socket.server.ts
-import { Server } from 'socket.io';
+// src/infra/socket/socket.server.ts
+// ASSI Platform — Socket.IO Server
+// Reuses the shared Redis client for pub/sub instead of creating
+// new connections. Uses CLIENT_URL (aligned with env.ts).
+
+import { Server }     from 'socket.io';
 import { Server as HttpServer } from 'http';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { createClient } from 'redis';
 
-import { attachAuthMiddleware } from './socket.auth';
+import { redisClient }           from '@/infra/redis';
+import { attachAuthMiddleware }  from './socket.auth';
 import { attachLifecycleHandlers } from './socket.lifecycle';
 import { attachSessionHandlers } from './socket.session';
-import { attachChatHandlers } from './socket.chat';
-import { attachWatchdog } from './socket.watchdog';
+import { attachChatHandlers }    from './socket.chat';
+import { attachWatchdog }        from './socket.watchdog';
+import { env }                   from '@/config/env';
 
 let _io: Server | null = null;
 
@@ -19,53 +24,43 @@ export function getIO(): Server {
 
 function parseOrigins(raw?: string): string[] {
   if (!raw) return [];
-  return raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
+  return raw.split(',').map(s => s.trim()).filter(Boolean);
 }
 
-export async function createSocketServer(httpServer: HttpServer) {
-  const allowedOrigins = parseOrigins(process.env.FRONTEND_URL);
+export async function createSocketServer(httpServer: HttpServer): Promise<Server> {
+  // CLIENT_URL is the canonical frontend origin — defined in env.ts
+  const allowedOrigins = parseOrigins(env.clientUrl);
 
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, cb) => {
-        // Allow non-browser clients or same-origin
-        if (!origin) return cb(null, true);
-
-        // If no allowlist specified, deny by default (safer)
-        if (!allowedOrigins.length) return cb(new Error('CORS origin not allowed'), false);
-
+        if (!origin)                  return cb(null, true);
+        if (!allowedOrigins.length)   return cb(new Error('CORS origin not configured'), false);
         if (allowedOrigins.includes(origin)) return cb(null, true);
         return cb(new Error('CORS origin not allowed'), false);
       },
       credentials: true,
     },
-
-    // If you deploy behind a reverse proxy and need a custom path, set it in env and match frontend
-    // path: process.env.SOCKET_PATH || '/socket.io',
-
-    // Optional stability tuning (avoid aggressive ping timeouts in flaky networks)
     pingInterval: 25_000,
-    pingTimeout: 20_000,
+    pingTimeout:  20_000,
   });
 
-  /* ── Redis Adapter ── */
-  const pubClient = createClient({ url: process.env.REDIS_URL });
+  // ── Redis Adapter ──────────────────────────────
+  // Reuse the shared Redis connection instead of creating new ones.
+  // pub and sub must be separate clients (Redis protocol requirement),
+  // but we derive sub by duplicating the existing connection.
+  await redisClient.connect(); // no-op if already connected
+  const pubClient = redisClient.client;
   const subClient = pubClient.duplicate();
 
-  pubClient.on('error', (err) => console.error('[redis pub] error', err));
   subClient.on('error', (err) => console.error('[redis sub] error', err));
-
-  await pubClient.connect();
   await subClient.connect();
 
   io.adapter(createAdapter(pubClient, subClient));
 
-  /* ── Attach Modules ── */
+  // ── Attach Modules ────────────────────────────
   attachAuthMiddleware(io);
-  attachLifecycleHandlers(io); 
+  attachLifecycleHandlers(io);
   attachSessionHandlers(io);
   attachChatHandlers(io);
   attachWatchdog(io);
@@ -74,7 +69,7 @@ export async function createSocketServer(httpServer: HttpServer) {
 
   console.log('[socket] initialized', {
     origins: allowedOrigins,
-    redis: Boolean(process.env.REDIS_URL),
+    redis:   Boolean(env.redisUrl),
   });
 
   return io;

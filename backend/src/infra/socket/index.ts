@@ -1,1 +1,1 @@
-export { createSocketServer } from './socket.server';
+export { createSocketServer, getIO } from './socket.server';

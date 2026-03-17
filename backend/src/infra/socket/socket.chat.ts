@@ -1,7 +1,6 @@
 // backend/src/infra/socket/socket.chat.ts
 import { Server, Socket } from 'socket.io';
 import { redisRuntimeService } from '@/infra/redis/redis.runtime.service';
-import { redisPresenceService } from '@/infra/redis';
 
 const MAX_PARTICIPANTS = 4;
 const toRoom   = (sessionId: string) => `session:${sessionId}`;
@@ -234,49 +233,5 @@ export function attachChatHandlers(io: Server) {
       }
     });
 
-    /* =====================
-       DEPRECATED: chat:accept_session
-       FIX #5: was a split-brain accept path that didn't emit session:ready
-       or session:started, leaving the student stuck on "Waiting for tutor"
-       even though the tutor had accepted.
-
-       Now delegates to the same Lua-atomic claim and emits all three events
-       exactly like session:accept in socket.session.ts.
-       TODO: remove after all clients migrate to session:accept.
-       ===================== */
-    socket.on('chat:accept_session', async (sessionId: string) => {
-      console.warn('[socket][chat:accept_session] DEPRECATED — clients should emit session:accept');
-      try {
-        if (!sessionId)        return;
-        if (role !== 'tutor') return;
-
-        const presence = await redisPresenceService.getFullPresence(userId);
-        if (!presence.online || !presence.socketConnected) return;
-        if (presence.intent !== 'available') return;
-
-        const state = await redisRuntimeService.getSessionState(sessionId);
-        if (!state || state.status !== 'waiting') return;
-        if (state.tutorId && state.tutorId !== userId) return;
-
-        const updated = await redisRuntimeService.acceptWaitingSession(sessionId, userId);
-        if (!updated) return;
-
-        await redisPresenceService.setStatusIntent(userId, 'busy_session');
-        await redisPresenceService.syncTutorAvailability(userId, true);
-
-        const roomId = toRoom(sessionId);
-        socket.join(roomId);
-
-        // ✅ Now emits all three events — was previously missing session:ready + session:started
-        io.to(`user:${updated.studentId}`).emit('session:ready',      { sessionId });
-        io.to(roomId).emit('chat:tutor_joined', { tutorId: userId, sessionId });
-        io.to(roomId).emit('session:started',   { sessionId });
-
-        const participants = await redisRuntimeService.getParticipantIds(sessionId);
-        io.to(roomId).emit('chat:presence', { sessionId, participants, count: participants.length });
-      } catch (err) {
-        console.error('[socket][chat:accept_session] error:', err);
-      }
-    });
   });
 }
