@@ -24,7 +24,9 @@
   "author": "ASSI Team",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^7.5.0",
     "@socket.io/redis-adapter": "^8.2.0",
+    "@supabase/supabase-js": "^2.99.2",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -34,7 +36,7 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mssql": "^12.2.0",
+    "openai": "^6.15.0",
     "redis": "^5.10.0",
     "socket.io": "^4.8.1"
   },
