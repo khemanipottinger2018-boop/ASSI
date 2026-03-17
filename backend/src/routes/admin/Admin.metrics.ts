@@ -38,21 +38,12 @@ router.get('/', requireAuth, withRole('admin'), async (_req, res) => {
 });
 
 /* ── GET /api/admin/metrics/runtime ── */
-// Returns live Node.js process stats.
-// RuntimeMetricsService was removed (depended on a non-existent service).
 
 router.get('/runtime', requireAuth, withRole('admin'), async (_req, res) => {
   try {
-    const mem = process.memoryUsage();
-    return res.json({
-      success: true,
-      runtime: {
-        heap_used_mb:  Math.round(mem.heapUsed  / 1024 / 1024),
-        rss_mb:        Math.round(mem.rss       / 1024 / 1024),
-        external_mb:   Math.round(mem.external  / 1024 / 1024),
-        uptime_s:      Math.round(process.uptime()),
-      },
-    });
+    const { RuntimeMetricsService } = await import('@/services/runtime-metrics.service');
+    const snapshot = await RuntimeMetricsService.snapshot();
+    return res.json({ success: true, runtime: snapshot });
   } catch (err) {
     console.error('[admin/metrics/runtime] error:', err);
     return res.status(500).json({ success: false, error: 'Failed to load runtime metrics' });
