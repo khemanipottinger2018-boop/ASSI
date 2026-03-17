@@ -1,26 +1,37 @@
-// services/auth.service.ts
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import { db } from '@/config/database';
-import { redisService } from '@/infra/redis/redis.service';
-import { User } from '@/core/users/user.types';
+// src/core/auth/auth.service.ts
+// ASSI Platform — Auth Service
+// Handles password hashing, session lifecycle, and user lookup.
+// All DB queries go through Prisma (no raw SQL).
 
+import bcrypt   from 'bcryptjs';
+import crypto   from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const ACCESS_TOKEN_EXPIRY = '1h'; // 1 hour
-const REFRESH_TOKEN_EXPIRY = 365 * 24 * 60 * 60; // 1 year in seconds
+import { prisma }              from '@/config/database';
+import { redisSessionService } from '@/infra/redis';
+import { UserRole }            from '@/types/roles';
+
+// ─────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────
 
 export interface AuthUser {
-  id: string;
-  username: string;
-  email: string;
-  role: 'student' | 'tutor-applicant' | 'tutor' | 'admin';
-  disclaimerAccepted?: boolean;
-  tutorProfile?: any | null;
+  id:                 string;
+  username:           string;
+  email:              string;
+  role:               UserRole;
+  disclaimerAccepted: boolean;
+  isMinor:            boolean;
+  tutorProfile:       any | null;
 }
 
+// ─────────────────────────────────────────────
+// SERVICE
+// ─────────────────────────────────────────────
+
 export class AuthService {
-  // --------- PASSWORD ----------
+
+  // ── Password ────────────────────────────────
+
   static async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 12);
   }
@@ -29,88 +40,112 @@ export class AuthService {
     return bcrypt.compare(password, hash);
   }
 
-  // --------- TOKEN ----------
-  static generateAccessToken(user: AuthUser): string {
-    const payload = { id: user.id, username: user.username, email: user.email, role: user.role };
-    return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  // ── Session ─────────────────────────────────
+
+  static async createSession(userId: string, role: UserRole): Promise<string> {
+    const sid = crypto.randomUUID();
+    await redisSessionService.createSession(sid, userId, role);
+    return sid;
   }
 
-  static generateRefreshToken(user: AuthUser): string {
-    const payload = { id: user.id };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY }); // number in seconds
-
-    // Save in Redis for invalidation
-    redisService.setRefreshToken(user.id, token, REFRESH_TOKEN_EXPIRY * 1000);
-    return token;
+  static async revokeSession(sid: string): Promise<void> {
+    await redisSessionService.revokeSession(sid);
   }
 
-  static verifyAccessToken(token: string): AuthUser | null {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (!decoded?.id || !decoded?.username || !decoded?.email || !decoded?.role) return null;
-      return {
-        id: decoded.id,
-        username: decoded.username,
-        email: decoded.email,
-        role: decoded.role as AuthUser['role'],
-      };
-    } catch {
-      return null;
-    }
+  static async revokeAllSessions(userId: string): Promise<void> {
+    await redisSessionService.revokeAllSessions(userId);
   }
 
-  static verifyRefreshToken(token: string): { id: string } | null {
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as any;
-      if (!decoded?.id) return null;
-      return { id: decoded.id };
-    } catch {
-      return null;
-    }
-  }
+  // ── User Lookup ─────────────────────────────
+  // Single Prisma query with tutor profile included.
+  // Previously: 2 separate raw SQL round trips.
 
-  // --------- USER FETCH ----------
   static async getUserById(userId: string): Promise<AuthUser | null> {
-    const user = await db.queryOne<{
-      id: string;
-      username: string;
-      email: string;
-      role: string;
-      disclaimer_accepted: boolean;
-    }>(
-      `SELECT id, username, email, role, disclaimer_accepted FROM Users WHERE id=@userId`,
-      { userId }
-    );
-    if (!user) return null;
+    // Supabase pattern: auth.users holds identity, user_profiles holds app data.
+    // userId is the auth.users uuid — user_profiles.user_id is the FK.
+    const profile = await prisma.userProfile.findUnique({
+      where:  { userId },
+      select: {
+        userId:             true,
+        username:           true,
+        role:               true,
+        disclaimerAccepted: true,
+        dateOfBirth:        true,   // requires migration (see notes)
+        parentalConsentGiven: true, // requires migration (see notes)
+        // Pull email from the related auth user via Supabase admin if needed,
+        // or join via the relation once Prisma schema reflects auth.users.
+        tutor: {
+          select: {
+            id:           true,
+            bio:          true,
+            hourlyRate:   true,
+            isAvailable:  true,
+            isVerified:   true,
+            rating:       true,
+            totalSessions: true,
+          },
+        },
+      },
+    });
 
-    const tutorProfile = await db.queryOne(`SELECT * FROM Tutors WHERE user_id=@userId`, { userId });
+    if (!profile) return null;
+
+    const isMinor = profile.dateOfBirth
+      ? AuthService.calculateIsMinor(profile.dateOfBirth)
+      : false;
 
     return {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role as AuthUser['role'],
-      disclaimerAccepted: user.disclaimer_accepted,
-      tutorProfile: tutorProfile || null,
+      id:                 profile.userId,
+      username:           profile.username,
+      email:              '',   // fetched separately via getSupabaseAdmin().auth.admin.getUserById(userId)
+      role:               profile.role as UserRole,
+      disclaimerAccepted: profile.disclaimerAccepted ?? false,
+      isMinor,
+      tutorProfile:       profile.tutor ?? null,
     };
   }
 
-  // --------- PRESENCE ----------
-  static async setUserOnline(userId: string) {
-    await redisService.setUserStatus(userId, 'online');
+  // Fetch email directly from Supabase Auth (not stored in user_profiles)
+  static async getEmailById(userId: string): Promise<string | null> {
+    const { getSupabaseAdmin } = await import('@/config/database');
+    const { data, error } = await getSupabaseAdmin().auth.admin.getUserById(userId);
+    if (error || !data?.user) return null;
+    return data.user.email ?? null;
   }
 
-  static async setUserOffline(userId: string) {
-    await redisService.setUserStatus(userId, 'offline');
-  }
+  // ── Validation ──────────────────────────────
 
-  static async getUserStatus(userId: string) {
-    return redisService.getUserStatus(userId);
-  }
-
-  // --------- EMAIL VALIDATION ----------
   static validateEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  static validatePasswordStrength(password: string): {
+    valid:   boolean;
+    message: string;
+  } {
+    if (password.length < 8) {
+      return { valid: false, message: 'Password must be at least 8 characters' };
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one uppercase letter' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, message: 'Password must contain at least one number' };
+    }
+    return { valid: true, message: 'OK' };
+  }
+
+  // ── Minor Check (App Store compliance) ──────
+  // ASSI High School serves under-18 users.
+  // This is used to gate features and enforce parental consent flows.
+
+  static calculateIsMinor(dateOfBirth: Date): boolean {
+    const today    = new Date();
+    const birthDate = new Date(dateOfBirth);
+    const age =
+      today.getFullYear() - birthDate.getFullYear() -
+      (today < new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate()) ? 1 : 0);
+    return age < 18;
   }
 }
 
