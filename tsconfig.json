@@ -4,7 +4,6 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "es6",
       "es2022"
     ],
     "allowJs": true,
@@ -30,47 +29,42 @@
         "./*"
       ],
       "@/app/*": [
-        "./app/*"
+        "app/*"
       ],
       "@/components/*": [
-        "./components/*"
+        "components/*"
       ],
       "@/contexts/*": [
-        "./contexts/*"
+        "contexts/*"
       ],
       "@/hooks/*": [
-        "./hooks/*"
+        "hooks/*"
       ],
       "@/lib/*": [
-        "./lib/*"
+        "lib/*"
       ],
       "@/styles/*": [
-        "./styles/*"
+        "styles/*"
       ],
       "@/types/*": [
-        "frontend/types/*"
+        "types/*"
       ],
       "@/public/*": [
-        "./public/*"
+        "public/*"
       ]
-    },
-    "typeRoots": [
-      "./node_modules/@types",
-      "frontend/types"
-    ]
+    }
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "frontend/types/**/*",
-    "lib/**/*",
     "app/**/*",
     "components/**/*",
-    "hooks/**/*",
     "contexts/**/*",
-    "actions",
+    "hooks/**/*",
+    "lib/**/*",
+    "types/**/*",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

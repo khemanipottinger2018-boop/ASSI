@@ -8,8 +8,17 @@ export default function LiveChatLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="h-screen w-full overflow-hidden">
+    <section
+      className="
+        relative
+        flex
+        flex-col
+        w-full
+        h-full
+        overflow-hidden
+      "
+    >
       {children}
-    </div>
+    </section>
   );
 }

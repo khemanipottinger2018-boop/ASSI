@@ -1,0 +1,166 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/navigation';
+import { User, Mail, BookOpen, Calendar, Edit3, LogOut, ShieldCheck } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+
+export default function StudentProfilePage() {
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/user/me`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setProfile(d.user); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push('/signin');
+  };
+
+  if (loading) return <ProfileSkeleton />;
+
+  const p = profile ?? user;
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+      {/* Header card */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="glass rounded-3xl p-6"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {/* Avatar */}
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {p?.avatarUrl
+                  ? <img src={p.avatarUrl} alt={p.username} className="w-full h-full object-cover" />
+                  : <User size={24} className="text-white/40" />
+                }
+              </div>
+              <span className="absolute -bottom-1 -right-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">
+                Student
+              </span>
+            </div>
+
+            <div>
+              <h1 className="text-white font-semibold text-lg tracking-tight">{p?.username}</h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <Mail size={11} className="text-white/35" />
+                <span className="text-white/40 text-xs">{p?.email}</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => router.push('/profile/student/edit')}
+            className="glass-soft rounded-xl p-2.5 text-white/40 hover:text-white/70 transition"
+          >
+            <Edit3 size={15} />
+          </button>
+        </div>
+
+        {/* Bio */}
+        {p?.bio && (
+          <p className="mt-4 text-white/55 text-sm leading-relaxed border-t border-white/8 pt-4">
+            {p.bio}
+          </p>
+        )}
+      </motion.div>
+
+      {/* Stats row */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+        className="grid grid-cols-2 gap-3"
+      >
+        <StatCard icon={BookOpen} label="Sessions" value="—" />
+        <StatCard icon={Calendar} label="Member since" value={
+          p?.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'
+        } />
+      </motion.div>
+
+      {/* Account */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+        className="glass rounded-3xl p-4 space-y-1"
+      >
+        <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
+
+        {p?.is_demo && (
+          <div className="flex items-center gap-3 px-2 py-2.5 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
+            <ShieldCheck size={14} className="text-yellow-400 flex-shrink-0" />
+            <div>
+              <p className="text-yellow-300 text-xs font-medium">Demo account</p>
+              <p className="text-yellow-400/60 text-[11px]">
+                Expires {p.demo_expires_at ? new Date(p.demo_expires_at).toLocaleDateString() : 'soon'}.{' '}
+                <button onClick={() => router.push('/upgrade')} className="underline underline-offset-2 hover:text-yellow-300 transition">
+                  Upgrade now
+                </button>
+              </p>
+            </div>
+          </div>
+        )}
+
+        <ActionRow label="Edit profile" onClick={() => router.push('/profile/student/edit')} />
+        <ActionRow label="Settings" onClick={() => router.push('/settings')} />
+        <ActionRow label="Sign out" onClick={handleLogout} destructive />
+      </motion.div>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="glass-soft rounded-2xl px-4 py-3.5 flex items-center gap-3">
+      <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
+        <Icon size={14} className="text-white/50" />
+      </div>
+      <div>
+        <div className="text-white font-medium text-sm">{value}</div>
+        <div className="text-white/35 text-[11px]">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ActionRow({ label, onClick, destructive }: { label: string; onClick: () => void; destructive?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center justify-between px-2 py-2.5 rounded-xl text-sm transition hover:bg-white/6 ${
+        destructive ? 'text-red-400/70 hover:text-red-400' : 'text-white/55 hover:text-white/80'
+      }`}
+    >
+      {label}
+      <span className="text-white/20">›</span>
+    </button>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
+      <div className="glass rounded-3xl p-6 h-32" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="glass-soft rounded-2xl h-16" />
+        <div className="glass-soft rounded-2xl h-16" />
+      </div>
+      <div className="glass rounded-3xl p-4 h-40" />
+    </div>
+  );
+}

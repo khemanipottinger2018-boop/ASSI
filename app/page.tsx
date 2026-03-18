@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import ServiceSelector from '@/components/service-selector/ServiceSelector';
-import TutorHomeSelector from '@/components/tutor/TutorHomeSelector';
+import ServiceSelector from '@/components/shared/service-selector/ServiceSelector';
+import TutorHomeSelector from '@/components/tutor/dashboard/TutorHomeSelector';
 
 const UNDERCOVER_KEY = 'sentinel:undercover';
 

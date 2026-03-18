@@ -15,41 +15,61 @@ export default function ChatInput({
   onTypingStart,
   onTypingStop,
   disabled = false,
-  placeholder = 'Type a message…',
+  placeholder = 'Ask anything. Take your time.',
 }: Props) {
   const [value, setValue] = useState('');
 
   const handleSend = () => {
     if (disabled) return;
-    if (!value.trim()) return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
 
-    onSend(value);
+    onSend(trimmed);
     setValue('');
     onTypingStop();
   };
 
   return (
-    <div className="border-t p-3 flex gap-2">
-      <input
-        value={value}
-        disabled={disabled}
-        onChange={(e) => {
-          if (disabled) return;
-          setValue(e.target.value);
-          onTypingStart();
-        }}
-        onBlur={onTypingStop}
-        placeholder={placeholder}
-        className="flex-1 px-3 py-2 rounded-md border bg-background text-sm disabled:opacity-50"
-      />
+    <div className="px-6 py-4 border-t border-neutral-800">
+      <div className="flex items-center gap-3 bg-neutral-900/70 rounded-xl px-4 py-3">
+        <input
+          value={value}
+          disabled={disabled}
+          onChange={(e) => {
+            if (disabled) return;
+            setValue(e.target.value);
+            onTypingStart();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          onBlur={onTypingStop}
+          placeholder={placeholder}
+          className="
+            flex-1 bg-transparent text-sm text-neutral-100
+            placeholder:text-neutral-500
+            focus:outline-none
+            disabled:opacity-50
+          "
+        />
 
-      <button
-        onClick={handleSend}
-        disabled={disabled}
-        className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm disabled:opacity-50"
-      >
-        Send
-      </button>
+        <button
+          onClick={handleSend}
+          disabled={disabled}
+          className="
+            text-sm px-4 py-2 rounded-lg
+            bg-neutral-800 text-neutral-200
+            hover:bg-neutral-700
+            disabled:opacity-40
+            transition
+          "
+        >
+          Send
+        </button>
+      </div>
     </div>
   );
 }

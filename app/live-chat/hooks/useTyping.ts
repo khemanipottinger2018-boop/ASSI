@@ -1,60 +1,50 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useChatSocket } from './useChatSocket';
 
-type UseTypingOptions = {
-  chatId: string | null;
-  currentUserId: string;
-};
+export function useTyping(sessionId: string) {
+  const { emit, on, off, isConnected } = useChatSocket();
+  const isTypingRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
 
-export function useTyping({
-  chatId,
-  currentUserId,
-}: UseTypingOptions) {
-  const { emit, on, off } = useChatSocket();
-
-  const [typingUsers, setTypingUsers] = useState<string[]>([]);
-
-  /* ---------------------------------------------------
-   * RECEIVE TYPING UPDATES
-   * --------------------------------------------------- */
   useEffect(() => {
-    if (!chatId) {
-      setTypingUsers([]);
-      return;
-    }
+    if (!isConnected || !sessionId) return;
 
-    const handleTypingUpdate = (payload: { users: string[] }) => {
-      if (!Array.isArray(payload.users)) return;
-
-      // Exclude self
-      setTypingUsers(
-        payload.users.filter((id) => id !== currentUserId)
-      );
+    const handleTyping = ({ userId, typing }: { userId: string; typing: boolean }) => {
+      setTypingUsers((prev) => ({ ...prev, [userId]: typing }));
     };
 
-    on('typing:update', handleTypingUpdate);
-    return () => off('typing:update', handleTypingUpdate);
-  }, [chatId, currentUserId, on, off]);
+    on('chat:typing', handleTyping);
+    return () => off('chat:typing', handleTyping);
+  }, [isConnected, sessionId, on, off]);
 
-  /* ---------------------------------------------------
-   * EMITTERS
-   * --------------------------------------------------- */
-  const startTyping = useCallback(() => {
-    if (!chatId) return;
-    emit('typing:start', chatId);
-  }, [chatId, emit]);
+  const onKeystroke = useCallback(() => {
+    if (!isConnected) return;
+
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      emit('chat:typing:start', { sessionId });
+    }
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      emit('chat:typing:stop', { sessionId });
+    }, 2000);
+  }, [emit, sessionId, isConnected]);
 
   const stopTyping = useCallback(() => {
-    if (!chatId) return;
-    emit('typing:stop', chatId);
-  }, [chatId, emit]);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (isTypingRef.current) {
+      isTypingRef.current = false;
+      emit('chat:typing:stop', { sessionId });
+    }
+  }, [emit, sessionId]);
 
-  return {
-    typingUsers,
-    isSomeoneTyping: typingUsers.length > 0,
-    startTyping,
-    stopTyping,
-  };
+  const someoneIsTyping = Object.values(typingUsers).some(Boolean);
+
+  return { onKeystroke, stopTyping, someoneIsTyping };
 }

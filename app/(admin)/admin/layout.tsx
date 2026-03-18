@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import AdminShell from '@/components/admin/AdminShell';
+import AdminShell from '@/components/admin/shell/AdminShell';
 
 const UNDERCOVER_KEY = 'sentinel:undercover';
 

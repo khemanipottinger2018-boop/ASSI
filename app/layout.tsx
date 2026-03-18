@@ -2,13 +2,13 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './styles/globals.css';
 
-import { ThemeProvider } from '@/components/themes/ThemeProvider';
+import { ThemeProvider } from '@/components/shared/themes/ThemeProvider';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
 import { SocketProvider } from '@/contexts/SocketContext';
 
-import AnimatedGradient from '@/components/themes/AnimatedGradient';
-import FloatingBlobs from '@/components/themes/FloatingBlobs';
+import AnimatedGradient from '@/components/shared/themes/AnimatedGradient';
+import FloatingBlobs from '@/components/shared/themes/FloatingBlobs';
 import AppShell from '@/components/AppShell';
 
 const inter = Inter({

@@ -9,7 +9,7 @@ import {
   EyeOff, Eye, ArrowRight, Loader2, Cpu,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import SentinelChat from '@/components/admin/SentinelChat';
+import SentinelChat from '@/components/admin/sentinel/SentinelChat';
 
 const API_URL        = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const UNDERCOVER_KEY = 'sentinel:undercover';

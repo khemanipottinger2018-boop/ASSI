@@ -1,129 +1,102 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useChatSocket } from './useChatSocket';
 
-export type ChatMessage = {
-  id: string;
-  chatId: string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+export interface ChatMessage {
+  messageId: string;
+  sessionId: string;
   senderId: string;
   content: string;
-  createdAt: number;
-  seq: number;
-};
+  timestamp: number;
+}
 
-type UseChatMessagesOptions = {
-  chatId: string | null;
-};
-
-export function useChatMessages({ chatId }: UseChatMessagesOptions) {
+export function useChatMessages(sessionId: string) {
   const { emit, on, off, isConnected } = useChatSocket();
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const lastSeqRef = useRef<number>(0);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
-  /* ---------------------------------------------------
-   * RESET ON CHAT CHANGE
-   * --------------------------------------------------- */
+  /* ─── Hydrate history on mount ──────────────────────
+     Fetch persisted messages from the backend before the
+     socket takes over for real-time delivery.
+     Without this, a tutor joining an in-progress session
+     (or either party reconnecting) would see a blank chat.
+  ─────────────────────────────────────────────────────── */
   useEffect(() => {
-    setMessages([]);
-    lastSeqRef.current = 0;
-  }, [chatId]);
+    if (!sessionId) return;
 
-  /* ---------------------------------------------------
-   * RECEIVE NEW MESSAGE (LIVE)
-   * --------------------------------------------------- */
+    let cancelled = false;
+
+    async function loadHistory() {
+      try {
+        const res = await fetch(
+          `${API_URL}/api/live-chat/${sessionId}/messages`,
+          { credentials: 'include' }
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (cancelled) return;
+
+        const history: ChatMessage[] = (data.messages ?? []).map((m: any) => ({
+          messageId: String(m.messageId),
+          sessionId: String(m.sessionId ?? sessionId),
+          senderId:  String(m.senderId),
+          content:   String(m.content),
+          timestamp: Number(m.timestamp),
+        }));
+
+        setMessages(history);
+      } catch {
+        // silent — socket messages will still arrive
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  /* ─── Real-time socket messages ─────────────────────
+     Deduplicates against history so a message that arrives
+     via socket while history was loading isn't shown twice.
+  ─────────────────────────────────────────────────────── */
   useEffect(() => {
-    if (!chatId) return;
+    if (!isConnected || !sessionId) return;
 
-    const handleNewMessage = (message: ChatMessage) => {
-      if (message.chatId !== chatId) return;
-      if (message.seq <= lastSeqRef.current) return;
+    const handleMessage = (msg: ChatMessage) => {
+      if (msg.sessionId !== sessionId) return;
 
-      lastSeqRef.current = message.seq;
-      setMessages((prev) => [...prev, message]);
+      setMessages((prev) => {
+        if (prev.some((m) => m.messageId === msg.messageId)) return prev;
+        return [...prev, msg];
+      });
     };
 
-    on('chat:new', handleNewMessage);
-    return () => off('chat:new', handleNewMessage);
-  }, [chatId, on, off]);
+    on('chat:message', handleMessage);
+    return () => off('chat:message', handleMessage);
+  }, [isConnected, sessionId, on, off]);
 
-  /* ---------------------------------------------------
-   * INITIAL SYNC / RECONNECT SYNC
-   * --------------------------------------------------- */
-  useEffect(() => {
-    if (!chatId || !isConnected) return;
+  /* ─── Send ─────────────────────────────────────────── */
 
-    emit(
-      'chat:sync',
-      {
-        chatId,
-        afterSeq: lastSeqRef.current,
-        limit: 100,
-      },
-      (res: {
-        ok: boolean;
-        messages?: ChatMessage[];
-        error?: string;
-      }) => {
-        if (!res?.ok || !res.messages?.length) return;
-
-        setMessages((prev) => {
-          const merged = [...prev];
-
-          for (const msg of res.messages!) {
-            if (!merged.find((m) => m.id === msg.id)) {
-              merged.push(msg);
-              lastSeqRef.current = Math.max(
-                lastSeqRef.current,
-                msg.seq
-              );
-            }
-          }
-
-          return merged.sort((a, b) => a.seq - b.seq);
-        });
-      }
-    );
-  }, [chatId, isConnected, emit]);
-
-  /* ---------------------------------------------------
-   * SEND MESSAGE (ACK-BASED)
-   * --------------------------------------------------- */
   const sendMessage = useCallback(
     (content: string) => {
-      if (!chatId || !content.trim()) return;
-
-      emit(
-        'chat:send',
-        {
-          chatId,
-          content,
-          clientMsgId: crypto.randomUUID(),
-        },
-        (res: {
-          ok: boolean;
-          message?: ChatMessage;
-          error?: string;
-        }) => {
-          if (!res?.ok || !res.message) return;
-
-          const msg = res.message;
-
-          setMessages((prev) => {
-            if (prev.find((m) => m.id === msg.id)) return prev;
-            lastSeqRef.current = msg.seq;
-            return [...prev, msg].sort((a, b) => a.seq - b.seq);
-          });
-        }
-      );
+      if (!content.trim()) return;
+      emit('chat:message', {
+        sessionId,
+        content: content.trim(),
+        messageId: crypto.randomUUID(),
+      });
     },
-    [chatId, emit]
+    [emit, sessionId]
   );
 
-  return {
-    messages,
-    sendMessage,
-    lastSeq: lastSeqRef.current,
-  };
+  return { messages, sendMessage, historyLoaded };
 }
