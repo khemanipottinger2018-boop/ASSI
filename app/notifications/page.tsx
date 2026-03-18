@@ -98,7 +98,7 @@ export default function NotificationsPage() {
               key={notification.id}
               notification={notification}
               onClick={() => {
-                if (!notification.read) {
+                if (!notification.isRead) {
                   markRead(notification.id);
                 }
               }}

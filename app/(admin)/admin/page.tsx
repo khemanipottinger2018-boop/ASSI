@@ -9,11 +9,10 @@ import {
   EyeOff, Eye, ArrowRight, Loader2, Cpu,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { adminApi } from '@/lib/api';
 import SentinelChat from '@/components/admin/sentinel/SentinelChat';
 
-const API_URL        = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const UNDERCOVER_KEY = 'sentinel:undercover';
-
 type UndercoverRole = 'student' | 'tutor' | null;
 
 const fade = {
@@ -24,56 +23,30 @@ const fade = {
   }),
 };
 
-/* ══════════════════════════════════════════════════
-   PRIMITIVES
-   ══════════════════════════════════════════════════ */
-
-function SectionCard({
-  title, icon: Icon, accent = '#00b4ff', path, loading, children,
-}: {
-  title: string;
-  icon: React.ElementType;
-  accent?: string;
-  path: string;
-  loading?: boolean;
-  children: React.ReactNode;
+function SectionCard({ title, icon: Icon, accent = '#00b4ff', path, loading, children }: {
+  title: string; icon: React.ElementType; accent?: string;
+  path: string; loading?: boolean; children: React.ReactNode;
 }) {
   const router = useRouter();
   return (
-    <div style={{
-      borderRadius: 12, overflow: 'hidden', position: 'relative',
-      background: 'rgba(0,10,22,0.75)', border: `1px solid ${accent}18`,
-      display: 'flex', flexDirection: 'column',
-    }}>
+    <div style={{ borderRadius: 12, overflow: 'hidden', position: 'relative',
+      background: 'rgba(0,10,22,0.75)', border: `1px solid ${accent}18`, display: 'flex', flexDirection: 'column' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
         background: `linear-gradient(90deg, transparent, ${accent}45, transparent)` }} />
-
-      {/* header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '11px 14px', borderBottom: `1px solid ${accent}10`,
-      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '11px 14px', borderBottom: `1px solid ${accent}10` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <Icon size={12} style={{ color: `${accent}80` }} />
-          <span style={{ color: `${accent}65`, fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-            {title}
-          </span>
+          <span style={{ color: `${accent}65`, fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase' }}>{title}</span>
         </div>
-        <button
-          onClick={() => router.push(path)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-            background: 'transparent', border: 'none', padding: '3px 0',
-            color: `${accent}45`, fontSize: 10, letterSpacing: '0.06em', transition: 'color 0.15s',
-          }}
+        <button onClick={() => router.push(path)} style={{ display: 'flex', alignItems: 'center', gap: 4,
+          cursor: 'pointer', background: 'transparent', border: 'none', padding: '3px 0',
+          color: `${accent}45`, fontSize: 10, letterSpacing: '0.06em', transition: 'color 0.15s' }}
           onMouseEnter={e => (e.currentTarget.style.color = accent)}
-          onMouseLeave={e => (e.currentTarget.style.color = `${accent}45`)}
-        >
+          onMouseLeave={e => (e.currentTarget.style.color = `${accent}45`)}>
           View all <ArrowRight size={11} style={{ marginLeft: 2 }} />
         </button>
       </div>
-
-      {/* body */}
       <div style={{ padding: '8px 14px 12px', flex: 1, minHeight: 90 }}>
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 80 }}>
@@ -91,14 +64,10 @@ function EmptyRow({ text }: { text: string }) {
 
 function MiniRow({ left, right, sub }: { left: React.ReactNode; right?: React.ReactNode; sub?: string }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
-    }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '7px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
       <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ color: 'rgba(200,225,255,0.6)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {left}
-        </div>
+        <div style={{ color: 'rgba(200,225,255,0.6)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{left}</div>
         {sub && <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sub}</div>}
       </div>
       {right && <div style={{ flexShrink: 0, marginLeft: 10 }}>{right}</div>}
@@ -108,18 +77,10 @@ function MiniRow({ left, right, sub }: { left: React.ReactNode; right?: React.Re
 
 function Pill({ label, color }: { label: string; color: string }) {
   return (
-    <span style={{
-      fontSize: 9, padding: '2px 7px', borderRadius: 20, textTransform: 'capitalize',
-      color, background: `${color}15`, border: `1px solid ${color}28`,
-    }}>
-      {label}
-    </span>
+    <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, textTransform: 'capitalize',
+      color, background: `${color}15`, border: `1px solid ${color}28` }}>{label}</span>
   );
 }
-
-/* ══════════════════════════════════════════════════
-   PAGE
-   ══════════════════════════════════════════════════ */
 
 export default function AdminDashboardPage() {
   const router   = useRouter();
@@ -136,7 +97,6 @@ export default function AdminDashboardPage() {
     window.location.href = next ? '/' : '/admin';
   }, [undercover]);
 
-  /* ── data ── */
   const [stats,        setStats]        = useState<any>(null);
   const [sessions,     setSessions]     = useState<any[]>([]);
   const [users,        setUsers]        = useState<any[]>([]);
@@ -152,37 +112,44 @@ export default function AdminDashboardPage() {
   const [lMetrics, setLMetrics] = useState(true);
 
   const load = useCallback(() => {
-    const go = (url: string) =>
-      fetch(`${API_URL}${url}`, { credentials: 'include' }).then(r => r.json()).catch(() => ({}));
-
     setLStats(true);
-    go('/api/admin/dashboard/stats').then(d => { if (d.success) setStats(d.stats); }).finally(() => setLStats(false));
+    adminApi.getMetrics()
+      .then(d => { if (d.success) setStats((d as any).stats); })
+      .catch(() => {}).finally(() => setLStats(false));
 
     setLSess(true);
-    go('/api/admin/sessions/live').then(d => {
-      if (d.success) setSessions(
-        (d.sessions ?? [])
-          .sort((a: any, b: any) => ['active','waiting','paused','ended'].indexOf(a.status) - ['active','waiting','paused','ended'].indexOf(b.status))
-          .slice(0, 4)
-      );
-    }).finally(() => setLSess(false));
+    adminApi.getLiveSessions()
+      .then(d => {
+        if (d.success) setSessions(
+          (d.sessions ?? [])
+            .sort((a: any, b: any) => ['active','waiting','paused','ended'].indexOf(a.status) - ['active','waiting','paused','ended'].indexOf(b.status))
+            .slice(0, 4)
+        );
+      }).catch(() => {}).finally(() => setLSess(false));
 
     setLUsers(true);
-    go('/api/admin/users').then(d => { if (d.success) setUsers((d.users ?? []).slice(0, 4)); }).finally(() => setLUsers(false));
+    adminApi.getUsers()
+      .then(d => { if (d.success) setUsers((d.users ?? []).slice(0, 4)); })
+      .catch(() => {}).finally(() => setLUsers(false));
 
     setLApps(true);
-    go('/api/admin/tutor-applications').then(d => { if (d.success) setApplications((d.applications ?? []).slice(0, 4)); }).finally(() => setLApps(false));
+    adminApi.getApplications()
+      .then(d => { if (d.success) setApplications((d.applications ?? []).slice(0, 4)); })
+      .catch(() => {}).finally(() => setLApps(false));
 
     setLErrors(true);
-    go('/api/admin/errors?range=24h').then(d => { if (d.success) setErrors((d.errors ?? []).slice(0, 4)); }).finally(() => setLErrors(false));
+    adminApi.getErrors('24h')
+      .then(d => { if (d.success) setErrors(((d as any).errors ?? []).slice(0, 4)); })
+      .catch(() => {}).finally(() => setLErrors(false));
 
     setLMetrics(true);
-    go('/api/admin/metrics').then(d => { if (d.success) setMetrics(d.metrics); }).finally(() => setLMetrics(false));
+    adminApi.getMetrics()
+      .then(d => { if (d.success) setMetrics((d as any).metrics); })
+      .catch(() => {}).finally(() => setLMetrics(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  /* ── helpers ── */
   const elapsed = (ts: number) => {
     const m = Math.floor((Date.now() - ts) / 60000);
     return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
@@ -199,14 +166,9 @@ export default function AdminDashboardPage() {
   };
   const pendingCount = applications.filter(a => a.status === 'pending').length;
 
-  /* ══════════════════════════════════════════════
-     RENDER
-     ══════════════════════════════════════════════ */
-
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-7">
 
-      {/* ── Header ── */}
       <motion.div custom={0} variants={fade} initial="initial" animate="animate"
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -225,7 +187,6 @@ export default function AdminDashboardPage() {
         </button>
       </motion.div>
 
-      {/* ── Stat strip ── */}
       <motion.div custom={1} variants={fade} initial="initial" animate="animate"
         className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
@@ -246,18 +207,14 @@ export default function AdminDashboardPage() {
         ))}
       </motion.div>
 
-      {/* ── Undercover panel ── */}
       <motion.div custom={2} variants={fade} initial="initial" animate="animate">
-        <div style={{
-          borderRadius: 12, overflow: 'hidden', position: 'relative',
+        <div style={{ borderRadius: 12, overflow: 'hidden', position: 'relative',
           background: 'rgba(0,10,22,0.78)',
-          border: undercover ? '1px solid rgba(245,158,11,0.32)' : '1px solid rgba(0,180,255,0.1)',
-        }}>
+          border: undercover ? '1px solid rgba(245,158,11,0.32)' : '1px solid rgba(0,180,255,0.1)' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
             background: undercover
               ? 'linear-gradient(90deg, transparent, rgba(245,158,11,0.5), transparent)'
               : 'linear-gradient(90deg, transparent, rgba(0,180,255,0.28), transparent)' }} />
-
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '11px 16px', borderBottom: undercover ? '1px solid rgba(245,158,11,0.1)' : '1px solid rgba(0,180,255,0.07)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -282,7 +239,6 @@ export default function AdminDashboardPage() {
               )}
             </AnimatePresence>
           </div>
-
           <div style={{ padding: '10px 16px', display: 'flex', gap: 8 }}>
             {(['student', 'tutor'] as const).map(role => {
               const Icon = role === 'student' ? GraduationCap : BookOpen;
@@ -293,8 +249,7 @@ export default function AdminDashboardPage() {
                   borderRadius: 8, cursor: 'pointer',
                   background: active ? 'rgba(245,158,11,0.1)' : 'rgba(0,180,255,0.04)',
                   border: `1px solid ${active ? 'rgba(245,158,11,0.32)' : 'rgba(0,180,255,0.1)'}`,
-                  transition: 'all 0.15s ease',
-                }}>
+                  transition: 'all 0.15s ease' }}>
                   <Icon size={13} style={{ color: active ? '#f59e0b' : 'rgba(0,180,255,0.4)', flexShrink: 0 }} />
                   <p style={{ color: active ? '#fbbf24' : 'rgba(200,230,255,0.5)', fontSize: 11, fontWeight: 600, textTransform: 'capitalize', flex: 1, textAlign: 'left' }}>
                     {active ? `Exit ${role} view` : `Go as ${role}`}
@@ -307,12 +262,10 @@ export default function AdminDashboardPage() {
               {undercover && (
                 <motion.button initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 'auto' }} exit={{ opacity: 0, width: 0 }}
                   onClick={() => { localStorage.removeItem(UNDERCOVER_KEY); window.location.href = '/admin'; }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8,
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 8,
                     cursor: 'pointer', overflow: 'hidden', whiteSpace: 'nowrap', flexShrink: 0,
                     background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.16)',
-                    color: 'rgba(255,69,58,0.6)', fontSize: 11,
-                  }}>
+                    color: 'rgba(255,69,58,0.6)', fontSize: 11 }}>
                   <Shield size={11} /> Back to Admin
                 </motion.button>
               )}
@@ -321,117 +274,85 @@ export default function AdminDashboardPage() {
         </div>
       </motion.div>
 
-      {/* ── Preview grid — 2 col ── */}
       <motion.div custom={3} variants={fade} initial="initial" animate="animate"
         style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
 
-        {/* Sessions */}
         <SectionCard title="Live Sessions" icon={Activity} accent="#34d399" path="/admin/sessions" loading={lSess}>
-          {sessions.length === 0
-            ? <EmptyRow text="No active sessions" />
-            : sessions.map(s => (
-                <MiniRow key={s.sessionId}
-                  left={
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                        background: sessionDot[s.status] ?? '#fff',
-                        boxShadow: s.status === 'active' ? `0 0 6px ${sessionDot.active}` : 'none' }} />
-                      {s.sessionId.slice(0, 8).toUpperCase()}
-                      {s.subjectName && <span style={{ color: 'rgba(255,255,255,0.25)', marginLeft: 4 }}>· {s.subjectName}</span>}
-                    </span>
-                  }
-                  right={
-                    <span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Clock size={9} /> {elapsed(s.startedAt)}
-                    </span>
-                  }
-                />
-              ))
-          }
+          {sessions.length === 0 ? <EmptyRow text="No active sessions" /> : sessions.map(s => (
+            <MiniRow key={s.sessionId}
+              left={<span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                  background: sessionDot[s.status] ?? '#fff',
+                  boxShadow: s.status === 'active' ? `0 0 6px ${sessionDot.active}` : 'none' }} />
+                {s.sessionId.slice(0, 8).toUpperCase()}
+                {s.subjectName && <span style={{ color: 'rgba(255,255,255,0.25)', marginLeft: 4 }}>· {s.subjectName}</span>}
+              </span>}
+              right={<span style={{ color: 'rgba(255,255,255,0.28)', fontSize: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Clock size={9} /> {elapsed(s.startedAt)}
+              </span>}
+            />
+          ))}
         </SectionCard>
 
-        {/* Users */}
         <SectionCard title="Users" icon={Users} accent="#60a5fa" path="/admin/users" loading={lUsers}>
-          {users.length === 0
-            ? <EmptyRow text="No users found" />
-            : users.map(u => (
-                <MiniRow key={u.id}
-                  left={u.username}
-                  sub={u.email}
-                  right={<Pill label={u.role} color={roleColor[u.role] ?? 'rgba(255,255,255,0.4)'} />}
-                />
-              ))
-          }
+          {users.length === 0 ? <EmptyRow text="No users found" /> : users.map(u => (
+            <MiniRow key={u.id} left={u.username} sub={u.email}
+              right={<Pill label={u.role} color={roleColor[u.role] ?? 'rgba(255,255,255,0.4)'} />}
+            />
+          ))}
         </SectionCard>
 
-        {/* Applications */}
         <SectionCard title="Tutor Applications" icon={BookOpen} accent="#a78bfa" path="/admin/tutor-applications" loading={lApps}>
-          {applications.length === 0
-            ? <EmptyRow text="No applications" />
-            : <>
-                {pendingCount > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 2,
-                    padding: '5px 9px', borderRadius: 7, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)' }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#a78bfa', flexShrink: 0 }} />
-                    <span style={{ color: '#a78bfa', fontSize: 10 }}>{pendingCount} pending review</span>
-                  </div>
-                )}
-                {applications.map(a => (
-                  <MiniRow key={a.id}
-                    left={a.username}
-                    sub={a.email}
-                    right={<Pill
-                      label={a.status}
-                      color={a.status === 'pending' ? '#a78bfa' : a.status === 'approved' ? '#34d399' : '#f87171'}
-                    />}
-                  />
-                ))}
-              </>
-          }
+          {applications.length === 0 ? <EmptyRow text="No applications" /> : <>
+            {pendingCount > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, marginTop: 2,
+                padding: '5px 9px', borderRadius: 7, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.15)' }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#a78bfa', flexShrink: 0 }} />
+                <span style={{ color: '#a78bfa', fontSize: 10 }}>{pendingCount} pending review</span>
+              </div>
+            )}
+            {applications.map(a => (
+              <MiniRow key={a.id} left={a.username} sub={a.email}
+                right={<Pill label={a.status}
+                  color={a.status === 'pending' ? '#a78bfa' : a.status === 'approved' ? '#34d399' : '#f87171'} />}
+              />
+            ))}
+          </>}
         </SectionCard>
 
-        {/* Errors */}
         <SectionCard title="Recent Errors (24h)" icon={AlertTriangle} accent="#f87171" path="/admin/errors" loading={lErrors}>
-          {errors.length === 0
-            ? <EmptyRow text="No errors in the last 24h 🎉" />
-            : errors.map(e => (
-                <MiniRow key={e.id}
-                  left={e.error_message ?? e.message ?? 'Unknown error'}
-                  sub={e.endpoint ?? e.route ?? undefined}
-                  right={<Pill
-                    label={e.severity ?? e.level ?? 'error'}
-                    color={levelColor[e.severity ?? e.level ?? 'error'] ?? '#f87171'}
-                  />}
-                />
-              ))
-          }
+          {errors.length === 0 ? <EmptyRow text="No errors in the last 24h 🎉" /> : errors.map(e => (
+            <MiniRow key={e.id}
+              left={e.error_message ?? e.message ?? 'Unknown error'}
+              sub={e.endpoint ?? e.route ?? undefined}
+              right={<Pill label={e.severity ?? e.level ?? 'error'}
+                color={levelColor[e.severity ?? e.level ?? 'error'] ?? '#f87171'} />}
+            />
+          ))}
         </SectionCard>
 
-        {/* Metrics — full width */}
         <div style={{ gridColumn: '1 / -1' }}>
           <SectionCard title="Platform Metrics" icon={BarChart2} accent="#ff9f0a" path="/admin/metrics" loading={lMetrics}>
-            {!metrics
-              ? <EmptyRow text="No metrics available" />
-              : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, paddingTop: 4 }}>
-                  {[
-                    { label: 'Total Sessions',    value: metrics.totalSessions,   color: '#00b4ff' },
-                    { label: 'Active Sessions',   value: metrics.activeSessions,  color: '#34d399' },
-                    { label: 'Avg Duration (min)',value: metrics.avgSessionDuration ?? '—', color: '#ff9f0a' },
-                    { label: 'Online Now',         value: metrics.onlineUsers,    color: '#a78bfa' },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} style={{ padding: '10px 12px', borderRadius: 8,
-                      background: 'rgba(255,255,255,0.025)', border: `1px solid ${color}15` }}>
-                      <p style={{ color: 'rgba(255,255,255,0.22)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</p>
-                      <p style={{ color, fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{value ?? '—'}</p>
-                    </div>
-                  ))}
-                </div>
-            }
+            {!metrics ? <EmptyRow text="No metrics available" /> : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, paddingTop: 4 }}>
+                {[
+                  { label: 'Total Sessions',     value: metrics.totalSessions,          color: '#00b4ff' },
+                  { label: 'Active Sessions',    value: metrics.activeSessions,         color: '#34d399' },
+                  { label: 'Avg Duration (min)', value: metrics.avgSessionDuration ?? '—', color: '#ff9f0a' },
+                  { label: 'Online Now',          value: metrics.onlineUsers,            color: '#a78bfa' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ padding: '10px 12px', borderRadius: 8,
+                    background: 'rgba(255,255,255,0.025)', border: `1px solid ${color}15` }}>
+                    <p style={{ color: 'rgba(255,255,255,0.22)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 6 }}>{label}</p>
+                    <p style={{ color, fontSize: 20, fontWeight: 700, lineHeight: 1 }}>{value ?? '—'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
         </div>
       </motion.div>
 
-      {/* ── Sentinel AI — full width, embedded ── */}
       <motion.div custom={4} variants={fade} initial="initial" animate="animate">
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 }}>
           <div style={{ width: 3, height: 14, borderRadius: 2, background: '#00b4ff', boxShadow: '0 0 8px #00b4ff' }} />
@@ -444,7 +365,6 @@ export default function AdminDashboardPage() {
           <SentinelChat />
         </div>
       </motion.div>
-
     </div>
   );
 }
