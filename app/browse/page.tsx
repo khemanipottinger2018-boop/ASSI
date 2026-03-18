@@ -1,33 +1,25 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Search, SlidersHorizontal, Loader2 } from 'lucide-react';
 import AvailableTutorCard from '@/components/student/dashboard/AvailableTutorCard';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Tutor = {
-  userId: string;
-  username: string;
-  avatarUrl: string | null;
-  hourlyRate: number;
-  isStudentTutor: boolean;
-  subjects: { id: string; name: string; level: string }[];
-};
+import { tutorsApi } from '@/lib/api';
+import type { TutorSummary } from '@/lib/api/tutors';
 
 type Filter = 'all' | 'available' | 'CAPE' | 'CSEC';
 
 export default function BrowsePage() {
-  const [tutors,   setTutors]   = useState<Tutor[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [query,    setQuery]    = useState('');
-  const [filter,   setFilter]   = useState<Filter>('all');
+  const [tutors,  setTutors]  = useState<TutorSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query,   setQuery]   = useState('');
+  const [filter,  setFilter]  = useState<Filter>('all');
 
   useEffect(() => {
-    fetch(`${API_URL}/api/tutors/available`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => { if (d.success) setTutors(d.tutors ?? []); })
+    tutorsApi.getAvailable()
+      .then(d => { if (d.success) setTutors(d.tutors ?? []); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,7 +31,7 @@ export default function BrowsePage() {
 
     const matchesFilter =
       filter === 'all' ||
-      (filter === 'available') || // all from API are available
+      filter === 'available' ||
       t.subjects.some((s) => s.level === filter);
 
     return matchesQuery && matchesFilter;
@@ -48,7 +40,6 @@ export default function BrowsePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
-      {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -60,14 +51,12 @@ export default function BrowsePage() {
         </p>
       </motion.div>
 
-      {/* ── Search + filters ── */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.35 }}
         className="space-y-3"
       >
-        {/* Search bar */}
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
@@ -79,7 +68,6 @@ export default function BrowsePage() {
           />
         </div>
 
-        {/* Filter chips */}
         <div className="flex items-center gap-2">
           <SlidersHorizontal size={13} className="text-white/30 flex-shrink-0" />
           {(['all', 'CAPE', 'CSEC'] as Filter[]).map((f) => (
@@ -100,7 +88,6 @@ export default function BrowsePage() {
         </div>
       </motion.div>
 
-      {/* ── Results ── */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={20} className="text-white/30 animate-spin" />

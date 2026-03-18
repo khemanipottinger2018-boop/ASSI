@@ -11,19 +11,10 @@ import RecentSessionRow   from '@/components/student/dashboard/RecentSessionRow'
 import AvailableTutorCard from '@/components/student/dashboard/AvailableTutorCard';
 import StatCard           from '@/components/student/dashboard/StatCard';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Session = {
-  sessionId: string; status: string; scheduledTime: string;
-  durationMinutes: number; subjectName: string;
-  partnerUsername: string; partnerAvatarUrl: string | null;
-};
-type Notification = { id: string; title: string; body: string; read: boolean };
-type Tutor = {
-  userId: string; username: string; avatarUrl: string | null;
-  hourlyRate: number; isStudentTutor: boolean;
-  subjects: { id: string; name: string; level: string }[];
-};
+import { sessionsApi, tutorsApi, notificationsApi } from '@/lib/api';
+import type { Session } from '@/lib/api/sessions';
+import type { TutorSummary } from '@/lib/api/tutors';
+import type { Notification } from '@/components/types/notification';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -31,19 +22,19 @@ export default function StudentDashboard() {
 
   const [sessions,      setSessions]      = useState<Session[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [tutors,        setTutors]        = useState<Tutor[]>([]);
+  const [tutors,        setTutors]        = useState<TutorSummary[]>([]);
   const [loading,       setLoading]       = useState(true);
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_URL}/api/browse/my-sessions`, { credentials: 'include' }).then(r => r.json()),
-      fetch(`${API_URL}/api/notifications`,       { credentials: 'include' }).then(r => r.json()),
-      fetch(`${API_URL}/api/tutors/available`,    { credentials: 'include' }).then(r => r.json()),
+      sessionsApi.getMySessions(),
+      notificationsApi.getAll(),
+      tutorsApi.getAvailable(),
     ]).then(([s, n, t]) => {
       if (s.success) setSessions(s.sessions ?? []);
       if (n.success) setNotifications((n.notifications ?? []).slice(0, 5));
       if (t.success) setTutors((t.tutors ?? []).slice(0, 4));
-    }).finally(() => setLoading(false));
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const upcoming  = sessions.filter(s => ['scheduled', 'confirmed'].includes(s.status)).slice(0, 3);

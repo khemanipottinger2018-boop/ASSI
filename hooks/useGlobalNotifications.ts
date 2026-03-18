@@ -3,31 +3,27 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/hooks/useSocket';
+import { notificationsApi } from '@/lib/api';
 import type { Notification } from '@/components/types/notification';
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export function useNotifications() {
   const { isAuthenticated } = useAuth();
   const { subscribe } = useSocket();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [unreadCount,   setUnreadCount]   = useState(0);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState<string | null>(null);
 
-  const mapNotification = useCallback((n: any): Notification => {
-    return {
-      id: String(n.id),
-      title: String(n.title ?? ''),
-      body: String(n.body ?? n.message ?? ''),
-      read: Boolean(n.read ?? n.is_read),
-      createdAt: String(n.createdAt ?? n.created_at ?? new Date().toISOString()),
-      type: n.type ?? undefined,
-      data: n.data ?? undefined,
-    };
-  }, []);
+  const mapNotification = useCallback((n: any): Notification => ({
+    id:        String(n.id),
+    title:     String(n.title ?? ''),
+    body:      String(n.body ?? n.message ?? ''),
+    read:      Boolean(n.read ?? n.is_read),
+    createdAt: String(n.createdAt ?? n.created_at ?? new Date().toISOString()),
+    type:      n.type ?? undefined,
+    data:      n.data ?? undefined,
+  }), []);
 
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -36,17 +32,8 @@ export function useNotifications() {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${API_URL}/api/notifications`, {
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch notifications');
-      }
-
-      const data = await res.json();
-
-      const mapped: Notification[] = (data.notifications || []).map(mapNotification);
+      const data = await notificationsApi.getAll();
+      const mapped: Notification[] = (data.notifications ?? []).map(mapNotification);
 
       setNotifications(mapped);
       setUnreadCount(mapped.filter((n) => !n.read).length);
@@ -57,6 +44,7 @@ export function useNotifications() {
     }
   }, [isAuthenticated, mapNotification]);
 
+  // Initial load
   useEffect(() => {
     if (!isAuthenticated) {
       setNotifications([]);
@@ -65,22 +53,22 @@ export function useNotifications() {
       setLoading(false);
       return;
     }
-
     refresh();
   }, [isAuthenticated, refresh]);
 
+  // Real-time socket listener
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const unsub = subscribe('notification:new', (payload: any) => {
       const incoming: Notification = {
-        id: String(payload.id ?? Date.now()),
-        title: payload.title ?? '',
-        body: payload.body ?? payload.message ?? '',
-        read: false,
+        id:        String(payload.id ?? Date.now()),
+        title:     payload.title ?? '',
+        body:      payload.body ?? payload.message ?? '',
+        read:      false,
         createdAt: payload.createdAt ?? new Date().toISOString(),
-        type: payload.type ?? undefined,
-        data: payload.data ?? undefined,
+        type:      payload.type ?? undefined,
+        data:      payload.data ?? undefined,
       };
 
       setNotifications((prev) => {
@@ -98,16 +86,12 @@ export function useNotifications() {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
-
     setUnreadCount((count) => Math.max(0, count - 1));
 
     try {
-      await fetch(`${API_URL}/api/notifications/${id}/read`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await notificationsApi.markRead(id);
     } catch {
-      // optional: re-sync with refresh() if needed
+      // silent — optimistic update stays
     }
   }, []);
 
@@ -118,22 +102,11 @@ export function useNotifications() {
     setUnreadCount(0);
 
     try {
-      await fetch(`${API_URL}/api/notifications/read-all`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await notificationsApi.markAllRead();
     } catch {
-      // optional: re-sync with refresh() if needed
+      // silent — optimistic update stays
     }
   }, [isAuthenticated]);
 
-  return {
-    notifications,
-    unreadCount,
-    loading,
-    error,
-    refresh,
-    markRead,
-    markAllRead,
-  };
+  return { notifications, unreadCount, loading, error, refresh, markRead, markAllRead };
 }

@@ -4,20 +4,8 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Calendar, Clock, User, BookOpen, ChevronRight, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Session = {
-  sessionId: string;
-  status: string;
-  scheduledTime: string;
-  durationMinutes: number;
-  subjectName: string;
-  partnerUsername: string;
-  partnerAvatarUrl: string | null;
-  price?: number;
-};
+import { sessionsApi } from '@/lib/api';
+import type { Session } from '@/lib/api/sessions';
 
 type Tab = 'upcoming' | 'completed' | 'all';
 
@@ -31,17 +19,16 @@ const statusStyle: Record<string, { label: string; color: string }> = {
 };
 
 export default function SessionsPage() {
-  const { user } = useAuth();
-  const router   = useRouter();
+  const router = useRouter();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState<Tab>('upcoming');
 
   useEffect(() => {
-    fetch(`${API_URL}/api/browse/my-sessions`, { credentials: 'include' })
-      .then((r) => r.json())
+    sessionsApi.getMySessions()
       .then((d) => { if (d.success) setSessions(d.sessions ?? []); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -52,7 +39,6 @@ export default function SessionsPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
 
-      {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -62,7 +48,6 @@ export default function SessionsPage() {
         <p className="text-white/40 text-sm mt-1">Your tutoring history and upcoming bookings</p>
       </motion.div>
 
-      {/* ── Tabs ── */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -79,10 +64,7 @@ export default function SessionsPage() {
             onClick={() => setTab(t.key)}
             className={`
               px-4 py-1.5 rounded-lg text-xs font-medium transition
-              ${tab === t.key
-                ? 'bg-white/15 text-white'
-                : 'text-white/40 hover:text-white/70'
-              }
+              ${tab === t.key ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70'}
             `}
           >
             {t.label}
@@ -90,7 +72,6 @@ export default function SessionsPage() {
         ))}
       </motion.div>
 
-      {/* ── List ── */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={20} className="text-white/30 animate-spin" />
@@ -134,7 +115,6 @@ export default function SessionsPage() {
                 onClick={() => router.push(`/sessions/${session.sessionId}`)}
                 className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition group"
               >
-                {/* Avatar */}
                 <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
                   {session.partnerAvatarUrl
                     ? <img src={session.partnerAvatarUrl} alt={session.partnerUsername} className="w-full h-full object-cover" />
@@ -142,7 +122,6 @@ export default function SessionsPage() {
                   }
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white/80 text-sm font-medium">{session.partnerUsername}</span>
@@ -162,7 +141,6 @@ export default function SessionsPage() {
                   </div>
                 </div>
 
-                {/* Date */}
                 <div className="text-right flex-shrink-0">
                   <p className="text-white/50 text-xs">{dateStr}</p>
                   <p className="text-white/25 text-[10px] mt-0.5">{timeStr}</p>
