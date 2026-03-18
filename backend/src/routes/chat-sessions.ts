@@ -1,6 +1,5 @@
 // src/routes/chat-sessions.ts
 // ASSI Platform — Chat Sessions (live + historical)
-// Schema fixes: booked_sessions.id (not session_id), messages (not chat_messages)
 
 import { Router } from 'express';
 import { prisma }              from '@/config/database';
@@ -77,8 +76,9 @@ router.get('/sessions', requireAuth, async (_req, res) => {
             : [],
         ]);
 
-        const partnerMap = new Map(partners.map(p => [p.userId, p.username]));
-        const subjectMap = new Map(subjects.map(s => [s.id, s.name]));
+        // Explicit tuple types so Map constructor is happy
+        const partnerMap = new Map<string, string>(partners.map(p => [p.userId, p.username] as [string, string]));
+        const subjectMap = new Map<string, string>(subjects.map(s => [s.id, s.name] as [string, string]));
 
         for (const { id: sessionId, state } of relevant) {
           const partnerId = role === 'tutor' ? state.studentId : state.tutorId;
@@ -96,28 +96,41 @@ router.get('/sessions', requireAuth, async (_req, res) => {
     }
 
     /* ── Historical sessions (DB) ── */
-    // Schema: booked_sessions.id (not session_id), tutor relation via tutor.userProfile
 
     const booked = await prisma.bookedSession.findMany({
       where: role === 'student'
         ? { studentId: userId }
-        : { tutor: { userProfile: { userId } } },
+        : { tutor: { userId } },
       orderBy: { scheduledAt: 'desc' },
-      select: {
-        id:          true,
-        status:      true,
-        scheduledAt: true,
-        student:     { select: { username: true, userId: true } },
-        tutor:       { select: { id: true, userProfile: { select: { username: true, userId: true } } } },
-        subject:     { select: { name: true } },
+      include: {
+        subject: { select: { name: true } },
+        tutor:   { include: { userProfile: { select: { username: true, userId: true } } } },
       },
     });
+
+    // Fetch student profiles for tutor view
+    const studentIds = role === 'tutor'
+      ? [...new Set(booked.map(s => s.studentId))]
+      : [];
+
+    const studentProfiles = studentIds.length
+      ? await prisma.userProfile.findMany({
+          where:  { userId: { in: studentIds } },
+          select: { userId: true, username: true },
+        })
+      : [];
+
+    const studentMap = new Map<string, string>(
+      studentProfiles.map(p => [p.userId, p.username] as [string, string])
+    );
 
     sessions.push(
       ...booked.map(s => ({
         id:          s.id,
-        partnerId:   role === 'student' ? s.tutor?.userProfile?.userId   : s.student?.userId,
-        partnerName: role === 'student' ? s.tutor?.userProfile?.username : s.student?.username ?? '',
+        partnerId:   role === 'student' ? s.tutor?.userProfile?.userId   : s.studentId,
+        partnerName: role === 'student'
+          ? s.tutor?.userProfile?.username ?? ''
+          : studentMap.get(s.studentId)   ?? '',
         subjectName: s.subject?.name ?? '',
         status:      s.status,
         live:        false,
@@ -155,25 +168,33 @@ router.get('/sessions/:sessionId/messages', requireAuth, async (req, res) => {
       return res.json({ success: true, messages, live: true });
     }
 
-    // Historical — read from messages table (schema: public.messages)
+    // Historical — read from messages table
     const dbMessages = await prisma.message.findMany({
       where:   { sessionId },
       orderBy: { createdAt: 'asc' },
       select: {
-        id:         true,
-        senderId:   true,
-        content:    true,
-        isRead:     true,
-        createdAt:  true,
-        sender:     { select: { username: true } },
+        id:        true,
+        senderId:  true,
+        content:   true,
+        isRead:    true,
+        createdAt: true,
       },
     });
 
-    // Confirm caller is a participant before returning history
     const isParticipant = dbMessages.some(m => m.senderId === userId);
     if (!isParticipant && dbMessages.length > 0) {
       return res.status(403).json({ success: false, error: 'Not a participant' });
     }
+
+    // Batch-fetch sender usernames
+    const senderIds = [...new Set(dbMessages.map(m => m.senderId))];
+    const senderProfiles = await prisma.userProfile.findMany({
+      where:  { userId: { in: senderIds } },
+      select: { userId: true, username: true },
+    });
+    const senderMap = new Map<string, string>(
+      senderProfiles.map(p => [p.userId, p.username] as [string, string])
+    );
 
     return res.json({
       success: true,
@@ -182,7 +203,7 @@ router.get('/sessions/:sessionId/messages', requireAuth, async (req, res) => {
         messageId:  m.id,
         sessionId,
         senderId:   m.senderId,
-        senderName: m.sender?.username ?? '',
+        senderName: senderMap.get(m.senderId) ?? '',
         content:    m.content,
         isRead:     m.isRead,
         timestamp:  m.createdAt.getTime(),

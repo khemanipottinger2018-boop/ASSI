@@ -28,7 +28,7 @@ router.get('/tutors', requireAuth, async (req, res) => {
     };
 
     if (subjectId) {
-      where.subjects = { some: { subjectId: subjectId as string } };
+      where.tutorSubjects = { some: { subjectId: subjectId as string } };
     }
     if (minRate || maxRate) {
       where.hourlyRate = {};
@@ -43,18 +43,11 @@ router.get('/tutors', requireAuth, async (req, res) => {
         skip:    (pageNum - 1) * limitNum,
         take:    limitNum,
         orderBy: { totalSessions: 'desc' },
-        select: {
-          id:           true,
-          hourlyRate:   true,
-          bio:          true,
-          timezone:     true,
-          chatMode:     true,
-          isStudentTutor: true,
-          totalSessions:  true,
+        include: {
           userProfile: {
             select: { userId: true, username: true },
           },
-          subjects: {
+          tutorSubjects: {
             select: { subject: { select: { id: true, name: true, category: true } } },
           },
         },
@@ -64,16 +57,16 @@ router.get('/tutors', requireAuth, async (req, res) => {
     return res.json({
       success: true,
       tutors: tutors.map(t => ({
-        tutorId:       t.id,
-        userId:        t.userProfile.userId,
-        username:      t.userProfile.username,
-        bio:           t.bio           ?? '',
-        hourlyRate:    t.hourlyRate    ?? 0,
-        timezone:      t.timezone      ?? null,
-        chatMode:      t.chatMode,
+        tutorId:        t.id,
+        userId:         t.userProfile.userId,
+        username:       t.userProfile.username,
+        bio:            t.bio            ?? '',
+        hourlyRate:     t.hourlyRate     ?? 0,
+        timezone:       t.timezone       ?? null,
+        chatMode:       t.chatMode,
         isStudentTutor: t.isStudentTutor,
-        totalSessions: t.totalSessions,
-        subjects:      t.subjects.map(ts => ts.subject),
+        totalSessions:  t.totalSessions,
+        subjects:       t.tutorSubjects.map(ts => ts.subject),
       })),
       pagination: {
         page:  pageNum,
@@ -121,8 +114,6 @@ router.post('/book', requireAuth, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Tutor not found or unavailable' });
     }
 
-    const rate = tutor.hourlyRate ?? 0;
-
     const session = await prisma.bookedSession.create({
       data: {
         studentId:       userId,
@@ -130,7 +121,7 @@ router.post('/book', requireAuth, async (req, res) => {
         subjectId:       subject_id,
         scheduledAt,
         durationMinutes: Number(duration_minutes),
-        rate,
+        rate:            tutor.hourlyRate ?? 0,
         notes:           notes ?? '',
         status:          'pending',
       },
@@ -149,37 +140,47 @@ router.get('/my-sessions', requireAuth, async (req, res) => {
   try {
     const { userId, role } = res.locals.auth as AuthContext;
 
+    // For tutors: find sessions where tutor.userId = userId
+    // For students: find sessions where studentId = userId
     const sessions = await prisma.bookedSession.findMany({
       where: role === 'student'
         ? { studentId: userId }
-        : { tutor: { userProfile: { userId } } },
+        : { tutor: { userId } },
       orderBy: { scheduledAt: 'desc' },
-      select: {
-        id:              true,
-        status:          true,
-        scheduledAt:     true,
-        durationMinutes: true,
-        rate:            true,
-        notes:           true,
-        subject:  { select: { name: true } },
-        student:  { select: { username: true } },
-        tutor:    { select: { userProfile: { select: { username: true } } } },
+      include: {
+        subject: { select: { name: true } },
+        tutor:   { include: { userProfile: { select: { username: true } } } },
       },
     });
+
+    // For student sessions we also need the student's username (that's the current user)
+    // For tutor sessions we need the student's username — fetch from UserProfile
+    const studentIds = role === 'tutor'
+      ? [...new Set(sessions.map(s => s.studentId))]
+      : [];
+
+    const studentProfiles = studentIds.length
+      ? await prisma.userProfile.findMany({
+          where:  { userId: { in: studentIds } },
+          select: { userId: true, username: true },
+        })
+      : [];
+
+    const studentMap = new Map(studentProfiles.map(p => [p.userId, p.username] as [string, string]));
 
     return res.json({
       success: true,
       sessions: sessions.map(s => ({
-        sessionId:      s.id,
-        status:         s.status,
-        scheduledAt:    s.scheduledAt,
+        sessionId:       s.id,
+        status:          s.status,
+        scheduledAt:     s.scheduledAt,
         durationMinutes: s.durationMinutes,
-        rate:           s.rate,
-        notes:          s.notes,
-        subjectName:    s.subject?.name ?? '',
+        rate:            s.rate,
+        notes:           s.notes,
+        subjectName:     s.subject?.name ?? '',
         partnerUsername: role === 'student'
           ? s.tutor?.userProfile?.username ?? ''
-          : s.student?.username ?? '',
+          : studentMap.get(s.studentId)    ?? '',
       })),
     });
   } catch (err) {

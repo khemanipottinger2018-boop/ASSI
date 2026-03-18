@@ -4,8 +4,15 @@ import { requireAuth } from '@/routes/middleware/requireAuth';
 import { withRole }    from '@/routes/middleware/withRole';
 import { prisma, getSupabaseAdmin } from '@/config/database';
 import { isUserRole }  from '@/types/roles';
-
 const router = Router();
+
+// Maps incoming string role (including 'tutor-applicant') to Prisma enum value
+const roleMap: Record<string, string> = {
+  'student':         'student',
+  'tutor':           'tutor',
+  'tutor-applicant': 'tutor_applicant',
+  'admin':           'admin',
+};
 
 /* ── GET /api/admin/users ── */
 
@@ -47,9 +54,14 @@ router.patch('/:userId/role', requireAuth, withRole('admin'), async (req, res) =
       return res.status(400).json({ success: false, error: 'Invalid role' });
     }
 
+    const prismaRole = roleMap[role as string];
+    if (!prismaRole) {
+      return res.status(400).json({ success: false, error: 'Invalid role' });
+    }
+
     await prisma.userProfile.update({
       where: { userId },
-      data:  { role },
+      data:  { role: prismaRole as any },
     });
 
     return res.json({ success: true });
@@ -71,7 +83,6 @@ router.patch('/:userId/suspend', requireAuth, withRole('admin'), async (req, res
       data:  { isSuspended: Boolean(suspended) },
     });
 
-    // If suspending, revoke Supabase Auth session too
     if (suspended) {
       await getSupabaseAdmin().auth.admin.signOut(userId, 'global');
     }

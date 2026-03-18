@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { requireAuth }             from '@/routes/middleware/requireAuth';
 import { withRole }                from '@/routes/middleware/withRole';
 import { prisma }                  from '@/config/database';
+import { getSupabaseAdmin }        from '@/config/database';
 import { isUserRole }              from '@/types/roles';
 import { TutorApplicationService } from '@/services/tutor-application.service';
 import { redisRuntimeService }     from '@/infra/redis/redis.runtime.service';
@@ -16,10 +17,10 @@ const router = Router();
 router.use(requireAuth, withRole('admin'));
 
 /* ── GET /api/ai/sentinel/users ─────────────────────
-   Search users by role, suspended status, or username/email
+   Search users by role, suspended status, or username
    ?role=student|tutor|admin|tutor-applicant
    ?suspended=true|false
-   ?q=username_or_email
+   ?q=username
    ───────────────────────────────────────────────────── */
 router.get('/users', async (req, res) => {
   try {
@@ -36,20 +37,18 @@ router.get('/users', async (req, res) => {
 
     if (q && typeof q === 'string' && q.trim().length >= 2) {
       const term = q.trim();
-      where.OR = [
-        { username: { contains: term, mode: 'insensitive' } },
-        { email:    { contains: term, mode: 'insensitive' } },
-      ];
+      // UserProfile has no email field — email lives in auth.users
+      // Search by username only; use Supabase admin for email lookups
+      where.username = { contains: term, mode: 'insensitive' };
     }
 
     const users = await prisma.userProfile.findMany({
       where,
-      take: 50,
+      take:    50,
       orderBy: { createdAt: 'desc' },
       select: {
-        id:          true,
+        userId:      true,
         username:    true,
-        email:       true,
         role:        true,
         isSuspended: true,
         isDemo:      true,
@@ -66,7 +65,7 @@ router.get('/users', async (req, res) => {
 });
 
 /* ── GET /api/ai/sentinel/users/:identifier ──────────
-   Get a single user by id, username, or email
+   Get a single user by userId or username
    ───────────────────────────────────────────────────── */
 router.get('/users/:identifier', async (req, res) => {
   try {
@@ -76,24 +75,20 @@ router.get('/users/:identifier', async (req, res) => {
       where: {
         deletedAt: null,
         OR: [
-          { id:       identifier },
+          { userId:   identifier },
           { username: identifier },
-          { email:    identifier },
         ],
       },
       select: {
-        id:                  true,
-        username:            true,
-        email:               true,
-        role:                true,
-        isSuspended:         true,
-        isDemo:              true,
-        demoExpiresAt:       true,
-        createdAt:           true,
-        lastLogin:           true,
-        disclaimerAccepted:  true,
-        bio:                 true,
-        avatarUrl:           true,
+        userId:             true,
+        username:           true,
+        role:               true,
+        isSuspended:        true,
+        isDemo:             true,
+        demoExpiresAt:      true,
+        createdAt:          true,
+        lastLogin:          true,
+        disclaimerAccepted: true,
       },
     });
 
@@ -122,7 +117,7 @@ router.patch('/users/:userId/suspend', async (req, res) => {
     }
 
     await prisma.userProfile.updateMany({
-      where: { id: userId, deletedAt: null },
+      where: { userId, deletedAt: null },
       data:  { isSuspended: suspended, updatedAt: new Date() },
     });
 
@@ -187,15 +182,15 @@ router.get('/errors', async (req, res) => {
       take:    100,
       orderBy: { createdAt: 'desc' },
       select: {
-        id:         true,
-        userId:     true,
-        errorType:  true,
-        message:    true,
-        endpoint:   true,
-        method:     true,
-        severity:   true,
-        resolved:   true,
-        createdAt:  true,
+        id:        true,
+        userId:    true,
+        errorType: true,
+        message:   true,
+        endpoint:  true,
+        method:    true,
+        severity:  true,
+        resolved:  true,
+        createdAt: true,
       },
     });
 

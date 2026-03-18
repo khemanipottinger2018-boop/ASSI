@@ -26,6 +26,7 @@ router.get('/available', requireAuth, async (req, res) => {
       return res.json({ success: true, tutors: [] });
     }
 
+    // Note: use include only — cannot mix select + include in Prisma
     const tutors = await prisma.tutor.findMany({
       where: {
         userProfile: {
@@ -34,19 +35,14 @@ router.get('/available', requireAuth, async (req, res) => {
           isSuspended: false,
         },
         ...(subjectId ? {
-          subjects: { some: { subjectId } },
+          tutorSubjects: { some: { subjectId } },
         } : {}),
       },
-      select: {
-        id:          true,
-        hourlyRate:  true,
-        bio:         true,
-        isAvailable: true,
-        chatMode:    true,
+      include: {
         userProfile: {
           select: { userId: true, username: true },
         },
-        subjects: {
+        tutorSubjects: {
           select: {
             subject: { select: { id: true, name: true, category: true } },
           },
@@ -63,7 +59,7 @@ router.get('/available', requireAuth, async (req, res) => {
         bio:        t.bio        ?? '',
         hourlyRate: t.hourlyRate ?? 0,
         chatMode:   t.chatMode,
-        subjects:   t.subjects.map(ts => ts.subject),
+        subjects:   t.tutorSubjects.map(ts => ts.subject),
       })),
     });
   } catch (err) {

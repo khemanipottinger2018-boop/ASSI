@@ -1,8 +1,446 @@
+// =============================================================================
+// ASSI Backend — schema.prisma
+// Generated from Supabase SQL schema + ALTER TABLE migrations
+// ORM: Prisma 5 | DB: PostgreSQL (Supabase)
+// =============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum Role {
+  student
+  tutor
+  tutor_applicant @map("tutor-applicant")
+  admin
+}
+
+enum AudienceType {
+  all
+  students
+  tutors
+  admins
+}
+
+enum AssignmentStatus {
+  submitted
+  under_review
+  completed
+  returned
+}
+
+enum SessionStatus {
+  pending
+  confirmed
+  in_progress
+  active
+  completed
+  cancelled
+}
+
+enum MessageContext {
+  direct
+  session
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum ApplicationStatus {
+  pending
+  seen
+  under_review
+  approved
+  rejected
+}
+
+enum SubscriptionPlan {
+  basic
+  pro
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  expired
+}
+
+enum Theme {
+  light
+  dark
+  system
+}
+
+enum ErrorSeverity {
+  info
+  warning
+  error
+  critical
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+model UserProfile {
+  userId               String    @id @map("user_id") @db.Uuid
+  username             String
+  role                 Role      @default(student)
+  disclaimerAccepted   Boolean   @default(false) @map("disclaimer_accepted")
+  isSuspended          Boolean   @default(false) @map("is_suspended")
+  isDemo               Boolean   @default(false) @map("is_demo")
+  demoExpiresAt        DateTime? @map("demo_expires_at") @db.Timestamp()
+  lastLogin            DateTime? @map("last_login") @db.Timestamp()
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamp()
+  // App Store compliance + minor check
+  dateOfBirth          DateTime? @map("date_of_birth") @db.Date
+  parentalConsentGiven Boolean   @default(false) @map("parental_consent_given")
+  parentEmail          String?   @map("parent_email")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  // Relations
+  tutor            Tutor?
+  tutorApplication TutorApplication?
+  supportTickets   SupportTicket[]
+
+  @@map("user_profiles")
+}
+
+model UserRole {
+  userId String @id @map("user_id") @db.Uuid
+  role   Role   @default(student)
+
+  @@map("user_roles")
+}
+
+model UserSettings {
+  userId             String   @id @map("user_id") @db.Uuid
+  emailNotifications Boolean  @default(true) @map("email_notifications")
+  pushNotifications  Boolean  @default(true) @map("push_notifications")
+  theme              Theme    @default(light)
+  language           String   @default("en")
+  timezone           String   @default("America/Jamaica")
+  // ASSI-specific preferences
+  assiEnabled        Boolean  @default(true) @map("assi_enabled")
+  assiPosition       Json?    @map("assi_position")
+  themePreference    String   @default("system") @map("theme_preference")
+  reduceMotion       Boolean  @default(false) @map("reduce_motion")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("user_settings")
+}
+
+model Subject {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tutorSubjects       TutorSubject[]
+  applicationSubjects ApplicationSubject[]
+  bookedSessions      BookedSession[]
+  assignments         Assignment[]
+  studentProgress     StudentProgress[]
+
+  @@map("subjects")
+}
+
+model Tutor {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  bio            String?
+  hourlyRate     Decimal? @map("hourly_rate")
+  isAvailable    Boolean  @default(true) @map("is_available")
+  isVerified     Boolean  @default(false) @map("is_verified")
+  rating         Decimal  @default(0.00)
+  totalSessions  Int      @default(0) @map("total_sessions")
+  chatMode       String?  @map("chat_mode")
+  isStudentTutor Boolean  @default(false) @map("is_student_tutor")
+  timezone       String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  userProfile        UserProfile              @relation(fields: [userId], references: [userId])
+  tutorSubjects      TutorSubject[]
+  education          TutorEducation[]
+  examQualifications TutorExamQualification[]
+  bookedSessions     BookedSession[]
+  assignments        Assignment[]
+  subscriptions      TutorSubscription[]
+
+  @@map("tutors")
+}
+
+model TutorSubject {
+  tutorId   String @map("tutor_id") @db.Uuid
+  subjectId String @map("subject_id") @db.Uuid
+
+  tutor   Tutor   @relation(fields: [tutorId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@id([tutorId, subjectId])
+  @@map("tutor_subjects")
+}
+
+model TutorEducation {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorId      String   @map("tutor_id") @db.Uuid
+  institution  String
+  degree       String
+  fieldOfStudy String?  @map("field_of_study")
+  startYear    Int?     @map("start_year")
+  endYear      Int?     @map("end_year")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tutor Tutor @relation(fields: [tutorId], references: [id])
+
+  @@map("tutor_education")
+}
+
+model TutorExamQualification {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorId      String   @map("tutor_id") @db.Uuid
+  examType     String   @map("exam_type")
+  subject      String
+  grade        String?
+  yearAchieved Int?     @map("year_achieved")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tutor Tutor @relation(fields: [tutorId], references: [id])
+
+  @@map("tutor_exam_qualifications")
+}
+
+model TutorSubscription {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tutorId   String             @map("tutor_id") @db.Uuid
+  plan      SubscriptionPlan   @default(basic)
+  status    SubscriptionStatus @default(active)
+  startedAt DateTime           @default(now()) @map("started_at")
+  expiresAt DateTime?          @map("expires_at")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  tutor Tutor @relation(fields: [tutorId], references: [id])
+
+  @@map("tutor_subscriptions")
+}
+
+model TutorApplication {
+  id                  String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId              String            @unique @map("user_id") @db.Uuid
+  status              ApplicationStatus @default(pending)
+  submittedAt         DateTime          @default(now()) @map("submitted_at")
+  reviewedAt          DateTime?         @map("reviewed_at")
+  reviewedBy          String?           @map("reviewed_by") @db.Uuid
+  notes               String?
+  // Application content fields
+  educationBackground String?           @map("education_background")
+  teachingExperience  String?           @map("teaching_experience")
+  whyTutor            String?           @map("why_tutor")
+  qualifications      String?
+  birthDate           DateTime?         @map("birth_date") @db.Date
+  ageVerified         Boolean           @default(false) @map("age_verified")
+  ageVerifiedAt       DateTime?         @map("age_verified_at")
+
+  // Relations
+  user                UserProfile          @relation(fields: [userId], references: [userId])
+  applicationSubjects ApplicationSubject[]
+
+  @@map("tutor_applications")
+}
+
+model ApplicationSubject {
+  applicationId String @map("application_id") @db.Uuid
+  subjectId     String @map("subject_id") @db.Uuid
+
+  application TutorApplication @relation(fields: [applicationId], references: [id])
+  subject     Subject          @relation(fields: [subjectId], references: [id])
+
+  @@id([applicationId, subjectId])
+  @@map("application_subjects")
+}
+
+model BookedSession {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId       String        @map("student_id") @db.Uuid
+  tutorId         String        @map("tutor_id") @db.Uuid
+  subjectId       String?       @map("subject_id") @db.Uuid
+  status          SessionStatus @default(pending)
+  scheduledAt     DateTime      @map("scheduled_at")
+  startedAt       DateTime?     @map("started_at")
+  durationMinutes Int           @default(60) @map("duration_minutes")
+  rate            Decimal?
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  // Note: studentId points to auth.users — query via UserProfile on studentId = userId
+  tutor   Tutor    @relation(fields: [tutorId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+
+  messages Message[]
+  reviews  SessionReview[]
+
+  @@map("booked_sessions")
+}
+
+model Assignment {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId   String           @map("student_id") @db.Uuid
+  tutorId     String?          @map("tutor_id") @db.Uuid
+  subjectId   String?          @map("subject_id") @db.Uuid
+  title       String
+  description String?
+  fileUrl     String?          @map("file_url")
+  status      AssignmentStatus @default(submitted)
+  dueAt       DateTime?        @map("due_at")
+  submittedAt DateTime         @default(now()) @map("submitted_at")
+  completedAt DateTime?        @map("completed_at")
+  tutorNotes  String?          @map("tutor_notes")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  tutor   Tutor?   @relation(fields: [tutorId], references: [id])
+  subject Subject? @relation(fields: [subjectId], references: [id])
+
+  @@map("assignments")
+}
+
+model Message {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  senderId   String         @map("sender_id") @db.Uuid
+  receiverId String?        @map("receiver_id") @db.Uuid
+  sessionId  String?        @map("session_id") @db.Uuid
+  context    MessageContext @default(direct)
+  content    String
+  isRead     Boolean        @default(false) @map("is_read")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  // sender/receiver point to auth.users — look up via UserProfile
+  session BookedSession? @relation(fields: [sessionId], references: [id])
+
+  @@map("messages")
+}
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String
+  title     String
+  body      String?
+  isRead    Boolean  @default(false) @map("is_read")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+model SessionReview {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId  String   @map("session_id") @db.Uuid
+  reviewerId String   @map("reviewer_id") @db.Uuid
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  session BookedSession @relation(fields: [sessionId], references: [id])
+
+  @@map("session_reviews")
+}
+
+model StudentProgress {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId            String    @map("student_id") @db.Uuid
+  subjectId            String    @map("subject_id") @db.Uuid
+  sessionsCompleted    Int       @default(0) @map("sessions_completed")
+  assignmentsSubmitted Int       @default(0) @map("assignments_submitted")
+  averageScore         Decimal?  @map("average_score")
+  lastActivityAt       DateTime? @map("last_activity_at")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@map("student_progress")
+}
+
+model Announcement {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdBy   String       @map("created_by") @db.Uuid
+  title       String
+  body        String
+  audience    AudienceType @default(all)
+  publishedAt DateTime?    @map("published_at")
+  expiresAt   DateTime?    @map("expires_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@map("announcements")
+}
+
+model SupportTicket {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  subject    String
+  body       String
+  status     TicketStatus   @default(open)
+  priority   TicketPriority @default(normal)
+  category   String         @default("other")
+  adminNotes String?        @map("admin_notes")
+  assignedTo String?        @map("assigned_to") @db.Uuid
+  resolvedAt DateTime?      @map("resolved_at")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  user UserProfile @relation(fields: [userId], references: [userId])
+
+  @@map("support_tickets")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String
+  targetRole String?  @map("target_role")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("admin_audit_log")
+}
+
+model ErrorLog {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?       @map("user_id") @db.Uuid
+  errorType String        @map("error_type")
+  message   String
+  stack     String?
+  endpoint  String?
+  method    String?
+  ipAddress String?       @map("ip_address")
+  userAgent String?       @map("user_agent")
+  severity  ErrorSeverity @default(error)
+  resolved  Boolean       @default(false)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@map("error_logs")
 }

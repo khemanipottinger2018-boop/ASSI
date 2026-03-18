@@ -10,19 +10,17 @@ export function startScheduledSessionWatcher() {
 
 async function runScheduledSessionCheck() {
   try {
-    // Find all confirmed sessions whose scheduled time has passed
-    // and haven't been started yet
     const sessions = await prisma.bookedSession.findMany({
       where: {
-        status:         'confirmed',
-        scheduled_time: { lte: new Date() },
-        started_at:     null,
+        status:      'confirmed',
+        scheduledAt: { lte: new Date() },
+        startedAt:   null,
       },
       select: {
-        session_id: true,
-        student_id: true,
-        tutor_id:   true,
-        subject_id: true,
+        id:        true,
+        studentId: true,
+        tutorId:   true,
+        subjectId: true,
       },
     });
 
@@ -35,52 +33,52 @@ async function runScheduledSessionCheck() {
 }
 
 async function startSession(session: {
-  session_id: string;
-  student_id: string;
-  tutor_id:   string;
-  subject_id: string;
+  id:        string;
+  studentId: string;
+  tutorId:   string;
+  subjectId: string | null;
 }) {
   try {
     // 1. Create runtime session in Redis
-    await redisRuntimeService.createSession(session.session_id, {
+    await redisRuntimeService.createSession(session.id, {
       type:      'booked',
-      tutorId:   session.tutor_id,
-      studentId: session.student_id,
+      tutorId:   session.tutorId,
+      studentId: session.studentId,
     });
 
-    // 2. Update DB — updateMany with started_at: null guard prevents double-start
+    // 2. Update DB — startedAt: null guard prevents double-start
     await prisma.bookedSession.updateMany({
       where: {
-        session_id: session.session_id,
-        started_at: null,               // idempotency guard
+        id:        session.id,
+        startedAt: null,          // idempotency guard
       },
       data: {
-        status:     'active',
-        started_at: new Date(),
-        updated_at: new Date(),
+        status:    'active',
+        startedAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
     // 3. Notify both parties
     await Promise.all([
       notificationService.notify({
-        userId: session.student_id,
+        userId: session.studentId,
         type:   'session_started',
         title:  'Your session has started',
         body:   'Your booked tutoring session is now live.',
-        data:   { sessionId: session.session_id },
+        data:   { sessionId: session.id },
       }),
       notificationService.notify({
-        userId: session.tutor_id,
+        userId: session.tutorId,
         type:   'session_started',
         title:  'Session started',
         body:   'Your booked tutoring session is now live.',
-        data:   { sessionId: session.session_id },
+        data:   { sessionId: session.id },
       }),
     ]);
 
-    console.log(`[Watcher] Started booked session ${session.session_id}`);
+    console.log(`[Watcher] Started booked session ${session.id}`);
   } catch (err) {
-    console.error(`[Watcher] Failed to start session ${session.session_id}:`, err);
+    console.error(`[Watcher] Failed to start session ${session.id}:`, err);
   }
 }

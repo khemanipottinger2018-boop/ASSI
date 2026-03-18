@@ -12,14 +12,14 @@ const VALID_LEVELS = ['CSEC', 'CAPE'];
 async function getSubjectsWithCount(where: Record<string, any> = {}) {
   const subjects = await prisma.subject.findMany({
     where,
-    include: { _count: { select: { tutors: true } } },
+    include: { _count: { select: { tutorSubjects: true } } },
     orderBy: [{ category: 'asc' }, { name: 'asc' }],
   });
   return subjects.map(s => ({
     id:         s.id,
     name:       s.name,
     category:   s.category,
-    tutorCount: s._count.tutors,
+    tutorCount: s._count.tutorSubjects,
   }));
 }
 
@@ -36,13 +36,18 @@ router.get('/public', async (_req, res) => {
 router.get('/popular', async (_req, res) => {
   try {
     const subjects = await prisma.subject.findMany({
-      include: { _count: { select: { tutors: true } } },
-      orderBy: { tutors: { _count: 'desc' } },
+      include: { _count: { select: { tutorSubjects: true } } },
+      orderBy: { tutorSubjects: { _count: 'desc' } },
       take:    10,
     });
     return res.json({
       success:  true,
-      subjects: subjects.map(s => ({ id: s.id, name: s.name, category: s.category, tutorCount: s._count.tutors })),
+      subjects: subjects.map(s => ({
+        id:         s.id,
+        name:       s.name,
+        category:   s.category,
+        tutorCount: s._count.tutorSubjects,
+      })),
     });
   } catch (err) {
     console.error('[subjects/popular] error:', err);
@@ -113,14 +118,19 @@ router.get('/:id', async (req, res) => {
   try {
     const subject = await prisma.subject.findUnique({
       where:   { id: req.params.id },
-      include: { _count: { select: { tutors: true } } },
+      include: { _count: { select: { tutorSubjects: true } } },
     });
     if (!subject) {
       return res.status(404).json({ success: false, error: 'Subject not found' });
     }
     return res.json({
       success: true,
-      subject: { id: subject.id, name: subject.name, category: subject.category, tutorCount: subject._count.tutors },
+      subject: {
+        id:         subject.id,
+        name:       subject.name,
+        category:   subject.category,
+        tutorCount: subject._count.tutorSubjects,
+      },
     });
   } catch (err) {
     console.error('[subjects/:id] error:', err);

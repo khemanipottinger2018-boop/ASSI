@@ -13,10 +13,6 @@ import OpenAI from 'openai';
 
 const router = Router();
 
-// ─────────────────────────────────────────────
-// OPENAI CLIENT  (lazy-init — same pattern as assi-guest.service.ts)
-// ─────────────────────────────────────────────
-
 let _openai: OpenAI | null = null;
 
 function getOpenAI(): OpenAI {
@@ -27,10 +23,6 @@ function getOpenAI(): OpenAI {
   _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   return _openai;
 }
-
-// ─────────────────────────────────────────────
-// PLATFORM CONTEXT  (injected into every Sentinel request)
-// ─────────────────────────────────────────────
 
 async function getPlatformContext(): Promise<string> {
   try {
@@ -47,7 +39,7 @@ async function getPlatformContext(): Promise<string> {
       prisma.userProfile.count(),
       prisma.userProfile.count({ where: { role: 'tutor' } }),
       prisma.userProfile.count({ where: { role: 'student' } }),
-      prisma.userProfile.count({ where: { role: 'tutor-applicant' } }),
+      prisma.userProfile.count({ where: { role: 'tutor_applicant' } }), // ← Prisma enum value
       prisma.supportTicket.count({ where: { status: 'open' } }),
       redisPresenceService.getOnlineCount(),
       redisRuntimeService.getLiveSessions(),
@@ -70,10 +62,6 @@ LIVE PLATFORM SNAPSHOT (as of this request):
   }
 }
 
-// ─────────────────────────────────────────────
-// SYSTEM PROMPT
-// ─────────────────────────────────────────────
-
 const SENTINEL_SYSTEM_PROMPT = `
 You are Sentinel — the private AI co-pilot for the ASSI platform owner and admin team.
 
@@ -92,10 +80,6 @@ Your tone:
 
 You are NOT accessible to students or tutors — this interface is admin-only.
 `.trim();
-
-// ─────────────────────────────────────────────
-// POST /api/ai/sentinel
-// ─────────────────────────────────────────────
 
 router.post('/sentinel', requireAuth, withRole('admin'), async (req, res) => {
   try {

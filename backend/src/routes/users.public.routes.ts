@@ -27,7 +27,7 @@ router.get('/:username', async (req, res) => {
             id:         true,
             bio:        true,
             hourlyRate: true,
-            subjects: {
+            tutorSubjects: {
               select: {
                 subject: {
                   select: { id: true, name: true, category: true },
@@ -43,21 +43,20 @@ router.get('/:username', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Not found' });
     }
 
-    // Admins are never public
     if (profile.role === 'admin') {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
 
-    const subjects = profile.tutor?.subjects.map(ts => ts.subject) ?? [];
+    const subjects = profile.tutor?.tutorSubjects.map(ts => ts.subject) ?? [];
 
     return res.json({
       success: true,
       user: {
-        id:        profile.userId,
-        username:  profile.username,
-        role:      profile.role,
-        tutorBio:  profile.tutor?.bio        ?? null,
-        hourlyRate: profile.tutor?.hourlyRate ?? null,
+        id:         profile.userId,
+        username:   profile.username,
+        role:       profile.role,
+        tutorBio:   profile.tutor?.bio        ?? null,
+        hourlyRate: profile.tutor?.hourlyRate  ?? null,
         subjects,
       },
     });
