@@ -4,23 +4,19 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { User, Star, BookOpen, Clock, DollarSign, Edit3, Wifi, WifiOff, Settings } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import { User, Star, BookOpen, DollarSign, Edit3 } from 'lucide-react';
+import { userApi } from '@/lib/api';
+import type { UserProfileView } from '@/components/types/profile.view';
 
 export default function TutorProfilePage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [tutor, setTutor] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/me`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.success) setProfile(d.user);
-      })
+    userApi.getMe()
+      .then((d) => { if (d.success) setProfile(d.user); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -31,11 +27,10 @@ export default function TutorProfilePage() {
 
   if (loading) return <ProfileSkeleton />;
 
-  const p = profile ?? user;
+  const p = profile;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -51,7 +46,6 @@ export default function TutorProfilePage() {
                   : <User size={24} className="text-white/40" />
                 }
               </div>
-              {/* Online indicator */}
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-black/30 flex items-center justify-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               </span>
@@ -76,7 +70,6 @@ export default function TutorProfilePage() {
           </button>
         </div>
 
-        {/* Tutor bio */}
         {p?.bio && (
           <p className="mt-4 text-white/55 text-sm leading-relaxed border-t border-white/8 pt-4">
             {p.bio}
@@ -84,7 +77,6 @@ export default function TutorProfilePage() {
         )}
       </motion.div>
 
-      {/* Stats */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -96,8 +88,7 @@ export default function TutorProfilePage() {
         <StatCard icon={Star}       label="Rating"      value="—" />
       </motion.div>
 
-      {/* Subjects */}
-      {p?.subjects?.length > 0 && (
+      {p?.subjects && p.subjects.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -106,10 +97,10 @@ export default function TutorProfilePage() {
         >
           <p className="text-white/25 text-xs font-medium uppercase tracking-widest mb-3">Subjects</p>
           <div className="flex flex-wrap gap-2">
-            {p.subjects.map((s: any) => (
+            {p.subjects.map((s) => (
               <span key={s.id} className={`
                 px-2.5 py-1 rounded-full text-xs font-medium border
-                ${s.level === 'CAPE'
+                ${s.category === 'CAPE'
                   ? 'bg-purple-500/15 border-purple-500/25 text-purple-300'
                   : 'bg-emerald-500/15 border-emerald-500/25 text-emerald-300'
                 }
@@ -121,7 +112,6 @@ export default function TutorProfilePage() {
         </motion.div>
       )}
 
-      {/* Account actions */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -129,17 +119,17 @@ export default function TutorProfilePage() {
         className="glass rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
-        <ActionRow label="Edit profile"     onClick={() => router.push('/profile/tutor/edit')} />
-        <ActionRow label="Manage subjects"  onClick={() => router.push('/profile/tutor/subjects')} />
-        <ActionRow label="Availability"     onClick={() => router.push('/profile/tutor/availability')} />
-        <ActionRow label="Settings"         onClick={() => router.push('/settings')} />
-        <ActionRow label="Sign out"         onClick={handleLogout} destructive />
+        <ActionRow label="Edit profile"    onClick={() => router.push('/profile/tutor/edit')} />
+        <ActionRow label="Manage subjects" onClick={() => router.push('/profile/tutor/subjects')} />
+        <ActionRow label="Availability"    onClick={() => router.push('/profile/tutor/availability')} />
+        <ActionRow label="Settings"        onClick={() => router.push('/settings')} />
+        <ActionRow label="Sign out"        onClick={handleLogout} destructive />
       </motion.div>
     </div>
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="glass-soft rounded-2xl px-3 py-3 flex flex-col gap-1.5">
       <Icon size={13} className="text-white/35" />

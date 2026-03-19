@@ -14,30 +14,23 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /* ── Types ── */
 
-type TutorAvailability = 'available' | 'busy' | 'offline';
-
+// Matches shape from GET /api/tutors/available — backend source of truth
 interface AvailableTutor {
-  userId:       string;
-  username:     string;
-  displayName?: string;
-  avatarUrl?:   string;
-  bio?:         string;
-  rating:       number | null;
-  reviewCount:  number;
-  sessionCount: number;
-  availability: TutorAvailability;
-  subjects:     { name: string; level: string }[];
+  tutorId:         string;
+  userId:          string;
+  username:        string;
+  bio:             string;
+  hourlyRate:      number;
+  chatMode:        string | null;
+  isStudentTutor?: boolean;
+  totalSessions?:  number;
+  subjects:        { id: string; name: string; category: string | null }[];
 }
 
 type Step = 'subject' | 'tutors' | 'requesting' | 'error';
 
-/* ── Availability dot ── */
-
-const AVAIL_DOT: Record<TutorAvailability, { bg: string; glow: string; label: string }> = {
-  available: { bg: '#34d399', glow: '0 0 6px rgba(52,211,153,0.7)',  label: 'Available'   },
-  busy:      { bg: '#fb923c', glow: '0 0 6px rgba(251,146,60,0.6)',  label: 'In Session'  },
-  offline:   { bg: 'rgba(255,255,255,0.2)', glow: 'none',            label: 'Offline'     },
-};
+// All tutors from /api/tutors/available are online by definition
+const AVAILABLE_DOT = { bg: '#34d399', glow: '0 0 6px rgba(52,211,153,0.7)', label: 'Available' };
 
 /* ══════════════════════════════════════════════════
    PAGE
@@ -79,7 +72,7 @@ export default function LiveChatPage() {
 
     try {
       const res  = await fetch(
-        `${API_URL}/api/browse/tutors?subjectId=${encodeURIComponent(sid)}`,
+        `${API_URL}/api/tutors/available?subjectId=${encodeURIComponent(sid)}`,
         { credentials: 'include', signal: ctrl.signal },
       );
       const data = await res.json();
@@ -103,7 +96,7 @@ export default function LiveChatPage() {
 
   /* ── Subject selected (from inline picker) ── */
   const handleSubjectSelect = (subject: Subject) => {
-    setSubjectId(subject.subject_id);
+    setSubjectId(subject.id);
     setSubjectName(subject.name);
     setStep('tutors');
   };
@@ -254,8 +247,8 @@ export default function LiveChatPage() {
               {!loadingTutors && tutors.length > 0 && (
                 <div className="space-y-3">
                   {tutors.map(tutor => {
-                    const dot       = AVAIL_DOT[tutor.availability];
-                    const isBlocked = tutor.availability === 'offline';
+                    const dot       = AVAILABLE_DOT;
+                    const isBlocked = false;
                     const isThisOne = requestingId === tutor.userId;
 
                     return (
@@ -275,10 +268,7 @@ export default function LiveChatPage() {
                               className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
                               style={{ background: 'rgba(255,255,255,0.1)' }}
                             >
-                              {tutor.avatarUrl
-                                ? <img src={tutor.avatarUrl} alt="" className="w-full h-full rounded-full object-cover" />
-                                : (tutor.displayName ?? tutor.username)[0]?.toUpperCase()
-                              }
+                              {tutor.username[0]?.toUpperCase()}
                             </div>
                             {/* Availability dot */}
                             <span style={{
@@ -286,7 +276,7 @@ export default function LiveChatPage() {
                               width: 10, height: 10, borderRadius: '50%',
                               background: dot.bg, boxShadow: dot.glow,
                               border: '1.5px solid rgba(0,0,0,0.5)',
-                              animation: tutor.availability === 'available' ? 'pulse 2.5s infinite' : 'none',
+                              animation: 'pulse 2.5s infinite',
                             }} />
                           </div>
 
@@ -294,14 +284,12 @@ export default function LiveChatPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-white/90 text-sm font-semibold">
-                                {tutor.displayName ?? tutor.username}
+                                {tutor.username}
                               </p>
                               <span style={{
                                 fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 600,
-                                background: tutor.availability === 'available'
-                                  ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.06)',
-                                border: `1px solid ${tutor.availability === 'available'
-                                  ? 'rgba(52,211,153,0.25)' : 'rgba(255,255,255,0.1)'}`,
+                                background: 'rgba(52,211,153,0.12)',
+                                border: '1px solid rgba(52,211,153,0.25)',
                                 color: dot.bg,
                               }}>
                                 {dot.label}
@@ -324,23 +312,6 @@ export default function LiveChatPage() {
 
                             {/* Rating + session count */}
                             <div className="flex items-center gap-3 mt-1">
-                              {tutor.rating !== null && (
-                                <div className="flex items-center gap-1">
-                                  <Star size={9} className="text-amber-400" />
-                                  <span className="text-[10px] text-white/40">
-                                    {tutor.rating.toFixed(1)}
-                                    {tutor.reviewCount > 0 && ` (${tutor.reviewCount})`}
-                                  </span>
-                                </div>
-                              )}
-                              {tutor.sessionCount > 0 && (
-                                <div className="flex items-center gap-1">
-                                  <Clock size={9} className="text-white/20" />
-                                  <span className="text-[10px] text-white/30">
-                                    {tutor.sessionCount} session{tutor.sessionCount !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           </div>
 

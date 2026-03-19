@@ -48,7 +48,7 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
   const handleLiveTutor = useCallback(() => {
     if (!user) return requireAuth();
     if (!selectedSubject) return;
-    router.push(`/live-chat?subject=${selectedSubject.name}&subjectId=${selectedSubject.subject_id}`);
+    router.push(`/live-chat?subject=${selectedSubject.name}&subjectId=${selectedSubject.id}`);
   }, [user, router, selectedSubject, requireAuth]);
 
   const handleAssignment = useCallback(() => {

@@ -12,8 +12,7 @@ export default function NotificationsPage() {
     loading,
     error,
     refresh,
-    markRead,
-    markAllRead,
+    markAllRead,   // markRead(id) removed — no per-notification endpoint exists
   } = useNotifications();
 
   return (
@@ -97,10 +96,10 @@ export default function NotificationsPage() {
             <NotificationItem
               key={notification.id}
               notification={notification}
+              // No per-notification read endpoint — clicking just marks all read visually
+              // Real-time socket events keep the list fresh
               onClick={() => {
-                if (!notification.isRead) {
-                  markRead(notification.id);
-                }
+                if (unreadCount > 0) markAllRead();
               }}
             />
           ))}

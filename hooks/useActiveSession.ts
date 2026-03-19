@@ -1,42 +1,39 @@
+'use client';
+
 /**
  * useActiveSession
  *
- * Returns the student's current active session ID if one exists in Redis,
- * or null if they have no active session.
+ * Returns the student's active live session ID if one exists in Redis,
+ * or null if they have none.
  *
- * Used by the nav/sidebar to show an "Ongoing Session →" badge so the
- * student can always get back to their session from any page.
+ * Used by nav/sidebar to show an "Ongoing Session →" badge.
  *
- * Backend endpoint expected:
- *   GET /api/live-chat/active
- *   → { success: true,  sessionId: string }   (active session exists)
- *   → { success: true,  sessionId: null }      (no active session)
- *   → { success: false, error: string }        (unauthenticated / error)
+ * Backend: GET /api/live-chat/active
+ * Response: { success, session: { sessionId, status, tutorName, subjectName, startedAt } | null }
  *
- * Only runs for authenticated users with role 'student'.
- * Polls every 15s so the badge disappears promptly when a session ends.
+ * Student role only. Polls every 15s.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { sessionsApi } from '@/lib/api';
 
-const API_URL     = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-const POLL_MS     = 15_000;
+const POLL_MS = 15_000;
 
 export function useActiveSession(): string | null {
   const { user } = useAuth();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const check = () => {
+  const check = async () => {
     if (!user || user.role !== 'student') return;
 
-    fetch(`${API_URL}/api/live-chat/active`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) setSessionId(d.sessionId ?? null);
-      })
-      .catch(() => {});
+    try {
+      const data = await sessionsApi.getActiveSession();
+      setSessionId(data.session?.sessionId ?? null);
+    } catch {
+      // silent — badge just won't show
+    }
   };
 
   useEffect(() => {
@@ -51,7 +48,8 @@ export function useActiveSession(): string | null {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role]);
 
   return sessionId;
 }

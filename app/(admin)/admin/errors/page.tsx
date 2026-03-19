@@ -2,17 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  AlertTriangle,
-  RefreshCw,
-  Loader2,
-  Copy,
-  Check,
-} from 'lucide-react';
+import { AlertTriangle, RefreshCw, Loader2, Copy, Check } from 'lucide-react';
+import { adminApi } from '@/lib/api';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-/* Backend returns these exact field names from dbo.error_logs */
 type RawErrorLog = {
   id: string;
   severity: string;
@@ -26,7 +18,6 @@ type RawErrorLog = {
   resolved?: boolean;
 };
 
-/* Normalised shape used by the UI */
 type ErrorLog = {
   id: string;
   level: string;
@@ -48,40 +39,31 @@ function normalise(raw: RawErrorLog): ErrorLog {
 }
 
 const levelStyle: Record<string, string> = {
-  error: 'text-red-400 bg-red-500/15 border-red-500/20',
-  warn: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20',
+  error:   'text-red-400 bg-red-500/15 border-red-500/20',
+  warn:    'text-yellow-400 bg-yellow-500/15 border-yellow-500/20',
   warning: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20',
-  info: 'text-blue-400 bg-blue-500/15 border-blue-500/20',
+  info:    'text-blue-400 bg-blue-500/15 border-blue-500/20',
 };
 
 export default function ErrorsPage() {
-  const [logs, setLogs] = useState<ErrorLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [logs,     setLogs]     = useState<ErrorLog[]>([]);
+  const [loading,  setLoading]  = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
-  const [range, setRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const [copied,   setCopied]   = useState<string | null>(null);
+  const [range,    setRange]    = useState<'24h' | '7d' | '30d'>('24h');
 
   async function load(r = range) {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/errors?range=${r}`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-
+      const data = await adminApi.getErrors(r);
       if (data.success) {
-        setLogs((data.errors ?? []).map(normalise));
+        setLogs(((data as any).errors ?? []).map(normalise));
       }
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    load();
-  }, [range]);
+  useEffect(() => { load(); }, [range]);
 
   async function copyStack(log: ErrorLog) {
     const text = [log.message, log.stack].filter(Boolean).join('\n');
@@ -102,11 +84,8 @@ export default function ErrorsPage() {
           <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
             <AlertTriangle size={16} className="text-white/60" />
           </div>
-
           <div>
-            <h1 className="text-white font-semibold text-lg tracking-tight">
-              Error Logs
-            </h1>
+            <h1 className="text-white font-semibold text-lg tracking-tight">Error Logs</h1>
             <p className="text-white/30 text-xs">
               {loading ? 'Loading…' : `${logs.length} entries`}
             </p>
@@ -120,16 +99,13 @@ export default function ErrorsPage() {
                 key={r}
                 onClick={() => setRange(r)}
                 className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                  range === r
-                    ? 'bg-white/15 text-white'
-                    : 'text-white/35 hover:text-white/60'
+                  range === r ? 'bg-white/15 text-white' : 'text-white/35 hover:text-white/60'
                 }`}
               >
                 {r}
               </button>
             ))}
           </div>
-
           <button
             onClick={() => load()}
             disabled={loading}
@@ -159,29 +135,19 @@ export default function ErrorsPage() {
               className="glass rounded-2xl overflow-hidden"
             >
               <button
-                onClick={() =>
-                  setExpanded(expanded === log.id ? null : log.id)
-                }
+                onClick={() => setExpanded(expanded === log.id ? null : log.id)}
                 className="w-full flex items-start gap-3 p-4 text-left hover:bg-white/5 transition"
               >
-                <span
-                  className={`mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border flex-shrink-0 ${
-                    levelStyle[log.level] ?? levelStyle.error
-                  }`}
-                >
+                <span className={`mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border flex-shrink-0 ${levelStyle[log.level] ?? levelStyle.error}`}>
                   {log.level}
                 </span>
-
                 <div className="flex-1 min-w-0">
-                  <p className="text-white/75 text-sm font-mono truncate">
-                    {log.message}
-                  </p>
+                  <p className="text-white/75 text-sm font-mono truncate">{log.message}</p>
                   <div className="flex items-center gap-3 mt-0.5 text-white/25 text-[10px]">
                     {log.route && <span>{log.route}</span>}
                     <span>{new Date(log.createdAt).toLocaleString()}</span>
                   </div>
                 </div>
-
                 <span className="text-white/20 text-xs flex-shrink-0">
                   {expanded === log.id ? '▲' : '▼'}
                 </span>
@@ -190,23 +156,15 @@ export default function ErrorsPage() {
               {expanded === log.id && log.stack && (
                 <div className="border-t border-white/8 px-4 pb-4">
                   <div className="flex items-center justify-between mb-2 pt-3">
-                    <span className="text-white/25 text-[10px] uppercase tracking-widest">
-                      Stack trace
-                    </span>
-
+                    <span className="text-white/25 text-[10px] uppercase tracking-widest">Stack trace</span>
                     <button
                       onClick={() => copyStack(log)}
                       className="flex items-center gap-1 text-white/25 hover:text-white/60 text-[10px] transition"
                     >
-                      {copied === log.id ? (
-                        <Check size={11} />
-                      ) : (
-                        <Copy size={11} />
-                      )}
+                      {copied === log.id ? <Check size={11} /> : <Copy size={11} />}
                       {copied === log.id ? 'Copied' : 'Copy'}
                     </button>
                   </div>
-
                   <pre className="text-white/40 text-[10px] font-mono leading-relaxed overflow-x-auto whitespace-pre-wrap break-all">
                     {log.stack}
                   </pre>

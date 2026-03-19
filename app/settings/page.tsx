@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Cpu, Palette, Sliders, Check, Sun, Moon, Sparkles } from 'lucide-react';
-import { useSettings, UserSettings } from '@/contexts/SettingsContext';
+import { Settings, Bell, Palette, Sliders, Check, Sun, Moon, Sparkles } from 'lucide-react';
+import { useSettings } from '@/contexts/SettingsContext';
+import type { UserSettings } from '@/contexts/SettingsContext';
 import {
   useTheme,
   ColorMode,
@@ -33,8 +34,9 @@ export default function SettingsPage() {
   const { colorMode, setColorMode, customPreset, setCustomPreset } = useTheme();
   const [saved, setSaved] = useState(false);
 
-  async function handleUpdate<K extends keyof UserSettings>(key: K, value: any) {
-    await update(key, value);
+  // update() now takes a Partial<UserSettings> patch object
+  async function handleUpdate(patch: Partial<UserSettings>) {
+    await update(patch);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   }
@@ -68,17 +70,24 @@ export default function SettingsPage() {
         <AnimatedCheck visible={saved} />
       </motion.div>
 
-      {/* ── ASSI Helper ── */}
+      {/* ── Notifications ── */}
       <motion.div custom={1} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-4"
       >
-        <SectionHeader icon={Cpu} title="ASSI Helper" />
+        <SectionHeader icon={Bell} title="Notifications" />
 
         <ToggleRow
-          label="Enable ASSI Helper"
-          description="Show the floating assistant on every page"
-          value={settings.assi_enabled}
-          onChange={(v) => handleUpdate('assi_enabled', v)}
+          label="Email notifications"
+          description="Receive updates and alerts via email"
+          value={settings.emailNotifications}
+          onChange={(v) => handleUpdate({ emailNotifications: v })}
+        />
+
+        <ToggleRow
+          label="Push notifications"
+          description="Receive in-app push notifications"
+          value={settings.pushNotifications}
+          onChange={(v) => handleUpdate({ pushNotifications: v })}
         />
       </motion.div>
 
@@ -88,7 +97,7 @@ export default function SettingsPage() {
       >
         <SectionHeader icon={Palette} title="Appearance" />
 
-        {/* ── Color Mode (Light / Dark / Custom) ── */}
+        {/* Color Mode */}
         <div>
           <p className="text-white/75 text-xs font-medium mb-3">UI Mode</p>
           <div className="grid grid-cols-3 gap-2">
@@ -116,7 +125,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* ── Custom Preset Picker (only when custom mode active) ── */}
+        {/* Custom Preset Picker */}
         <AnimatePresence>
           {colorMode === 'custom' && (
             <motion.div
@@ -129,7 +138,7 @@ export default function SettingsPage() {
               <p className="text-white/75 text-xs font-medium mb-3">Custom Theme</p>
               <div className="grid grid-cols-2 gap-2">
                 {PRESETS.map((preset) => {
-                  const active  = customPreset === preset;
+                  const active   = customPreset === preset;
                   const [c1, c2] = CUSTOM_PRESET_COLORS[preset];
                   return (
                     <button
@@ -144,7 +153,6 @@ export default function SettingsPage() {
                         }
                       `}
                     >
-                      {/* Gradient swatch */}
                       <span
                         className="w-6 h-6 rounded-lg flex-shrink-0 ring-1 ring-white/10"
                         style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
@@ -152,9 +160,7 @@ export default function SettingsPage() {
                       <span className={`text-sm font-medium ${active ? 'text-white' : 'text-white/65'}`}>
                         {CUSTOM_PRESET_LABELS[preset]}
                       </span>
-                      {active && (
-                        <Check size={13} className="ml-auto text-orange-400 flex-shrink-0" />
-                      )}
+                      {active && <Check size={13} className="ml-auto text-orange-400 flex-shrink-0" />}
                     </button>
                   );
                 })}
@@ -162,14 +168,6 @@ export default function SettingsPage() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* ── Reduce motion ── */}
-        <ToggleRow
-          label="Reduce motion"
-          description="Minimize animations and transitions"
-          value={settings.reduce_motion}
-          onChange={(v) => handleUpdate('reduce_motion', v)}
-        />
       </motion.div>
 
       {/* ── Advanced ── */}
@@ -179,8 +177,8 @@ export default function SettingsPage() {
         <SectionHeader icon={Sliders} title="Advanced" />
 
         <p className="text-white/65 text-xs leading-relaxed">
-          Additional settings such as notification preferences, data exports,
-          and account management are available from your profile page.
+          Additional settings such as data exports and account management
+          are available from your profile page.
         </p>
       </motion.div>
     </div>

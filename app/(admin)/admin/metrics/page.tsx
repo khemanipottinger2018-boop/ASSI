@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart2, Users, MessageCircle, Clock, TrendingUp, Loader2, RefreshCw } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import { adminApi } from '@/lib/api';
 
 type Metrics = {
   totalUsers: number;
@@ -12,7 +11,6 @@ type Metrics = {
   totalStudents: number;
   totalSessions: number;
   activeSessions: number;
-  avgSessionDuration: number;
   onlineUsers: number;
 };
 
@@ -25,15 +23,14 @@ const fade = {
 };
 
 export default function MetricsPage() {
-  const [metrics,  setMetrics]  = useState<Metrics | null>(null);
-  const [loading,  setLoading]  = useState(true);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const res  = await fetch(`${API_URL}/api/admin/metrics`, { credentials: 'include' });
-      const data = await res.json();
-      if (data.success) setMetrics(data.metrics);
+      const data = await adminApi.getMetrics();
+      if (data.success) setMetrics((data as any).metrics);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }
@@ -41,13 +38,12 @@ export default function MetricsPage() {
   useEffect(() => { load(); }, []);
 
   const stats = metrics ? [
-    { icon: Users,          label: 'Total Users',      value: metrics.totalUsers,                 accent: 'white' },
-    { icon: Users,          label: 'Tutors',            value: metrics.totalTutors,                accent: 'orange' },
-    { icon: Users,          label: 'Students',          value: metrics.totalStudents,              accent: 'purple' },
-    { icon: TrendingUp,     label: 'Online Now',        value: metrics.onlineUsers,                accent: 'emerald' },
-    { icon: MessageCircle,  label: 'Active Sessions',   value: metrics.activeSessions,             accent: 'blue' },
-    { icon: BarChart2,      label: 'Total Sessions',    value: metrics.totalSessions,              accent: 'white' },
-    { icon: Clock,          label: 'Avg Duration (min)',value: metrics.avgSessionDuration ?? '—',  accent: 'white' },
+    { icon: Users,         label: 'Total Users',       value: metrics.totalUsers,                accent: 'white'   },
+    { icon: Users,         label: 'Tutors',             value: metrics.totalTutors,               accent: 'orange'  },
+    { icon: Users,         label: 'Students',           value: metrics.totalStudents,             accent: 'purple'  },
+    { icon: TrendingUp,    label: 'Online Now',         value: metrics.onlineUsers,               accent: 'emerald' },
+    { icon: MessageCircle, label: 'Active Sessions',    value: metrics.activeSessions,            accent: 'blue'    },
+    { icon: BarChart2,     label: 'Total Sessions',     value: metrics.totalSessions,             accent: 'white'   },
   ] : [];
 
   const accentClass: Record<string, string> = {
@@ -60,7 +56,6 @@ export default function MetricsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-
       <motion.div custom={0} variants={fade} initial="initial" animate="animate"
         className="flex items-center justify-between"
       >

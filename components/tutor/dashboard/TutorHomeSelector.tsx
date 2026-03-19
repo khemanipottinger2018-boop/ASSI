@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,13 +8,14 @@ import {
   Calendar, ChevronRight, Loader2, BookOpen,
   Users, Clock,
 } from 'lucide-react';
-import { useAuth }     from '@/contexts/AuthContext';
+import { useAuth }    from '@/contexts/AuthContext';
 import { usePresence, type PresenceStatus } from '@/hooks/usePresence';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { useSocket }  from '@/hooks/useSocket';
 
 type AvailabilityStatus = PresenceStatus;
 
+// Queue entries arrive via socket event 'session:request'
+// There is no REST polling endpoint for the tutor queue
 type QueueEntry = {
   sessionId:   string;
   studentName: string;
@@ -27,22 +28,22 @@ const STATUS_CFG: Record<AvailabilityStatus, {
   bg: string; border: string; labelColor: string;
 }> = {
   online: {
-    label: 'You\'re Live',
-    sub: 'Students can request your help right now',
+    label: "You're Live",
+    sub:   'Students can request your help right now',
     dot: '#34d399', glow: 'rgba(52,211,153,0.5)',
     bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.25)',
     labelColor: '#34d399',
   },
   offline: {
-    label: 'You\'re Offline',
-    sub: 'Go online to start receiving student requests',
+    label: "You're Offline",
+    sub:   'Go online to start receiving student requests',
     dot: 'rgba(255,255,255,0.25)', glow: 'transparent',
     bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)',
     labelColor: 'rgba(255,255,255,0.5)',
   },
   busy: {
     label: 'In a Session',
-    sub: 'You\'re currently with a student',
+    sub:   "You're currently with a student",
     dot: '#fb923c', glow: 'rgba(251,146,60,0.5)',
     bg: 'rgba(251,146,60,0.08)', border: 'rgba(251,146,60,0.25)',
     labelColor: '#fb923c',
@@ -53,31 +54,35 @@ export default function TutorHomeSelector() {
   const router   = useRouter();
   const { user } = useAuth();
 
-  // Status comes from Redis via the shared hook — no separate fetch or local state needed
   const { status, setStatus } = usePresence();
+  const { subscribe }         = useSocket();
 
   const [toggling, setToggling] = useState(false);
-  const [loadingQ, setLoadingQ] = useState(true);
   const [queue,    setQueue]    = useState<QueueEntry[]>([]);
 
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  /* ── Queue fetch + polling (matches TutorDashboard cadence) ── */
-  const fetchQueue = () => {
-    fetch(`${API_URL}/api/tutor/queue`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => { if (d.success) setQueue(d.queue ?? []); })
-      .catch(() => {})
-      .finally(() => setLoadingQ(false));
-  };
-
+  // Queue is populated via socket — no REST polling endpoint exists
   useEffect(() => {
-    fetchQueue();
-    pollRef.current = setInterval(fetchQueue, 8_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
+    const unsub = subscribe('session:request', (payload: any) => {
+      const entry: QueueEntry = {
+        sessionId:   payload.sessionId,
+        studentName: payload.studentName ?? 'Student',
+        subjectName: payload.subjectName ?? '',
+        requestedAt: payload.requestedAt ?? Date.now(),
+      };
+      setQueue(prev => {
+        if (prev.some(q => q.sessionId === entry.sessionId)) return prev;
+        return [entry, ...prev];
+      });
+    });
 
-  /* ── Toggle online/offline ── */
+    // Also clear queue entry when session ends or is accepted
+    const unsubEnd = subscribe('session:ended', (payload: any) => {
+      setQueue(prev => prev.filter(q => q.sessionId !== payload.sessionId));
+    });
+
+    return () => { unsub(); unsubEnd(); };
+  }, [subscribe]);
+
   const toggle = async () => {
     if (toggling || status === 'busy') return;
     const next: AvailabilityStatus = status === 'online' ? 'offline' : 'online';
@@ -88,7 +93,9 @@ export default function TutorHomeSelector() {
 
   const cfg         = STATUS_CFG[status];
   const hasRequests = queue.length > 0;
-  const isTutorApp  = user?.role === 'tutor-applicant';
+
+  // role uses underscore: tutor_applicant (not tutor-applicant)
+  const isTutorApp = user?.role === 'tutor_applicant';
 
   const elapsed = (ts: number) => {
     const m = Math.floor((Date.now() - ts) / 60000);
@@ -147,16 +154,12 @@ export default function TutorHomeSelector() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                {/* Animated dot */}
                 <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
                   {status === 'online' && (
                     <motion.div
                       animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
                       transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-                      style={{
-                        position: 'absolute', inset: 0, borderRadius: '50%',
-                        background: cfg.dot, opacity: 0.3,
-                      }}
+                      style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: cfg.dot, opacity: 0.3 }}
                     />
                   )}
                   <div style={{
@@ -208,7 +211,6 @@ export default function TutorHomeSelector() {
               border: hasRequests ? '1px solid rgba(251,146,60,0.25)' : '1px solid rgba(255,255,255,0.07)',
               transition: 'border-color 0.2s ease',
             }}>
-              {/* Header row */}
               <button
                 onClick={() => router.push('/dashboard/tutor')}
                 style={{
@@ -241,8 +243,7 @@ export default function TutorHomeSelector() {
                 <ChevronRight size={13} style={{ color: 'rgba(255,255,255,0.2)' }} />
               </button>
 
-              {/* Queue preview — top 2 */}
-              {!loadingQ && hasRequests && (
+              {hasRequests && (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                   {queue.slice(0, 2).map((req, i) => (
                     <div key={req.sessionId} style={{
@@ -275,7 +276,7 @@ export default function TutorHomeSelector() {
                 </div>
               )}
 
-              {!loadingQ && !hasRequests && status === 'online' && (
+              {!hasRequests && status === 'online' && (
                 <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
                   <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
                     No requests yet — students will appear here
@@ -283,18 +284,11 @@ export default function TutorHomeSelector() {
                 </div>
               )}
 
-              {!loadingQ && !hasRequests && status === 'offline' && (
+              {!hasRequests && status === 'offline' && (
                 <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
                   <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
                     Go online to receive requests
                   </p>
-                </div>
-              )}
-
-              {loadingQ && (
-                <div style={{ padding: '14px', display: 'flex', justifyContent: 'center',
-                  borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  <Loader2 size={13} className="text-white/20 animate-spin" />
                 </div>
               )}
             </div>

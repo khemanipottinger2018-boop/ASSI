@@ -9,19 +9,19 @@ interface TutorSessionRequestCardProps {
   studentName: string;
   studentAvatarUrl?: string | null;
   subject: string;
-  scheduledTime: string;
+  scheduledAt: string;
   durationMinutes: number;
 }
 
 export default function TutorSessionRequestCard({
-  sessionId, studentName, studentAvatarUrl, subject, scheduledTime, durationMinutes,
+  sessionId, studentName, studentAvatarUrl, subject, scheduledAt, durationMinutes,
 }: TutorSessionRequestCardProps) {
   const router = useRouter();
 
-  const dateStr = new Date(scheduledTime).toLocaleDateString('en-US', {
+  const dateStr = new Date(scheduledAt).toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
   });
-  const timeStr = new Date(scheduledTime).toLocaleTimeString('en-US', {
+  const timeStr = new Date(scheduledAt).toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', hour12: true,
   });
 

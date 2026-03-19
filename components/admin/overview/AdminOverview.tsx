@@ -5,19 +5,18 @@ import { motion } from 'framer-motion';
 import { Users, GraduationCap, BookOpen, Wifi, AlertTriangle, Activity } from 'lucide-react';
 import StatCard from './StatCard';
 import SystemNotice from './SystemNotice';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-
-type Stats = { totalUsers: number; tutors: number; students: number; onlineUsers: number };
+import { adminApi, type DashboardStats } from '@/lib/api';
 
 export default function AdminOverview() {
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/admin/dashboard/stats`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => { if (d.success) setStats(d.stats); else setError(true); })
+    adminApi.getDashboardStats()
+      .then((d) => {
+        if (d.success) setStats(d.stats);
+        else setError(true);
+      })
       .catch(() => setError(true));
   }, []);
 
@@ -44,9 +43,9 @@ export default function AdminOverview() {
 
       {/* Quick action grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 8 }}>
-        <QuickLink href="/admin/tutor-applications" icon={BookOpen}     label="Review Applications" sub="Pending tutor approvals" />
-        <QuickLink href="/admin/errors"             icon={AlertTriangle} label="Error Logs"          sub="Platform diagnostics"    accent="orange" />
-        <QuickLink href="/admin/sentinel"           icon={Activity}      label="Open Sentinel"       sub="AI co-pilot interface"   accent="green"  />
+        <QuickLink href="/admin/tutor-applications" icon={BookOpen}      label="Review Applications" sub="Pending tutor approvals" />
+        <QuickLink href="/admin/errors"             icon={AlertTriangle} label="Error Logs"           sub="Platform diagnostics"    accent="orange" />
+        <QuickLink href="/admin/sentinel"           icon={Activity}      label="Open Sentinel"        sub="AI co-pilot interface"   accent="green"  />
       </div>
     </div>
   );

@@ -4,19 +4,18 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Shield, Users, AlertTriangle, BarChart2, Settings, LogOut, User } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import { Shield, Users, AlertTriangle, BarChart2, User } from 'lucide-react';
+import { userApi } from '@/lib/api';
+import type { UserProfileView } from '@/components/types/profile.view';
 
 export default function AdminProfilePage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/me`, { credentials: 'include' })
-      .then((r) => r.json())
+    userApi.getMe()
       .then((d) => { if (d.success) setProfile(d.user); })
       .finally(() => setLoading(false));
   }, []);
@@ -28,11 +27,10 @@ export default function AdminProfilePage() {
 
   if (loading) return <ProfileSkeleton />;
 
-  const p = profile ?? user;
+  const p = profile;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -41,10 +39,7 @@ export default function AdminProfilePage() {
       >
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {p?.avatarUrl
-              ? <img src={p.avatarUrl} alt={p.username} className="w-full h-full object-cover" />
-              : <Shield size={24} className="text-orange-400/70" />
-            }
+            <User size={15} className="text-white/35" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -58,7 +53,6 @@ export default function AdminProfilePage() {
         </div>
       </motion.div>
 
-      {/* Admin quick links */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -66,13 +60,12 @@ export default function AdminProfilePage() {
         className="glass rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Admin</p>
-        <AdminAction icon={Users}         label="Manage users"               onClick={() => router.push('/admin/users')} />
-        <AdminAction icon={Shield}        label="Tutor applications"          onClick={() => router.push('/admin/tutor-applications')} />
-        <AdminAction icon={AlertTriangle} label="Support tickets"             onClick={() => router.push('/admin/support')} />
-        <AdminAction icon={BarChart2}     label="System metrics"              onClick={() => router.push('/admin/metrics')} />
+        <AdminAction icon={Users}         label="Manage users"          onClick={() => router.push('/admin/users')} />
+        <AdminAction icon={Shield}        label="Tutor applications"    onClick={() => router.push('/admin/tutor-applications')} />
+        <AdminAction icon={AlertTriangle} label="Support tickets"       onClick={() => router.push('/admin/support')} />
+        <AdminAction icon={BarChart2}     label="System metrics"        onClick={() => router.push('/admin/metrics')} />
       </motion.div>
 
-      {/* Account */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -87,7 +80,7 @@ export default function AdminProfilePage() {
   );
 }
 
-function AdminAction({ icon: Icon, label, onClick }: { icon: any; label: string; onClick: () => void }) {
+function AdminAction({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}

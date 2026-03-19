@@ -20,7 +20,7 @@ export default function DashboardIndexPage() {
     switch (user.role) {
       case 'student':         router.replace('/dashboard/student'); break;
       case 'tutor':           router.replace('/dashboard/tutor');   break;
-      case 'tutor-applicant': router.replace('/dashboard/tutor');   break;
+      case 'tutor_applicant': router.replace('/dashboard/tutor');   break;
       case 'admin':           router.replace('/admin');             break;
       default:                router.replace('/dashboard/student'); break;
     }

@@ -4,23 +4,24 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { User } from 'lucide-react';
 
+// Matches SubjectSummary from lib/api/tutors — uses category not level
 interface Subject {
-  id: string;
-  name: string;
-  level: string;
+  id:       string;
+  name:     string;
+  category: string | null;  // was level — backend returns category (CSEC | CAPE)
 }
 
 interface AvailableTutorCardProps {
-  userId: string;
-  username: string;
-  avatarUrl?: string | null;
-  subjects: Subject[];
-  hourlyRate?: number;
+  userId:          string;
+  username:        string;
+  // avatarUrl removed — backend does not return this field
+  subjects:        Subject[];
+  hourlyRate?:     number;
   isStudentTutor?: boolean;
 }
 
 export default function AvailableTutorCard({
-  userId, username, avatarUrl, subjects, hourlyRate, isStudentTutor,
+  userId, username, subjects, hourlyRate, isStudentTutor,
 }: AvailableTutorCardProps) {
   const router = useRouter();
 
@@ -36,10 +37,10 @@ export default function AvailableTutorCard({
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0">
             <div className="w-9 h-9 rounded-xl glass-soft flex items-center justify-center overflow-hidden">
-              {avatarUrl
-                ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
-                : <User size={14} className="text-white/40" />
-              }
+              {/* No avatarUrl — always use initials */}
+              <span className="text-white/50 text-sm font-semibold">
+                {username[0]?.toUpperCase()}
+              </span>
             </div>
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black/20" />
           </div>
@@ -60,7 +61,7 @@ export default function AvailableTutorCard({
           {subjects.slice(0, 3).map((s) => (
             <span key={s.id} className={`
               px-2 py-0.5 rounded-full text-[10px] font-medium border
-              ${s.level === 'CAPE'
+              ${s.category === 'CAPE'
                 ? 'bg-purple-500/15 border-purple-500/20 text-purple-300'
                 : 'bg-emerald-500/15 border-emerald-500/20 text-emerald-300'
               }

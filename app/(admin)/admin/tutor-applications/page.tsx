@@ -6,9 +6,17 @@ import { ClipboardList, User, Check, X, Loader2, Clock } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
 type Application = {
-  id: string; userId: string; username: string; email: string;
-  avatarUrl: string | null; appliedAt: string;
-  status: 'pending' | 'approved' | 'rejected'; subjects?: string[];
+  id:          string;
+  userId:      string;
+  status:      'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt:  string | null;
+  notes:       string | null;
+  user: {
+    username:  string;
+    role:      string;
+    createdAt: string;
+  };
 };
 
 export default function TutorApplicationsPage() {
@@ -29,7 +37,9 @@ export default function TutorApplicationsPage() {
   async function handleAction(id: string, action: 'approve' | 'reject') {
     setActioning(id);
     try {
-      await adminApi.reviewApplication(id, action);
+      action === 'approve'
+        ? await adminApi.approveApplication(id)
+        : await adminApi.rejectApplication(id);
       await loadApplications();
     } finally { setActioning(null); }
   }
@@ -54,7 +64,9 @@ export default function TutorApplicationsPage() {
       </motion.div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={20} className="text-white/30 animate-spin" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={20} className="text-white/30 animate-spin" />
+        </div>
       ) : (
         <>
           {pending.length > 0 && (
@@ -99,21 +111,18 @@ function ApplicationCard({ app, actioning, onApprove, onReject }: {
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
       className="glass rounded-2xl p-4 flex items-center gap-4">
       <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-        {app.avatarUrl
-          ? <img src={app.avatarUrl} alt={app.username} className="w-full h-full object-cover" />
-          : <User size={15} className="text-white/35" />
-        }
+        <User size={15} className="text-white/35" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-white/80 text-sm font-medium">{app.username}</span>
+          <span className="text-white/80 text-sm font-medium">{app.user.username}</span>
           <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${statusStyle}`}>
             {app.status}
           </span>
         </div>
-        <p className="text-white/30 text-xs mt-0.5">{app.email}</p>
+        <p className="text-white/30 text-xs mt-0.5">{app.user.role}</p>
         <p className="text-white/20 text-[10px] flex items-center gap-1 mt-0.5">
-          <Clock size={9} />{new Date(app.appliedAt).toLocaleDateString()}
+          <Clock size={9} />{new Date(app.submittedAt).toLocaleDateString()}
         </p>
       </div>
       {app.status === 'pending' && onApprove && onReject && (

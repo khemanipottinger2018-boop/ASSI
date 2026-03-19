@@ -8,19 +8,18 @@ import { useNotifications } from '@/hooks/useGlobalNotifications';
 import { getNav, type NavItem } from './navConfig';
 
 interface SidebarProps {
-  collapsed: boolean;
-  onToggle: () => void;
+  collapsed:      boolean;
+  onToggle:       () => void;
   /** Admin undercover role — overrides the nav shown */
   undercoverRole?: 'student' | 'tutor' | null;
 }
 
 export default function Sidebar({ collapsed, onToggle, undercoverRole }: SidebarProps) {
-  const { user }       = useAuth();
-  const pathname       = usePathname();
-  const router         = useRouter();
-  const { unreadCount} = useNotifications();
+  const { user }        = useAuth();
+  const pathname        = usePathname();
+  const router          = useRouter();
+  const { unreadCount } = useNotifications();
 
-  // If admin is undercover, show that role's nav instead
   const effectiveRole = undercoverRole ?? user?.role;
   const nav = getNav(effectiveRole);
   const w   = collapsed ? 64 : 220;
@@ -47,7 +46,6 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
           }
         `}
       >
-        {/* Orange active accent bar */}
         {active && (
           <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-orange-400" />
         )}
@@ -68,7 +66,6 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
           )}
         </AnimatePresence>
 
-        {/* Notification badge */}
         {count > 0 && (
           <span className={`
             flex-shrink-0 min-w-[18px] h-[18px] rounded-full
@@ -146,7 +143,8 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
       `}
         style={{ borderColor: 'var(--sidebar-border)' }}
       >
-        {/* User info when expanded */}
+        {/* User info when expanded
+            ⚠️  backend does not return avatarUrl — always use initials */}
         <AnimatePresence initial={false}>
           {!collapsed && user && (
             <motion.div
@@ -156,16 +154,17 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
               transition={{ duration: 0.18 }}
               className="flex items-center gap-2.5 px-3 py-2 mb-1"
             >
-              <div className="w-7 h-7 rounded-full glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {user.avatarUrl
-                  ? <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                  : <span className="text-white/80 text-xs font-semibold">{user.username[0]?.toUpperCase()}</span>
-                }
+              <div className="w-7 h-7 rounded-full glass-soft flex items-center justify-center flex-shrink-0">
+                <span className="text-white/80 text-xs font-semibold">
+                  {user.username[0]?.toUpperCase()}
+                </span>
               </div>
               <div className="min-w-0">
                 <p className="text-white text-xs font-semibold truncate">{user.username}</p>
                 <p className="text-white/50 text-[10px] capitalize">
-                  {undercoverRole ? `${user.role} · viewing as ${undercoverRole}` : user.role}
+                  {undercoverRole
+                    ? `${user.role} · viewing as ${undercoverRole}`
+                    : user.role.replace('_', ' ')}
                 </p>
               </div>
             </motion.div>

@@ -4,19 +4,18 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { User, Mail, BookOpen, Calendar, Edit3, LogOut, ShieldCheck } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import { User, Mail, BookOpen, Calendar, Edit3, ShieldCheck } from 'lucide-react';
+import { userApi } from '@/lib/api';
+import type { UserProfileView } from '@/components/types/profile.view';
 
 export default function StudentProfilePage() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfileView | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/user/me`, { credentials: 'include' })
-      .then((r) => r.json())
+    userApi.getMe()
       .then((d) => { if (d.success) setProfile(d.user); })
       .finally(() => setLoading(false));
   }, []);
@@ -28,11 +27,10 @@ export default function StudentProfilePage() {
 
   if (loading) return <ProfileSkeleton />;
 
-  const p = profile ?? user;
+  const p = profile;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-      {/* Header card */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -41,7 +39,6 @@ export default function StudentProfilePage() {
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
-            {/* Avatar */}
             <div className="relative">
               <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {p?.avatarUrl
@@ -71,7 +68,6 @@ export default function StudentProfilePage() {
           </button>
         </div>
 
-        {/* Bio */}
         {p?.bio && (
           <p className="mt-4 text-white/55 text-sm leading-relaxed border-t border-white/8 pt-4">
             {p.bio}
@@ -79,7 +75,6 @@ export default function StudentProfilePage() {
         )}
       </motion.div>
 
-      {/* Stats row */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -92,7 +87,6 @@ export default function StudentProfilePage() {
         } />
       </motion.div>
 
-      {/* Account */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -100,22 +94,6 @@ export default function StudentProfilePage() {
         className="glass rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
-
-        {p?.is_demo && (
-          <div className="flex items-center gap-3 px-2 py-2.5 rounded-xl bg-yellow-500/8 border border-yellow-500/15">
-            <ShieldCheck size={14} className="text-yellow-400 flex-shrink-0" />
-            <div>
-              <p className="text-yellow-300 text-xs font-medium">Demo account</p>
-              <p className="text-yellow-400/60 text-[11px]">
-                Expires {p.demo_expires_at ? new Date(p.demo_expires_at).toLocaleDateString() : 'soon'}.{' '}
-                <button onClick={() => router.push('/upgrade')} className="underline underline-offset-2 hover:text-yellow-300 transition">
-                  Upgrade now
-                </button>
-              </p>
-            </div>
-          </div>
-        )}
-
         <ActionRow label="Edit profile" onClick={() => router.push('/profile/student/edit')} />
         <ActionRow label="Settings" onClick={() => router.push('/settings')} />
         <ActionRow label="Sign out" onClick={handleLogout} destructive />
@@ -124,7 +102,7 @@ export default function StudentProfilePage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="glass-soft rounded-2xl px-4 py-3.5 flex items-center gap-3">
       <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">

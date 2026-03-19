@@ -32,7 +32,7 @@ export default function BrowsePage() {
     const matchesFilter =
       filter === 'all' ||
       filter === 'available' ||
-      t.subjects.some((s) => s.level === filter);
+      t.subjects.some((s) => s.category === filter);
 
     return matchesQuery && matchesFilter;
   });

@@ -3,13 +3,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Search, GraduationCap, BookOpen } from 'lucide-react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import { api } from '@/lib/api/client';
 
 export interface Subject {
-  subject_id: string;
+  id:         string;
   name:       string;
-  level:      'CSEC' | 'CAPE';
+  category:   string;
   tutorCount: number;
 }
 
@@ -17,7 +16,6 @@ interface Props {
   selected:         Subject | null;
   onSelect:         (subject: Subject) => void;
   onOpenChange?:    (open: boolean) => void;
-  /** Called when the internal subjects fetch starts/finishes. */
   onLoadingChange?: (loading: boolean) => void;
 }
 
@@ -37,12 +35,11 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
 
   useEffect(() => {
     onLoadingChange?.(true);
-    fetch(`${API_URL}/api/subjects/public`)
-      .then((r) => r.json())
+    api.get<{ success: boolean; subjects: Subject[] }>('/api/subjects/public')
       .then((data) => {
         if (data.success) {
           setSubjects([...data.subjects].sort((a, b) => {
-            if (a.level !== b.level) return a.level === 'CSEC' ? -1 : 1;
+            if (a.category !== b.category) return a.category === 'CSEC' ? -1 : 1;
             return a.name.localeCompare(b.name);
           }));
         }
@@ -59,8 +56,8 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
     return subjects.filter((s) => s.name.toLowerCase().includes(q));
   }, [subjects, search]);
 
-  const csec = filtered.filter((s) => s.level === 'CSEC');
-  const cape = filtered.filter((s) => s.level === 'CAPE');
+  const csec = filtered.filter((s) => s.category === 'CSEC');
+  const cape = filtered.filter((s) => s.category === 'CAPE');
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -80,13 +77,14 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
         onClick={() => toggle(!open)}
         className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200"
         style={{
-          background:   open ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)',
-          border:       `1px solid ${open ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.14)'}`,
+          background:     open ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)',
+          border:         `1px solid ${open ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.14)'}`,
           backdropFilter: 'blur(12px)',
         }}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(255,255,255,0.12)' }}
           >
             {selected
@@ -101,9 +99,12 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
                 <div className="text-sm font-semibold text-white truncate">{selected.name}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`text-[10px] font-bold px-1.5 py-px rounded-full
-                    ${selected.level === 'CAPE' ? 'bg-purple-500/35 text-purple-200' : 'bg-emerald-500/35 text-emerald-200'}`}
+                    ${selected.category === 'CAPE'
+                      ? 'bg-purple-500/35 text-purple-200'
+                      : 'bg-emerald-500/35 text-emerald-200'
+                    }`}
                   >
-                    {selected.level}
+                    {selected.category}
                   </span>
                   <span className="text-[11px] text-white/40">
                     {selected.tutorCount} registered
@@ -149,8 +150,7 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Search ${subjects.length} subjects…`}
-                  className="w-full rounded-xl pl-8 pr-3 py-2 text-sm text-white
-                             placeholder-white/25 outline-none transition"
+                  className="w-full rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-white/25 outline-none transition"
                   style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)' }}
                 />
               </div>
@@ -173,10 +173,10 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
                     </div>
                     {items.map((sub) => (
                       <button
-                        key={sub.subject_id}
+                        key={sub.id}
                         onClick={() => { onSelect(sub); toggle(false); setSearch(''); }}
                         className="w-full text-left px-3 py-2.5 rounded-xl transition-colors flex items-center justify-between gap-3 hover:bg-white/8"
-                        style={selected?.subject_id === sub.subject_id ? { background: 'rgba(255,255,255,0.10)' } : {}}
+                        style={selected?.id === sub.id ? { background: 'rgba(255,255,255,0.10)' } : {}}
                       >
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-white/90 truncate">{sub.name}</div>
@@ -188,7 +188,10 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
                         </div>
                         {sub.tutorCount > 0 && (
                           <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full
-                            ${label === 'CAPE' ? 'bg-purple-500/25 text-purple-300' : 'bg-emerald-500/25 text-emerald-300'}`}
+                            ${label === 'CAPE'
+                              ? 'bg-purple-500/25 text-purple-300'
+                              : 'bg-emerald-500/25 text-emerald-300'
+                            }`}
                           >
                             {sub.tutorCount}
                           </span>

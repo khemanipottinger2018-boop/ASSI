@@ -5,23 +5,23 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Calendar, Clock, User, BookOpen, ChevronRight, Loader2 } from 'lucide-react';
 import { sessionsApi } from '@/lib/api';
-import type { Session } from '@/lib/api/sessions';
+import type { BookedSession } from '@/lib/api';   // was: Session
 
 type Tab = 'upcoming' | 'completed' | 'all';
 
 const statusStyle: Record<string, { label: string; color: string }> = {
-  active:    { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-  scheduled: { label: 'Scheduled', color: 'text-blue-400 bg-blue-500/15 border-blue-500/20' },
-  confirmed: { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20' },
-  pending:   { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20' },
-  completed: { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10' },
-  cancelled: { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15' },
+  active:      { label: 'Live',       color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  in_progress: { label: 'Live',       color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  pending:     { label: 'Pending',    color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
+  confirmed:   { label: 'Confirmed',  color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
+  completed:   { label: 'Done',       color: 'text-white/30 bg-white/5 border-white/10'                },
+  cancelled:   { label: 'Cancelled',  color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
 };
 
 export default function SessionsPage() {
   const router = useRouter();
 
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<BookedSession[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState<Tab>('upcoming');
 
@@ -32,7 +32,7 @@ export default function SessionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const upcoming  = sessions.filter((s) => ['scheduled', 'confirmed', 'pending', 'active'].includes(s.status));
+  const upcoming  = sessions.filter((s) => ['pending', 'confirmed', 'in_progress', 'active'].includes(s.status));
   const completed = sessions.filter((s) => ['completed', 'cancelled'].includes(s.status));
   const displayed = tab === 'upcoming' ? upcoming : tab === 'completed' ? completed : sessions;
 
@@ -99,10 +99,10 @@ export default function SessionsPage() {
         <div className="space-y-2">
           {displayed.map((session, i) => {
             const style   = statusStyle[session.status] ?? statusStyle.pending;
-            const dateStr = new Date(session.scheduledTime).toLocaleDateString('en-US', {
+            const dateStr = new Date(session.scheduledAt).toLocaleDateString('en-US', {
               weekday: 'short', month: 'short', day: 'numeric',
             });
-            const timeStr = new Date(session.scheduledTime).toLocaleTimeString('en-US', {
+            const timeStr = new Date(session.scheduledAt).toLocaleTimeString('en-US', {
               hour: 'numeric', minute: '2-digit', hour12: true,
             });
 
@@ -115,11 +115,8 @@ export default function SessionsPage() {
                 onClick={() => router.push(`/sessions/${session.sessionId}`)}
                 className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition group"
               >
-                <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-                  {session.partnerAvatarUrl
-                    ? <img src={session.partnerAvatarUrl} alt={session.partnerUsername} className="w-full h-full object-cover" />
-                    : <User size={15} className="text-white/35" />
-                  }
+                <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
+                  <User size={15} className="text-white/35" />
                 </div>
 
                 <div className="flex-1 min-w-0">

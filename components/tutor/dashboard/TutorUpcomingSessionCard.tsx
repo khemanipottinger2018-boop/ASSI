@@ -9,19 +9,19 @@ interface TutorUpcomingSessionCardProps {
   studentName: string;
   studentAvatarUrl?: string | null;
   subject: string;
-  scheduledTime: string;
+  scheduledAt: string;
   durationMinutes: number;
   status: 'scheduled' | 'confirmed';
 }
 
 export default function TutorUpcomingSessionCard({
   sessionId, studentName, studentAvatarUrl, subject,
-  scheduledTime, durationMinutes, status,
+  scheduledAt, durationMinutes, status,
 }: TutorUpcomingSessionCardProps) {
   const router = useRouter();
 
   const now       = Date.now();
-  const sessionMs = new Date(scheduledTime).getTime();
+  const sessionMs = new Date(scheduledAt).getTime();
   const diffMins  = Math.round((sessionMs - now) / 60000);
   const isIminent = diffMins <= 30 && diffMins > 0;
 
@@ -31,7 +31,7 @@ export default function TutorUpcomingSessionCard({
     ? `In ${diffMins}m`
     : diffMins < 1440
     ? `In ${Math.round(diffMins / 60)}h`
-    : new Date(scheduledTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    : new Date(scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return (
     <motion.div

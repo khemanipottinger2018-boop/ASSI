@@ -19,7 +19,7 @@ export default function ProfileRouterPage() {
     switch (user.role) {
       case 'student':         router.replace('/profile/student');         break;
       case 'tutor':           router.replace('/profile/tutor');           break;
-      case 'tutor-applicant': router.replace('/profile/tutor-applicant'); break;
+      case 'tutor_applicant': router.replace('/profile/tutor'); break;
       case 'admin':           router.replace('/profile/admin');           break;
       default:                router.replace('/dashboard');               break;
     }

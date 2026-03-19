@@ -122,7 +122,7 @@ export default function HomePage() {
   /* ── Determine selector ── */
   const showTutor =
     user.role === 'tutor' ||
-    user.role === 'tutor-applicant' ||
+    user.role === 'tutor_applicant' ||
     (user.role === 'admin' && undercover === 'tutor');
 
   return (

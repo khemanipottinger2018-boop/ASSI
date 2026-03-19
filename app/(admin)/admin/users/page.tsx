@@ -4,23 +4,31 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Users, Search, RefreshCw, Loader2, ShieldCheck, ShieldOff, ChevronDown, Check } from 'lucide-react';
 import { adminApi } from '@/lib/api';
+import type { AdminUser } from '@/lib/api';
 
-type UserRow = {
-  id: string; username: string; email: string; role: string;
-  is_suspended: boolean | number; is_demo: boolean | number; created_at: string;
+// Backend returns: userId, username, role, isSuspended, isDemo, createdAt
+// No email field on this endpoint
+
+type UserRole = AdminUser['role'];
+
+const ROLES: UserRole[] = ['student', 'tutor', 'tutor_applicant', 'admin'];
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  student:         'Student',
+  tutor:           'Tutor',
+  tutor_applicant: 'Applicant',
+  admin:           'Admin',
 };
 
-const ROLES = ['student', 'tutor', 'tutor-applicant', 'admin'];
-
-const roleStyle: Record<string, string> = {
-  admin:             'text-orange-400 bg-orange-500/15 border-orange-500/20',
-  tutor:             'text-emerald-400 bg-emerald-500/15 border-emerald-500/20',
-  student:           'text-blue-400 bg-blue-500/15 border-blue-500/20',
-  'tutor-applicant': 'text-purple-400 bg-purple-500/15 border-purple-500/20',
+const roleStyle: Record<UserRole, string> = {
+  admin:           'text-orange-400 bg-orange-500/15 border-orange-500/20',
+  tutor:           'text-emerald-400 bg-emerald-500/15 border-emerald-500/20',
+  student:         'text-blue-400 bg-blue-500/15 border-blue-500/20',
+  tutor_applicant: 'text-purple-400 bg-purple-500/15 border-purple-500/20',
 };
 
 export default function AdminUsersPage() {
-  const [users,     setUsers]     = useState<UserRow[]>([]);
+  const [users,     setUsers]     = useState<AdminUser[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [query,     setQuery]     = useState('');
   const [actioning, setActioning] = useState<string | null>(null);
@@ -44,29 +52,31 @@ export default function AdminUsersPage() {
     return () => document.removeEventListener('click', close);
   }, [roleMenu]);
 
-  async function toggleSuspend(user: UserRow) {
-    setActioning(user.id);
+  async function toggleSuspend(user: AdminUser) {
+    setActioning(user.userId);
     try {
-      await adminApi.suspendUser(user.id);
+      await adminApi.suspendUser(user.userId, !user.isSuspended);
       setUsers(prev => prev.map(u =>
-        u.id === user.id ? { ...u, is_suspended: !u.is_suspended } : u
+        u.userId === user.userId ? { ...u, isSuspended: !u.isSuspended } : u
       ));
     } finally { setActioning(null); }
   }
 
-  async function changeRole(userId: string, role: string) {
+  async function changeRole(userId: string, role: UserRole) {
     setRoleMenu(null);
     setActioning(userId);
     try {
       await adminApi.updateUserRole(userId, role);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+      // Cast role to UserRole so TypeScript is satisfied with AdminUser shape
+      setUsers(prev => prev.map(u =>
+        u.userId === userId ? { ...u, role } : u
+      ));
     } finally { setActioning(null); }
   }
 
   const filtered = users.filter(u =>
     !query ||
-    u.username.toLowerCase().includes(query.toLowerCase()) ||
-    u.email.toLowerCase().includes(query.toLowerCase())
+    u.username.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -92,13 +102,15 @@ export default function AdminUsersPage() {
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.3 }} className="relative">
         <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-        <input type="text" placeholder="Search by username or email…" value={query}
+        <input type="text" placeholder="Search by username…" value={query}
           onChange={e => setQuery(e.target.value)}
           className="w-full glass rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:border-white/25 transition" />
       </motion.div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 size={20} className="text-white/30 animate-spin" /></div>
+        <div className="flex justify-center py-16">
+          <Loader2 size={20} className="text-white/30 animate-spin" />
+        </div>
       ) : filtered.length === 0 ? (
         <div className="glass rounded-2xl px-4 py-12 text-center">
           <p className="text-white/25 text-sm">No users found</p>
@@ -106,49 +118,70 @@ export default function AdminUsersPage() {
       ) : (
         <div className="space-y-2">
           {filtered.map((user, i) => {
-            const suspended   = Boolean(user.is_suspended);
-            const isActioning = actioning === user.id;
+            const suspended   = Boolean(user.isSuspended);
+            const isActioning = actioning === user.userId;
+            const roleMeta    = roleStyle[user.role] ?? 'text-white/40 bg-white/5 border-white/10';
             return (
-              <motion.div key={user.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+              <motion.div key={user.userId} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.02, duration: 0.25 }}
                 className={`glass rounded-2xl p-4 flex items-center gap-4 ${suspended ? 'opacity-60' : ''}`}>
+
                 <div className="w-9 h-9 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
                   <span className="text-white/50 text-sm font-semibold">{user.username[0]?.toUpperCase()}</span>
                 </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white/80 text-sm font-medium truncate">{user.username}</span>
-                    {Boolean(user.is_demo) && (
+                    {user.isDemo && (
                       <span className="text-yellow-400/70 text-[9px] border border-yellow-500/20 px-1.5 py-0.5 rounded-full">demo</span>
                     )}
                     {suspended && (
                       <span className="text-red-400/70 text-[9px] border border-red-500/20 px-1.5 py-0.5 rounded-full">suspended</span>
                     )}
                   </div>
-                  <p className="text-white/30 text-xs truncate mt-0.5">{user.email}</p>
+                  <p className="text-white/30 text-xs mt-0.5">
+                    Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  </p>
                 </div>
+
                 <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => setRoleMenu(roleMenu === user.id ? null : user.id)}
+                  <button
+                    onClick={() => setRoleMenu(roleMenu === user.userId ? null : user.userId)}
                     disabled={isActioning}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border transition hover:opacity-80 disabled:opacity-40 ${roleStyle[user.role] ?? 'text-white/40 bg-white/5 border-white/10'}`}>
-                    {user.role}<ChevronDown size={9} />
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border transition hover:opacity-80 disabled:opacity-40 ${roleMeta}`}
+                  >
+                    {ROLE_LABELS[user.role] ?? user.role}
+                    <ChevronDown size={9} />
                   </button>
-                  {roleMenu === user.id && (
-                    <div className="absolute right-0 top-full mt-1 z-50 glass rounded-xl py-1 min-w-[140px] shadow-xl">
+
+                  {roleMenu === user.userId && (
+                    <div className="absolute right-0 top-full mt-1 z-50 glass rounded-xl py-1 min-w-[150px] shadow-xl">
                       {ROLES.map(r => (
-                        <button key={r} onClick={() => changeRole(user.id, r)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/8 transition capitalize">
+                        <button key={r} onClick={() => changeRole(user.userId, r)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/8 transition">
                           {r === user.role && <Check size={10} className="text-emerald-400 flex-shrink-0" />}
-                          <span className={r !== user.role ? 'ml-[18px]' : ''}>{r}</span>
+                          <span className={r !== user.role ? 'ml-[18px]' : ''}>{ROLE_LABELS[r]}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
-                <button onClick={() => toggleSuspend(user)} disabled={isActioning}
+
+                <button
+                  onClick={() => toggleSuspend(user)}
+                  disabled={isActioning}
                   title={suspended ? 'Unsuspend user' : 'Suspend user'}
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition disabled:opacity-40 ${suspended ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25' : 'glass-soft text-white/30 hover:text-red-400 hover:bg-red-500/10'}`}>
-                  {isActioning ? <Loader2 size={13} className="animate-spin" /> : suspended ? <ShieldCheck size={13} /> : <ShieldOff size={13} />}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition disabled:opacity-40 ${
+                    suspended
+                      ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25'
+                      : 'glass-soft text-white/30 hover:text-red-400 hover:bg-red-500/10'
+                  }`}
+                >
+                  {isActioning
+                    ? <Loader2 size={13} className="animate-spin" />
+                    : suspended ? <ShieldCheck size={13} /> : <ShieldOff size={13} />
+                  }
                 </button>
               </motion.div>
             );

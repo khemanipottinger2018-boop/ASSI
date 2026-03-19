@@ -1,11 +1,31 @@
 'use client';
 
+/**
+ * useNotifications
+ *
+ * Fetches and manages the notification inbox.
+ *
+ * Backend endpoints:
+ *   GET  /api/notifications          → { success, notifications }
+ *   POST /api/notifications/read-all → { success }
+ *
+ * ⚠️  There is NO per-notification mark-read endpoint.
+ *     PATCH /api/notifications/:id/read does NOT exist.
+ *     Only bulk markAllRead is available.
+ *
+ * Real-time: listens to socket event 'notification:new'.
+ */
+
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSocket } from '@/hooks/useSocket';
 import { notificationsApi } from '@/lib/api';
-import { filterActive } from '@/components/types/notification';
-import type { Notification } from '@/components/types/notification';
+import type { Notification } from '@/lib/api';
+
+function isExpired(n: Notification): boolean {
+  if (!n.expiresAt) return false;
+  return new Date(n.expiresAt) <= new Date();
+}
 
 export function useNotifications() {
   const { isAuthenticated } = useAuth();
@@ -16,32 +36,21 @@ export function useNotifications() {
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState<string | null>(null);
 
-  const mapNotification = useCallback((n: any): Notification => ({
-    id:        String(n.id),
-    type:      n.type ?? 'system',
-    title:     String(n.title ?? ''),
-    body:      n.body ?? n.message ?? null,
-    metadata:  n.metadata ?? n.data ?? null,
-    isRead:    Boolean(n.isRead ?? n.is_read ?? false),
-    createdAt: String(n.createdAt ?? n.created_at ?? new Date().toISOString()),
-    expiresAt: n.expiresAt ?? n.expires_at ?? null,
-  }), []);
-
   const refresh = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
       setLoading(true);
       setError(null);
-      const data    = await notificationsApi.getAll();
-      const mapped  = filterActive((data.notifications ?? []).map(mapNotification));
-      setNotifications(mapped);
-      setUnreadCount(mapped.filter(n => !n.isRead).length);
+      const data   = await notificationsApi.getAll();
+      const active = (data.notifications ?? []).filter(n => !isExpired(n));
+      setNotifications(active);
+      setUnreadCount(active.filter(n => !n.isRead).length);
     } catch {
       setError('Could not load notifications');
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, mapNotification]);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -54,24 +63,24 @@ export function useNotifications() {
     refresh();
   }, [isAuthenticated, refresh]);
 
-  // Real-time socket listener
+  /* ── Real-time socket listener ── */
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const unsub = subscribe('notification:new', (payload: any) => {
       const incoming: Notification = {
         id:        String(payload.id ?? Date.now()),
-        type:      payload.type ?? 'system',
-        title:     payload.title ?? '',
-        body:      payload.body ?? payload.message ?? null,
-        metadata:  payload.metadata ?? payload.data ?? null,
+        type:      payload.type    ?? 'system',
+        title:     payload.title   ?? '',
+        body:      payload.body    ?? payload.message ?? null,
+        metadata:  payload.metadata ?? null,
         isRead:    false,
         createdAt: payload.createdAt ?? new Date().toISOString(),
         expiresAt: payload.expiresAt ?? null,
       };
 
-      // Respect expiry even on incoming real-time notifications
-      if (incoming.expiresAt && new Date(incoming.expiresAt) <= new Date()) return;
+      if (isExpired(incoming)) return;
 
       setNotifications(prev => {
         if (prev.some(n => n.id === incoming.id)) return prev;
@@ -83,22 +92,28 @@ export function useNotifications() {
     return unsub;
   }, [isAuthenticated, subscribe]);
 
-  const markRead = useCallback(async (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    setUnreadCount(count => Math.max(0, count - 1));
-    try {
-      await notificationsApi.markRead(id);
-    } catch { /* silent — optimistic update stays */ }
-  }, []);
-
+  /* ── Mark all read ──
+   * Optimistic update — if POST fails, rollback via refresh.
+   */
   const markAllRead = useCallback(async () => {
     if (!isAuthenticated) return;
+
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     setUnreadCount(0);
+
     try {
       await notificationsApi.markAllRead();
-    } catch { /* silent */ }
-  }, [isAuthenticated]);
+    } catch {
+      await refresh();
+    }
+  }, [isAuthenticated, refresh]);
 
-  return { notifications, unreadCount, loading, error, refresh, markRead, markAllRead };
+  return {
+    notifications,
+    unreadCount,
+    loading,
+    error,
+    refresh,
+    markAllRead,
+  };
 }

@@ -7,7 +7,7 @@ interface RecentSessionRowProps {
   sessionId: string;
   subject: string;
   partnerName: string;
-  scheduledTime: string;
+  scheduledAt: string;
   durationMinutes: number;
   status: string;
   rating?: number | null;
@@ -23,7 +23,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function RecentSessionRow({
-  sessionId, subject, partnerName, scheduledTime,
+  sessionId, subject, partnerName, scheduledAt,
   durationMinutes, status, rating,
 }: RecentSessionRowProps) {
   const router = useRouter();
@@ -40,7 +40,7 @@ export default function RecentSessionRow({
       <div className="flex-1 min-w-0">
         <p className="text-white/75 text-sm font-medium truncate">{subject}</p>
         <p className="text-white/35 text-xs mt-0.5">
-          {partnerName} · {new Date(scheduledTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {partnerName} · {new Date(scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
       </div>
 

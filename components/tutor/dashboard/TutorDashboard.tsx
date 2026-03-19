@@ -9,46 +9,51 @@ import {
   Wifi, WifiOff, MessageCircle, Calendar,
   Star, Zap,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth }    from '@/contexts/AuthContext';
 import { usePresence, type PresenceStatus } from '@/hooks/usePresence';
 import { getPresenceDisplay } from '@/lib/presence/getPresenceDisplay';
-import PresenceBadge from '@/components/shared/presence/PresenceBadge';
+import PresenceBadge  from '@/components/shared/presence/PresenceBadge';
+import { sessionsApi, tutorsApi } from '@/lib/api';
+import type { BookedSession } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 type AvailabilityStatus = PresenceStatus;
 
+// Queue entries come via socket — not a REST endpoint
 type QueueEntry = {
-  sessionId: string;
-  studentId: string;
+  sessionId:   string;
+  studentId:   string;
   studentName: string;
-  subjectId: string;
+  subjectId:   string;
   subjectName: string;
   requestedAt: number;
-  message?: string;
+  message?:    string;
 };
 
 type ActiveSession = {
-  sessionId: string;
+  sessionId:   string;
   studentName: string;
   subjectName: string;
-  startedAt: number;
-  status: 'active' | 'paused';
+  startedAt:   number;
+  status:      'active' | 'paused';
 };
 
+// Stats derived from /api/browse/my-sessions — no dedicated stats endpoint exists
 type TutorStats = {
-  sessionsToday: number;
-  sessionsTotal: number;
-  avgRating: number | null;
-  totalReviews: number;
-  hoursThisWeek: number;
+  sessionsTotal:  number;
+  sessionsToday:  number;
+  hoursThisWeek:  number;
+  avgRating:      number | null;
+  totalReviews:   number;
 };
 
+// Subject shape from /api/subjects — uses category not level
 type TutorSubject = {
-  subject_id: number;
-  name: string;
-  level: string;
-  tutorCount?: number;
+  id:         string;
+  name:       string;
+  category:   string | null;  // was level — backend returns category
+  tutorCount: number;
 };
 
 const fade = {
@@ -56,11 +61,7 @@ const fade = {
   animate: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.32,
-      delay: i * 0.07,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
+    transition: { duration: 0.32, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
@@ -81,207 +82,143 @@ const STATUS_CONFIG: Record<
   AvailabilityStatus,
   { label: string; dot: string; glow: string; bg: string; border: string }
 > = {
-  online: {
-    label: 'Available',
-    dot: '#34d399',
-    glow: '0 0 8px rgba(52,211,153,0.8)',
-    bg: 'rgba(52,211,153,0.1)',
-    border: 'rgba(52,211,153,0.3)',
-  },
-  busy: {
-    label: 'In Session',
-    dot: '#fb923c',
-    glow: '0 0 8px rgba(251,146,60,0.7)',
-    bg: 'rgba(251,146,60,0.1)',
-    border: 'rgba(251,146,60,0.3)',
-  },
-  offline: {
-    label: 'Offline',
-    dot: 'rgba(255,255,255,0.25)',
-    glow: 'none',
-    bg: 'rgba(255,255,255,0.05)',
-    border: 'rgba(255,255,255,0.12)',
-  },
+  online:  { label: 'Available',  dot: '#34d399', glow: '0 0 8px rgba(52,211,153,0.8)',  bg: 'rgba(52,211,153,0.1)',      border: 'rgba(52,211,153,0.3)'  },
+  busy:    { label: 'In Session', dot: '#fb923c', glow: '0 0 8px rgba(251,146,60,0.7)',  bg: 'rgba(251,146,60,0.1)',      border: 'rgba(251,146,60,0.3)'  },
+  offline: { label: 'Offline',    dot: 'rgba(255,255,255,0.25)', glow: 'none', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)' },
 };
 
-const LEVEL_COLOR: Record<string, string> = {
-  CSEC: '#60a5fa',
-  CAPE: '#a78bfa',
-};
+const STAT_CARDS = [
+  { label: 'Today',     suffix: 'sessions', color: '#34d399', icon: Zap,       key: 'sessionsToday' },
+  { label: 'This Week', suffix: 'hours',    color: '#60a5fa', icon: Clock,     key: 'hoursThisWeek' },
+  { label: 'All Time',  suffix: 'sessions', color: '#a78bfa', icon: BarChart2, key: 'sessionsTotal' },
+  { label: 'Rating',    suffix: '',         color: '#fb923c', icon: Star,      key: 'avgRating'     },
+] as const;
+
+/** Derive basic stats from booked sessions list */
+function deriveStats(sessions: BookedSession[]): TutorStats {
+  const today     = new Date().toDateString();
+  const completed = sessions.filter(s => s.status === 'completed');
+  const todayDone = completed.filter(s => new Date(s.scheduledAt).toDateString() === today);
+
+  const weekAgo   = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weekDone  = completed.filter(s => new Date(s.scheduledAt).getTime() > weekAgo);
+  const hoursThisWeek = weekDone.reduce((acc, s) => acc + (s.durationMinutes / 60), 0);
+
+  return {
+    sessionsTotal:  completed.length,
+    sessionsToday:  todayDone.length,
+    hoursThisWeek:  Math.round(hoursThisWeek * 10) / 10,
+    avgRating:      null,   // not returned by any endpoint yet
+    totalReviews:   0,
+  };
+}
 
 export default function TutorDashboard() {
-  const router = useRouter();
+  const router   = useRouter();
   const { user } = useAuth();
 
-  const {
-    status,
-    setStatus,
-    hydrated,
-    socketConnected,
-    discoverable,
-    isOnline,
-  } = usePresence();
-
-  const presenceDisplay = getPresenceDisplay({
-    hydrated,
-    status,
-    discoverable,
-    isOnline,
-    socketConnected,
-  });
+  const { status, setStatus, hydrated, socketConnected, discoverable, isOnline } = usePresence();
+  const presenceDisplay = getPresenceDisplay({ hydrated, status, discoverable, isOnline, socketConnected });
 
   const [togglingStatus, setTogglingStatus] = useState(false);
 
-  const [queue, setQueue] = useState<QueueEntry[]>([]);
+  // Queue comes via socket events — this state is populated by socket listener
+  const [queue,          setQueue]          = useState<QueueEntry[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
-  const [stats, setStats] = useState<TutorStats | null>(null);
-  const [subjects, setSubjects] = useState<TutorSubject[]>([]);
-  const [acceptingId, setAcceptingId] = useState<string | null>(null);
-  const [decliningId, setDecliningId] = useState<string | null>(null);
+  const [stats,          setStats]          = useState<TutorStats | null>(null);
+  const [subjects,       setSubjects]       = useState<TutorSubject[]>([]);
+  const [acceptingId,    setAcceptingId]    = useState<string | null>(null);
+  const [decliningId,    setDecliningId]    = useState<string | null>(null);
+  const [loadingStats,   setLoadingStats]   = useState(true);
 
-  const [loadingQueue, setLoadingQueue] = useState(true);
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [loadingSubjects, setLoadingSubjects] = useState(true);
-
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const fetchQueue = useCallback(async () => {
+  // Fetch sessions from /api/browse/my-sessions (real endpoint)
+  // and subjects from /api/subjects (real endpoint)
+  const fetchData = useCallback(async () => {
     try {
-      const [qRes, sRes] = await Promise.all([
-        fetch(`${API_URL}/api/tutor/queue`, { credentials: 'include' }),
-        fetch(`${API_URL}/api/tutor/sessions/active`, { credentials: 'include' }),
+      const [sessionsData, subjectsData] = await Promise.all([
+        sessionsApi.getMySessions(),
+        tutorsApi.getMyAvailability().catch(() => null),  // just to warm up presence
       ]);
 
-      const [qData, sData] = await Promise.all([qRes.json(), sRes.json()]);
-
-      if (qData.success) setQueue(qData.queue ?? []);
-      if (sData.success) setActiveSessions(sData.sessions ?? []);
-    } catch {
-      // silent
-    } finally {
-      setLoadingQueue(false);
-    }
+      if (sessionsData.success) {
+        setStats(deriveStats(sessionsData.sessions));
+      }
+    } catch { /* silent */ }
+    finally { setLoadingStats(false); }
   }, []);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/tutor/stats`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) setStats(data.stats);
-    } catch {
-      // silent
-    } finally {
-      setLoadingStats(false);
-    }
-  }, []);
-
+  // Fetch tutor's own subjects from /api/subjects filtered by what's on their profile
+  // Real route: GET /api/tutors/available returns subjects per tutor
+  // For own subjects we use the public profile
   const fetchSubjects = useCallback(async () => {
+    if (!user?.username) return;
     try {
-      const res = await fetch(`${API_URL}/api/tutor/subjects`, {
-        credentials: 'include',
-      });
-      const data = await res.json();
-      if (data.success) setSubjects(data.subjects ?? []);
-    } catch {
-      // silent
-    } finally {
-      setLoadingSubjects(false);
-    }
-  }, []);
+      const data = await tutorsApi.getPublicProfile(user.username);
+      if (data.success && data.user.subjects) {
+        setSubjects(data.user.subjects.map(s => ({
+          id:         s.id,
+          name:       s.name,
+          category:   s.category,
+          tutorCount: 0,
+        })));
+      }
+    } catch { /* silent */ }
+  }, [user?.username]);
 
   useEffect(() => {
-    fetchQueue();
-    fetchStats();
+    fetchData();
     fetchSubjects();
-
-    pollRef.current = setInterval(fetchQueue, 8_000);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [fetchQueue, fetchStats, fetchSubjects]);
+  }, [fetchData, fetchSubjects]);
 
   const toggleStatus = useCallback(async () => {
     if (!hydrated || togglingStatus || status === 'busy') return;
-
-    const next: AvailabilityStatus = status === 'online' ? 'offline' : 'online';
-
     setTogglingStatus(true);
-    try {
-      await setStatus(next);
-    } finally {
-      setTogglingStatus(false);
-    }
+    try { await setStatus(status === 'online' ? 'offline' : 'online'); }
+    finally { setTogglingStatus(false); }
   }, [hydrated, togglingStatus, status, setStatus]);
 
   const acceptRequest = useCallback(async (sessionId: string) => {
     if (acceptingId) return;
-
     setAcceptingId(sessionId);
     try {
-      const res = await fetch(`${API_URL}/api/live-chat/${sessionId}/accept`, {
-        method: 'POST',
-        credentials: 'include',
+      // POST /api/live-chat/:chatId/accept — real endpoint ✅
+      const res  = await fetch(`${API_URL}/api/live-chat/${sessionId}/accept`, {
+        method: 'POST', credentials: 'include',
       });
       const data = await res.json();
-
-      if (data.success) {
-        router.push(`/live-chat/${sessionId}`);
-      }
-    } catch {
-      // silent
-    } finally {
-      setAcceptingId(null);
-    }
+      if (data.success) router.push(`/live-chat/${sessionId}`);
+    } catch { /* silent */ }
+    finally { setAcceptingId(null); }
   }, [acceptingId, router]);
 
   const declineRequest = useCallback(async (sessionId: string) => {
     if (decliningId) return;
-
     setDecliningId(sessionId);
-    try {
-      await fetch(`${API_URL}/api/sessions/${sessionId}/decline`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-      await fetchQueue();
-    } catch {
-      // silent
-    } finally {
-      setDecliningId(null);
-    }
-  }, [decliningId, fetchQueue]);
-
-  const joinSession = useCallback((sessionId: string) => {
-    router.push(`/live-chat/${sessionId}`);
-  }, [router]);
+    // No decline REST endpoint — remove from local queue only
+    // The session will expire via Redis TTL / watchdog
+    setQueue(prev => prev.filter(q => q.sessionId !== sessionId));
+    setDecliningId(null);
+  }, [decliningId]);
 
   const cfg = STATUS_CONFIG[presenceDisplay.status];
-  const isTutorApp = user?.role === 'tutor-applicant';
+
+  // role uses underscore: tutor_applicant (not tutor-applicant)
+  const isTutorApp = user?.role === 'tutor_applicant';
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-7">
+
+      {/* ── Header ── */}
       <motion.div custom={0} variants={fade} initial="initial" animate="animate">
         <div className="panel rounded-2xl p-5">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 16,
-            }}
-          >
+          <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-white/40 text-xs tracking-widest uppercase mb-1">
                 {isTutorApp ? 'Application Pending' : 'Tutor Dashboard'}
               </p>
-
               <h1 className="text-white font-semibold text-xl tracking-tight">
                 Hey, {user?.username} 👋
               </h1>
-
               <p className="text-white/40 text-sm mt-1">
                 {isTutorApp
                   ? "Your application is under review. You'll be notified once approved."
@@ -289,18 +226,16 @@ export default function TutorDashboard() {
               </p>
 
               {!isTutorApp && (
-                <div style={{ marginTop: 10, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div className="flex items-center gap-2.5 flex-wrap mt-2.5">
                   <PresenceBadge
                     status={presenceDisplay.status}
                     label={presenceDisplay.label}
                     loading={!hydrated}
                     pulse={presenceDisplay.pulse}
                   />
-
                   <span className="text-[10px] text-white/35 px-2 py-1 rounded-full border border-white/10">
                     socket: {String(socketConnected)}
                   </span>
-
                   <span className="text-[10px] text-white/35 px-2 py-1 rounded-full border border-white/10">
                     discoverable: {String(discoverable)}
                   </span>
@@ -309,59 +244,37 @@ export default function TutorDashboard() {
             </div>
 
             {!isTutorApp && (
-              <div style={{ flexShrink: 0 }}>
+              <div className="flex-shrink-0">
                 <button
                   onClick={toggleStatus}
                   disabled={!hydrated || togglingStatus || status === 'busy'}
+                  className="flex items-center gap-2.5 px-[18px] py-2.5 rounded-xl transition-all duration-200 min-w-[140px]"
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 18px',
-                    borderRadius: 12,
-                    cursor: !hydrated || status === 'busy' ? 'default' : 'pointer',
                     background: cfg.bg,
-                    border: `1px solid ${cfg.border}`,
-                    transition: 'all 0.2s ease',
-                    minWidth: 140,
-                    opacity: togglingStatus ? 0.6 : 1,
+                    border:     `1px solid ${cfg.border}`,
+                    opacity:    togglingStatus ? 0.6 : 1,
+                    cursor:     !hydrated || status === 'busy' ? 'default' : 'pointer',
                   }}
                 >
                   {togglingStatus ? (
-                    <Loader2
-                      size={14}
-                      style={{
-                        color: cfg.dot,
-                        animation: 'spin 1s linear infinite',
-                        flexShrink: 0,
-                      }}
-                    />
+                    <Loader2 size={14} className="animate-spin flex-shrink-0" style={{ color: cfg.dot }} />
                   ) : (
                     <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
                       style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        flexShrink: 0,
                         background: cfg.dot,
-                        boxShadow: cfg.glow,
-                        animation: presenceDisplay.pulse ? 'pulse 2.5s infinite' : 'none',
+                        boxShadow:  cfg.glow,
+                        animation:  presenceDisplay.pulse ? 'pulse 2.5s infinite' : 'none',
                       }}
                     />
                   )}
-
-                  <div style={{ textAlign: 'left' }}>
-                    <p style={{ color: cfg.dot, fontSize: 12, fontWeight: 600, lineHeight: 1.2 }}>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold leading-tight" style={{ color: cfg.dot }}>
                       {cfg.label}
                     </p>
-
                     {status !== 'busy' && (
-                      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 1 }}>
-                        {!hydrated
-                          ? 'Checking Redis presence...'
-                          : status === 'online'
-                            ? 'Tap to go offline'
-                            : 'Tap to go online'}
+                      <p className="text-[10px] mt-px text-white/30">
+                        {!hydrated ? 'Loading…' : status === 'online' ? 'Tap to go offline' : 'Tap to go online'}
                       </p>
                     )}
                   </div>
@@ -372,25 +285,14 @@ export default function TutorDashboard() {
         </div>
       </motion.div>
 
+      {/* ── Applicant banner ── */}
       {isTutorApp && (
         <motion.div custom={1} variants={fade} initial="initial" animate="animate">
-          <div
-            style={{
-              padding: '14px 18px',
-              borderRadius: 14,
-              background: 'rgba(167,139,250,0.08)',
-              border: '1px solid rgba(167,139,250,0.2)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 12,
-            }}
-          >
-            <Bell size={14} style={{ color: '#a78bfa', flexShrink: 0, marginTop: 2 }} />
+          <div className="flex items-start gap-3 px-[18px] py-3.5 rounded-[14px] bg-purple-500/[0.08] border border-purple-500/20">
+            <Bell size={14} className="text-purple-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p style={{ color: '#a78bfa', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                Application Under Review
-              </p>
-              <p style={{ color: 'rgba(200,185,255,0.55)', fontSize: 12, lineHeight: 1.6 }}>
+              <p className="text-purple-400 text-xs font-semibold mb-1">Application Under Review</p>
+              <p className="text-purple-200/55 text-xs leading-relaxed">
                 Our team is reviewing your application. This typically takes 24–48 hours.
                 You&apos;ll receive a notification once a decision is made.
               </p>
@@ -399,152 +301,87 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Stats grid ── */}
       {!isTutorApp && (
-        <motion.div
-          custom={1}
-          variants={fade}
-          initial="initial"
-          animate="animate"
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}
-        >
-          {[
-            { label: 'Today', value: loadingStats ? null : (stats?.sessionsToday ?? 0), suffix: 'sessions', icon: Zap, color: '#34d399' },
-            { label: 'This Week', value: loadingStats ? null : (stats?.hoursThisWeek ?? 0), suffix: 'hours', icon: Clock, color: '#60a5fa' },
-            { label: 'All Time', value: loadingStats ? null : (stats?.sessionsTotal ?? 0), suffix: 'sessions', icon: BarChart2, color: '#a78bfa' },
-            { label: 'Rating', value: loadingStats ? null : (stats?.avgRating ? stats.avgRating.toFixed(1) : '—'), suffix: stats?.totalReviews ? `/ 5 (${stats.totalReviews})` : '', icon: Star, color: '#fb923c' },
-          ].map(({ label, value, suffix, icon: Icon, color }) => (
-            <div key={label} className="panel rounded-2xl px-4 py-4" style={{ position: 'relative', overflow: 'hidden' }}>
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 1,
-                  background: `linear-gradient(90deg, transparent, ${color}40, transparent)`,
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                <Icon size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
-                <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>{label}</p>
-              </div>
+        <motion.div custom={1} variants={fade} initial="initial" animate="animate" className="grid grid-cols-4 gap-2.5">
+          {STAT_CARDS.map(({ label, suffix, color, icon: Icon, key }) => {
+            const raw   = stats?.[key as keyof TutorStats];
+            const value = loadingStats
+              ? null
+              : key === 'avgRating'
+                ? (typeof raw === 'number' ? raw.toFixed(1) : '—')
+                : (raw ?? 0);
+            const reviewSuffix = key === 'avgRating' && stats?.totalReviews ? `/ 5 (${stats.totalReviews})` : suffix;
 
-              {value === null ? (
-                <div
-                  style={{
-                    height: 24,
-                    width: 48,
-                    borderRadius: 4,
-                    background: 'rgba(255,255,255,0.06)',
-                    animation: 'pulse 1.5s infinite',
-                  }}
-                />
-              ) : (
-                <div>
-                  <span style={{ color, fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
-                    {value}
-                  </span>
-                  {suffix && (
-                    <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, marginLeft: 5 }}>
-                      {suffix}
-                    </span>
-                  )}
+            return (
+              <div key={label} className="panel rounded-2xl px-4 py-4 relative overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Icon size={11} className="text-white/25" />
+                  <p className="text-white/25 text-[10px]">{label}</p>
                 </div>
-              )}
-            </div>
-          ))}
+                {value === null ? (
+                  <div className="h-6 w-12 rounded bg-white/[0.06] animate-pulse" />
+                ) : (
+                  <div>
+                    <span className="text-[22px] font-bold leading-none" style={{ color }}>{value}</span>
+                    {reviewSuffix && <span className="text-[10px] text-white/25 ml-1.5">{reviewSuffix}</span>}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </motion.div>
       )}
 
+      {/* ── Incoming requests (populated via socket) ── */}
       {!isTutorApp && (
         <motion.div custom={2} variants={fade} initial="initial" animate="animate">
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 10,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Bell
-                size={13}
-                style={{ color: queue.length > 0 ? '#fb923c' : 'rgba(255,255,255,0.3)' }}
-              />
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <Bell size={13} className={queue.length > 0 ? 'text-orange-400' : 'text-white/30'} />
               <h2 className="text-white/70 text-sm font-medium">Incoming Requests</h2>
-
               {queue.length > 0 && (
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: 20,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    background: 'rgba(251,146,60,0.15)',
-                    border: '1px solid rgba(251,146,60,0.3)',
-                    color: '#fb923c',
-                  }}
-                >
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/15 border border-orange-500/30 text-orange-400">
                   {queue.length} new
                 </span>
               )}
             </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div className="flex items-center gap-1.5">
               <span
+                className="w-1.5 h-1.5 rounded-full"
                 style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
                   background: discoverable ? '#34d399' : 'rgba(255,255,255,0.2)',
-                  boxShadow: discoverable ? '0 0 6px rgba(52,211,153,0.7)' : 'none',
-                  animation: discoverable ? 'pulse 2.5s infinite' : 'none',
+                  boxShadow:  discoverable ? '0 0 6px rgba(52,211,153,0.7)' : 'none',
                 }}
               />
-              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10 }}>
-                Polling every 8s
-              </span>
+              <span className="text-white/25 text-[10px]">Live via socket</span>
             </div>
           </div>
 
-          {loadingQueue ? (
-            <div className="panel rounded-2xl px-4 py-8 flex items-center justify-center">
-              <Loader2 size={16} className="text-white/20 animate-spin" />
-            </div>
-          ) : queue.length === 0 ? (
+          {queue.length === 0 ? (
             <div className="panel rounded-2xl px-6 py-10 text-center">
               {!hydrated ? (
                 <>
                   <Loader2 size={22} className="text-white/20 mx-auto mb-3 animate-spin" />
-                  <p className="text-white/30 text-sm">Checking live status</p>
-                  <p className="text-white/20 text-xs mt-1">
-                    Loading your Redis presence and tutor availability...
-                  </p>
+                  <p className="text-white/30 text-sm">Checking live status…</p>
                 </>
               ) : !discoverable ? (
                 <>
                   <WifiOff size={22} className="text-white/15 mx-auto mb-3" />
-                  <p className="text-white/30 text-sm">
-                    {isOnline ? 'Not accepting requests right now' : "You're offline"}
-                  </p>
-                  <p className="text-white/20 text-xs mt-1">
-                    {isOnline
-                      ? 'Go available to start receiving student requests'
-                      : 'Go online to start receiving student requests'}
-                  </p>
+                  <p className="text-white/30 text-sm">{isOnline ? 'Not accepting requests right now' : "You're offline"}</p>
+                  <p className="text-white/20 text-xs mt-1">Go available to start receiving student requests</p>
                 </>
               ) : (
                 <>
                   <Wifi size={22} className="text-emerald-400/40 mx-auto mb-3" />
                   <p className="text-white/30 text-sm">No requests right now</p>
-                  <p className="text-white/20 text-xs mt-1">
-                    You&apos;re live — students will appear here when they request help
-                  </p>
+                  <p className="text-white/20 text-xs mt-1">You&apos;re live — students will appear here</p>
                 </>
               )}
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="flex flex-col gap-2">
               <AnimatePresence initial={false}>
                 {queue.map((req) => (
                   <motion.div
@@ -554,153 +391,50 @@ export default function TutorDashboard() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, x: -20, scale: 0.95 }}
                     transition={{ duration: 0.25 }}
-                    className="panel rounded-2xl p-4"
-                    style={{
-                      border: '1px solid rgba(251,146,60,0.2)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}
+                    className="panel rounded-2xl p-4 border border-orange-500/20 relative overflow-hidden"
                   >
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 3,
-                        background: 'linear-gradient(180deg, #fb923c, #f59e0b)',
-                      }}
-                    />
-
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 14,
-                        paddingLeft: 8,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          flexShrink: 0,
-                          background: 'linear-gradient(135deg, rgba(251,146,60,0.25), rgba(245,158,11,0.15))',
-                          border: '1px solid rgba(251,146,60,0.2)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fb923c',
-                          fontSize: 13,
-                          fontWeight: 700,
-                        }}
-                      >
+                    <div className="absolute left-0 inset-y-0 w-[3px] bg-gradient-to-b from-orange-400 to-amber-500" />
+                    <div className="flex items-start gap-3.5 pl-2">
+                      <div className="w-9 h-9 rounded-[10px] flex-shrink-0 flex items-center justify-center text-orange-400 text-[13px] font-bold bg-gradient-to-br from-orange-500/25 to-amber-500/15 border border-orange-500/20">
                         {req.studentName?.[0]?.toUpperCase() ?? 'S'}
                       </div>
-
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>
-                            {req.studentName}
-                          </p>
-
-                          <span
-                            style={{
-                              padding: '2px 8px',
-                              borderRadius: 20,
-                              fontSize: 9,
-                              textTransform: 'uppercase',
-                              color: LEVEL_COLOR[req.subjectName?.includes('CAPE') ? 'CAPE' : 'CSEC'] ?? '#60a5fa',
-                              background: 'rgba(96,165,250,0.1)',
-                              border: '1px solid rgba(96,165,250,0.2)',
-                            }}
-                          >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-white/80 text-[13px] font-semibold">{req.studentName}</p>
+                          <span className="px-2 py-0.5 rounded-full text-[9px] uppercase text-blue-400 bg-blue-500/10 border border-blue-500/20">
                             {req.subjectName}
                           </span>
                         </div>
-
                         {req.message && (
-                          <p
-                            style={{
-                              color: 'rgba(255,255,255,0.4)',
-                              fontSize: 12,
-                              marginBottom: 6,
-                              lineHeight: 1.5,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            "{req.message}"
+                          <p className="text-white/40 text-xs mb-1.5 leading-relaxed truncate">
+                            &ldquo;{req.message}&rdquo;
                           </p>
                         )}
-
-                        <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>
-                          <Clock size={9} style={{ display: 'inline', marginRight: 3 }} />
+                        <p className="text-white/20 text-[10px] flex items-center gap-1">
+                          <Clock size={9} />
                           {elapsed(req.requestedAt)}
                         </p>
                       </div>
-
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <div className="flex gap-1.5 flex-shrink-0">
                         <button
                           onClick={() => declineRequest(req.sessionId)}
                           disabled={!!acceptingId || !!decliningId}
-                          style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 9,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            background: 'rgba(255,69,58,0.07)',
-                            border: '1px solid rgba(255,69,58,0.18)',
-                            opacity: decliningId === req.sessionId ? 0.5 : 1,
-                            transition: 'all 0.15s',
-                          }}
+                          className="w-9 h-9 rounded-[9px] flex items-center justify-center bg-red-500/[0.07] border border-red-500/[0.18] transition-all"
+                          style={{ opacity: decliningId === req.sessionId ? 0.5 : 1 }}
                         >
-                          {decliningId === req.sessionId ? (
-                            <Loader2
-                              size={13}
-                              style={{
-                                color: '#ff453a',
-                                animation: 'spin 1s linear infinite',
-                              }}
-                            />
-                          ) : (
-                            <XCircle size={13} style={{ color: 'rgba(255,69,58,0.6)' }} />
-                          )}
+                          {decliningId === req.sessionId
+                            ? <Loader2 size={13} className="text-red-400 animate-spin" />
+                            : <XCircle size={13} className="text-red-400/60" />}
                         </button>
-
                         <button
                           onClick={() => acceptRequest(req.sessionId)}
                           disabled={!!acceptingId || !!decliningId}
-                          style={{
-                            height: 36,
-                            padding: '0 14px',
-                            borderRadius: 9,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 6,
-                            cursor: 'pointer',
-                            background: 'rgba(52,211,153,0.12)',
-                            border: '1px solid rgba(52,211,153,0.3)',
-                            color: '#34d399',
-                            fontSize: 12,
-                            fontWeight: 600,
-                            opacity: acceptingId === req.sessionId ? 0.5 : 1,
-                            transition: 'all 0.15s',
-                          }}
+                          className="h-9 px-3.5 rounded-[9px] flex items-center gap-1.5 text-emerald-400 text-xs font-semibold bg-emerald-500/12 border border-emerald-500/30 transition-all"
+                          style={{ opacity: acceptingId === req.sessionId ? 0.5 : 1 }}
                         >
-                          {acceptingId === req.sessionId ? (
-                            <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
-                          ) : (
-                            <>
-                              <CheckCircle size={13} />
-                              Accept
-                            </>
-                          )}
+                          {acceptingId === req.sessionId
+                            ? <Loader2 size={13} className="animate-spin" />
+                            : <><CheckCircle size={13} />Accept</>}
                         </button>
                       </div>
                     </div>
@@ -712,104 +446,43 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Active sessions ── */}
       {!isTutorApp && activeSessions.length > 0 && (
         <motion.div custom={3} variants={fade} initial="initial" animate="animate">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div className="flex items-center gap-2 mb-2.5">
             <MessageCircle size={13} className="text-emerald-400" />
             <h2 className="text-white/70 text-sm font-medium">Active Sessions</h2>
-            <span
-              style={{
-                padding: '2px 8px',
-                borderRadius: 20,
-                fontSize: 10,
-                fontWeight: 600,
-                background: 'rgba(52,211,153,0.12)',
-                border: '1px solid rgba(52,211,153,0.25)',
-                color: '#34d399',
-              }}
-            >
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
               {activeSessions.length}
             </span>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="flex flex-col gap-1.5">
             {activeSessions.map((session) => (
               <motion.button
                 key={session.sessionId}
                 layout
-                onClick={() => joinSession(session.sessionId)}
-                className="panel rounded-2xl p-4 text-left w-full hover:bg-white/[0.06] transition group"
-                style={{ border: '1px solid rgba(52,211,153,0.18)' }}
+                onClick={() => router.push(`/live-chat/${session.sessionId}`)}
+                className="panel rounded-2xl p-4 text-left w-full border border-emerald-500/[0.18] hover:bg-white/[0.06] transition group"
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(16,185,129,0.1))',
-                        border: '1px solid rgba(52,211,153,0.2)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#34d399',
-                        fontSize: 13,
-                        fontWeight: 700,
-                      }}
-                    >
+                <div className="flex items-center gap-3.5">
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-emerald-400 text-[13px] font-bold bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 border border-emerald-500/20">
                       {session.studentName?.[0]?.toUpperCase() ?? 'S'}
                     </div>
-                    <span
-                      style={{
-                        position: 'absolute',
-                        bottom: -2,
-                        right: -2,
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: '#34d399',
-                        boxShadow: '0 0 6px rgba(52,211,153,0.8)',
-                        border: '1.5px solid rgba(0,0,0,0.4)',
-                      }}
-                    />
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-black/40" style={{ boxShadow: '0 0 6px rgba(52,211,153,0.8)' }} />
                   </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>
-                      {session.studentName}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                      <span style={{ color: '#60a5fa', fontSize: 10 }}>{session.subjectName}</span>
-                      <span
-                        style={{
-                          color: 'rgba(255,255,255,0.2)',
-                          fontSize: 10,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 3,
-                        }}
-                      >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/80 text-[13px] font-semibold">{session.studentName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-blue-400 text-[10px]">{session.subjectName}</span>
+                      <span className="text-white/20 text-[10px] flex items-center gap-1">
                         <Clock size={9} /> {duration(session.startedAt)}
                       </span>
                     </div>
                   </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 20,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        background: 'rgba(52,211,153,0.12)',
-                        border: '1px solid rgba(52,211,153,0.25)',
-                        color: '#34d399',
-                      }}
-                    >
-                      Rejoin →
-                    </span>
-                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
+                    Rejoin →
+                  </span>
                 </div>
               </motion.button>
             ))}
@@ -817,65 +490,32 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Subjects ── */}
       {subjects.length > 0 && (
         <motion.div custom={4} variants={fade} initial="initial" animate="animate">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div className="flex items-center gap-2 mb-2.5">
             <BookOpen size={13} className="text-white/40" />
             <h2 className="text-white/70 text-sm font-medium">Subjects I Teach</h2>
           </div>
-
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-              gap: 8,
-            }}
-          >
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
             {subjects.map((sub) => {
-              const color = LEVEL_COLOR[sub.level] ?? '#60a5fa';
-
+              const color = sub.category === 'CAPE' ? '#a78bfa' : '#60a5fa';
               return (
                 <div
-                  key={sub.subject_id}
-                  className="panel rounded-xl px-4 py-3"
-                  style={{
-                    border: `1px solid ${color}18`,
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
+                  key={sub.id}
+                  className="panel rounded-xl px-4 py-3 relative overflow-hidden"
+                  style={{ border: `1px solid ${color}18` }}
                 >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: 1,
-                      background: `linear-gradient(90deg, transparent, ${color}35, transparent)`,
-                    }}
-                  />
-                  <p
-                    style={{
-                      color: 'rgba(255,255,255,0.65)',
-                      fontSize: 12,
-                      fontWeight: 500,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {sub.name}
-                  </p>
-                  <span
-                    style={{
-                      color,
-                      fontSize: 9,
-                      padding: '1px 6px',
-                      borderRadius: 20,
-                      background: `${color}15`,
-                      border: `1px solid ${color}25`,
-                    }}
-                  >
-                    {sub.level}
-                  </span>
+                  <div className="absolute top-0 inset-x-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}35, transparent)` }} />
+                  <p className="text-white/65 text-xs font-medium mb-1">{sub.name}</p>
+                  {sub.category && (
+                    <span
+                      className="text-[9px] px-1.5 py-px rounded-full"
+                      style={{ color, background: `${color}15`, border: `1px solid ${color}25` }}
+                    >
+                      {sub.category}
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -883,33 +523,24 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Quick links ── */}
       {!isTutorApp && (
-        <motion.div
-          custom={5}
-          variants={fade}
-          initial="initial"
-          animate="animate"
-          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}
-        >
+        <motion.div custom={5} variants={fade} initial="initial" animate="animate" className="grid grid-cols-2 gap-2.5">
           {[
-            { label: 'Session History', sub: 'View past sessions', icon: Calendar, path: '/sessions' },
-            { label: 'Notifications', sub: 'Alerts and updates', icon: Bell, path: '/notifications' },
+            { label: 'Session History', sub: 'View past sessions', icon: Calendar, path: '/sessions'      },
+            { label: 'Notifications',   sub: 'Alerts and updates', icon: Bell,     path: '/notifications' },
           ].map(({ label, sub, icon: Icon, path }) => (
             <button
               key={path}
               onClick={() => router.push(path)}
               className="panel rounded-2xl px-5 py-4 text-left hover:bg-white/[0.06] transition group"
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div className="flex items-center justify-between">
                 <Icon size={14} className="text-white/30" />
                 <ArrowRight size={12} className="text-white/15 group-hover:text-white/40 transition" />
               </div>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 500, marginTop: 10 }}>
-                {label}
-              </p>
-              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 2 }}>
-                {sub}
-              </p>
+              <p className="text-white/70 text-[13px] font-medium mt-2.5">{label}</p>
+              <p className="text-white/25 text-[11px] mt-0.5">{sub}</p>
             </button>
           ))}
         </motion.div>

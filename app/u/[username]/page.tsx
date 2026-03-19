@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import PublicProfileCard from '@/components/shared/ui/PublicProfileCard';
-import { UserProfileView } from '@/components/types/profile.view';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+import { tutorsApi } from '@/lib/api';
+import type { UserProfileView } from '@/components/types/profile.view';
 
 export default function PublicProfilePage({
   params,
@@ -13,23 +12,15 @@ export default function PublicProfilePage({
   params: { username: string };
 }) {
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfileView | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [profile,  setProfile]  = useState<UserProfileView | null>(null);
+  const [loading,  setLoading]  = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/users-public/${params.username}`)
-      .then((res) => {
-        if (res.status === 404 || res.status === 403) {
-          setNotFound(true);
-          return null;
-        }
-        if (!res.ok) throw new Error('Failed to fetch profile');
-        return res.json();
-      })
+    tutorsApi.getPublicProfile(params.username)
       .then((data) => {
-        if (!data) return;
-        setProfile(data.user);
+        if (!data.success || !data.user) { setNotFound(true); return; }
+        setProfile(data.user as UserProfileView);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));

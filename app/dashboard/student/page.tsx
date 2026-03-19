@@ -13,15 +13,15 @@ import StatCard           from '@/components/student/dashboard/StatCard';
 
 import { sessionsApi, tutorsApi, notificationsApi } from '@/lib/api';
 import { filterActive } from '@/components/types/notification';
-import type { Session } from '@/lib/api/sessions';
-import type { TutorSummary } from '@/lib/api/tutors';
-import type { Notification } from '@/components/types/notification';
+import type { BookedSession } from '@/lib/api';        // was: Session
+import type { TutorSummary }  from '@/lib/api';
+import type { Notification }  from '@/components/types/notification';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const router   = useRouter();
 
-  const [sessions,      setSessions]      = useState<Session[]>([]);
+  const [sessions,      setSessions]      = useState<BookedSession[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [tutors,        setTutors]        = useState<TutorSummary[]>([]);
   const [loading,       setLoading]       = useState(true);
@@ -38,7 +38,7 @@ export default function StudentDashboard() {
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
-  const upcoming  = sessions.filter(s => ['scheduled', 'confirmed'].includes(s.status)).slice(0, 3);
+  const upcoming  = sessions.filter(s => ['pending', 'confirmed', 'in_progress', 'active'].includes(s.status)).slice(0, 3);
   const completed = sessions.filter(s => s.status === 'completed');
   const unread    = notifications.filter(n => !n.isRead).length;
 
@@ -83,7 +83,7 @@ export default function StudentDashboard() {
           upcoming.map(s => (
             <RecentSessionRow key={s.sessionId} sessionId={s.sessionId}
               subject={s.subjectName} partnerName={s.partnerUsername}
-              scheduledTime={s.scheduledTime} durationMinutes={s.durationMinutes} status={s.status} />
+              scheduledAt={s.scheduledAt} durationMinutes={s.durationMinutes} status={s.status} />
           ))
         )}
       </DashboardSection>
@@ -94,9 +94,15 @@ export default function StudentDashboard() {
             <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-20 animate-pulse" />)}</>
           ) : (
             tutors.map(t => (
-              <AvailableTutorCard key={t.userId} userId={t.userId} username={t.username}
-                avatarUrl={t.avatarUrl} subjects={t.subjects}
-                hourlyRate={t.hourlyRate} isStudentTutor={t.isStudentTutor} />
+              // avatarUrl not returned by backend — AvailableTutorCard must handle missing avatar
+              <AvailableTutorCard
+                key={t.userId}
+                userId={t.userId}
+                username={t.username}
+                subjects={t.subjects}
+                hourlyRate={t.hourlyRate}
+                isStudentTutor={t.isStudentTutor}
+              />
             ))
           )}
         </DashboardSection>

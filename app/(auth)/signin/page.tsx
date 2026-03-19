@@ -66,7 +66,7 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      await login(email.trim().toLowerCase(), password, rememberMe);
+      await login(email.trim().toLowerCase(), password);
 
       sessionStorage.removeItem('assi_demo_credentials');
       router.replace('/');

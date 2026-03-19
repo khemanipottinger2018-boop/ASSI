@@ -10,36 +10,38 @@ import {
 
 /* =====================================================
  * TYPES
- * ===================================================== */
-
-/**
- * Mirrors the full `/api/auth/me` response payload.
- * All fields are present — nothing dropped on the way in.
+ * =====================================================
+ *
+ * Mirrors /api/auth/me response exactly.
+ * Backend returns camelCase — no mapping needed.
+ *
+ * Role enum matches backend prisma schema:
+ *   student | tutor | tutor_applicant | admin
  */
+
 export type AuthUser = {
-  id: string;
-  email: string;
-  username: string;
-  role: 'student' | 'tutor' | 'admin' | 'tutor-applicant';
-  avatarUrl: string | null;
+  id:                 string;
+  email:              string | null;
+  username:           string;
+  role:               'student' | 'tutor' | 'tutor_applicant' | 'admin';
   disclaimerAccepted: boolean;
-  isDemo: boolean;
-  demoExpiresAt: string | null;
+  isDemo:             boolean;
+  demoExpiresAt:      string | null;
 };
 
 type AuthContextType = {
-  user: AuthUser | null;
-  isLoading: boolean;
+  user:            AuthUser | null;
+  isLoading:       boolean;
   isAuthenticated: boolean;
 
-  // Convenience role booleans — derived from user.role so
-  // components never have to do string comparisons themselves.
-  isStudent: boolean;
-  isTutor: boolean;
-  isAdmin: boolean;
+  // Convenience role booleans — derived from user.role
+  isStudent:       boolean;
+  isTutor:         boolean;
+  isTutorApplicant: boolean;
+  isAdmin:         boolean;
 
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  logout: () => Promise<void>;
+  login:   (email: string, password: string) => Promise<void>;
+  logout:  () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
 };
 
@@ -55,17 +57,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
  * HELPERS
  * ===================================================== */
 
-/** Map the raw snake_case API response to our camelCase AuthUser. */
+/**
+ * /api/auth/me returns camelCase — map directly, no snake_case conversion.
+ * Fields: id, email, username, role, disclaimerAccepted, isDemo, demoExpiresAt
+ */
 function mapUser(raw: any): AuthUser {
   return {
     id:                 String(raw.id),
-    email:              String(raw.email),
+    email:              raw.email ?? null,
     username:           String(raw.username),
     role:               raw.role,
-    avatarUrl:          raw.avatar_url ?? null,
-    disclaimerAccepted: Boolean(raw.disclaimer_accepted),
-    isDemo:             Boolean(raw.is_demo),
-    demoExpiresAt:      raw.demo_expires_at ?? null,
+    disclaimerAccepted: Boolean(raw.disclaimerAccepted),
+    isDemo:             Boolean(raw.isDemo),
+    demoExpiresAt:      raw.demoExpiresAt ?? null,
   };
 }
 
@@ -74,13 +78,14 @@ function mapUser(raw: any): AuthUser {
  * ===================================================== */
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user,      setUser]      = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAuthenticated = user !== null;
-  const isStudent = user?.role === 'student';
-  const isTutor   = user?.role === 'tutor' || user?.role === 'tutor-applicant';
-  const isAdmin   = user?.role === 'admin';
+  const isAuthenticated  = user !== null;
+  const isStudent        = user?.role === 'student';
+  const isTutor          = user?.role === 'tutor';
+  const isTutorApplicant = user?.role === 'tutor_applicant';
+  const isAdmin          = user?.role === 'admin';
 
   /* ================= REHYDRATE SESSION ================= */
 
@@ -97,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await res.json();
 
-      if (!data?.user) {
+      if (!data?.success || !data?.user) {
         setUser(null);
         return null;
       }
@@ -123,12 +128,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /* ================= LOGIN ================= */
 
-  async function login(email: string, password: string, rememberMe = true) {
+  async function login(email: string, password: string) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ email, password, rememberMe }),
+      body:        JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
@@ -137,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.error || 'Login failed');
     }
 
+    // /api/auth/login response shape matches /api/auth/me user shape
     setUser(mapUser(data.user));
   }
 
@@ -145,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function logout() {
     try {
       await fetch(`${API_URL}/api/auth/logout`, {
-        method: 'POST',
+        method:      'POST',
         credentials: 'include',
       });
     } finally {
@@ -153,9 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /* =====================================================
-   * PROVIDER VALUE
-   * ===================================================== */
+  /* ===================================================== */
 
   return (
     <AuthContext.Provider
@@ -165,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         isStudent,
         isTutor,
+        isTutorApplicant,
         isAdmin,
         login,
         logout,

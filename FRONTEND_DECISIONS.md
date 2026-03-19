@@ -29,3 +29,21 @@
 **Decision**: Role-based separation — shared/, student/, tutor/, admin/
 **Status**: Done ✅
 
+```
+
+---
+
+Add this to `FRONTEND_DECISIONS.md`:
+```
+## Admin metrics endpoint
+adminApi.getMetrics() points to /api/admin/metrics
+Old raw fetch was hitting /api/admin/metrics/runtime
+Confirm correct endpoint with backend before building out the metrics UI.
+
+```
+
+Add to `FRONTEND_DECISIONS.md`:
+```
+## Public profile response shape
+tutorsApi.getPublicProfile() maps to /api/users-public/:username
+Page uses data.profile — confirm backend returns { success, profile } not { success, user }

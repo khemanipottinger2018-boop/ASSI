@@ -9,14 +9,13 @@ import {
   Shield,
   Award,
   DollarSign,
-  Phone,
 } from 'lucide-react';
 
 interface ProfileCardProps {
-  profile: UserProfileView;
+  profile:    UserProfileView;
   isPrivate?: boolean;
-  onEdit?: () => void;
-  onLogout?: () => void;
+  onEdit?:    () => void;
+  onLogout?:  () => void;
 }
 
 export default function ProfileCard({
@@ -27,14 +26,20 @@ export default function ProfileCard({
 }: ProfileCardProps) {
   const initials = profile.username.charAt(0).toUpperCase();
 
+  // ⚠️ role enum uses underscore: tutor_applicant (not tutor-applicant)
   const roleMap = {
-    student: { label: 'Student', icon: UserIcon },
-    'tutor-applicant': { label: 'Applicant', icon: Award },
-    tutor: { label: 'Tutor', icon: GraduationCap },
-    admin: { label: 'Admin', icon: Shield },
+    student:         { label: 'Student',         icon: UserIcon      },
+    tutor_applicant: { label: 'Applicant',        icon: Award         },
+    tutor:           { label: 'Tutor',            icon: GraduationCap },
+    admin:           { label: 'Admin',            icon: Shield        },
   } as const;
 
-  const RoleIcon = roleMap[profile.role].icon;
+  const roleMeta = roleMap[profile.role] ?? { label: profile.role, icon: UserIcon };
+  const RoleIcon = roleMeta.icon;
+
+  // Hourly rate: /api/user/me returns it under tutor.hourlyRate
+  // /api/users-public/:username returns it at the top level as hourlyRate
+  const hourlyRate = profile.tutor?.hourlyRate ?? profile.hourlyRate ?? null;
 
   return (
     <div className="
@@ -66,7 +71,7 @@ export default function ProfileCard({
 
             <div className="flex items-center gap-2 text-sm text-white/70 mt-1">
               <RoleIcon size={14} />
-              {roleMap[profile.role].label}
+              {roleMeta.label}
             </div>
           </div>
         </div>
@@ -95,14 +100,17 @@ export default function ProfileCard({
 
       {/* ABOUT */}
       <div className="space-y-3 text-white/80">
-        <div className="flex items-center gap-2 text-sm">
-          <Calendar size={14} />
-          Joined {new Date(profile.createdAt).toDateString()}
-        </div>
+        {profile.createdAt && (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar size={14} />
+            Joined {new Date(profile.createdAt).toDateString()}
+          </div>
+        )}
 
-        {profile.bio && (
+        {/* tutorBio from public profile — bio not returned by /api/user/me */}
+        {profile.tutorBio && (
           <p className="text-white/70 leading-relaxed max-w-2xl">
-            {profile.bio}
+            {profile.tutorBio}
           </p>
         )}
       </div>
@@ -114,13 +122,6 @@ export default function ProfileCard({
             <div className="flex items-center gap-2">
               <Mail size={14} />
               {profile.email}
-            </div>
-          )}
-
-          {profile.phoneNumber && (
-            <div className="flex items-center gap-2">
-              <Phone size={14} />
-              {profile.phoneNumber}
             </div>
           )}
         </div>
@@ -140,15 +141,11 @@ export default function ProfileCard({
           </h2>
 
           <div className="flex flex-wrap gap-6 text-sm text-white/80">
-            {profile.hourlyRate != null && (
+            {hourlyRate != null && (
               <div className="flex items-center gap-2">
                 <DollarSign size={14} />
-                ${profile.hourlyRate}/hr
+                ${hourlyRate}/hr
               </div>
-            )}
-
-            {profile.timezone && (
-              <div>Timezone: {profile.timezone}</div>
             )}
           </div>
 
@@ -164,7 +161,7 @@ export default function ProfileCard({
                     text-xs text-white/90
                   "
                 >
-                  {s.name} · {s.level}
+                  {s.name}{s.category ? ` · ${s.category}` : ''}
                 </span>
               ))}
             </div>

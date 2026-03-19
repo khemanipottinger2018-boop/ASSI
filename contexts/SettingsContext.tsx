@@ -9,50 +9,48 @@ import {
 } from 'react';
 import { useAuth } from './AuthContext';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /* =====================================================
  * TYPES
+ *
+ * Mirrors GET /api/user/settings response exactly.
+ * Backend returns:
+ *   emailNotifications, pushNotifications, theme, language, timezone
+ *
+ * Note: assi_enabled, assi_position, theme_preference, reduce_motion
+ * exist in the DB schema but are NOT returned by /api/user/settings yet.
+ * Do not add them here until the backend selects them.
  * ===================================================== */
 
 export type UserSettings = {
-  assi_enabled: boolean;
-  assi_position: { x: number; y: number } | null;
-  theme_preference: 'system' | 'light' | 'dark';
-  reduce_motion: boolean;
+  emailNotifications: boolean;
+  pushNotifications:  boolean;
+  theme:              'light' | 'dark' | 'system';
+  language:           string;
+  timezone:           string;
 };
 
 type SettingsContextType = {
-  settings: UserSettings | null;
+  settings:  UserSettings | null;
   isLoading: boolean;
-  update: <K extends keyof UserSettings>(
-    key: K,
-    value: UserSettings[K]
-  ) => Promise<void>;
-  refresh: () => Promise<void>;
+  update:    (patch: Partial<UserSettings>) => Promise<void>;
+  refresh:   () => Promise<void>;
 };
 
 /* =====================================================
  * CONTEXT
  * ===================================================== */
 
-const SettingsContext = createContext<
-  SettingsContextType | undefined
->(undefined);
+const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 /* =====================================================
  * PROVIDER
  * ===================================================== */
 
-export function SettingsProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth();
-  const [settings, setSettings] =
-    useState<UserSettings | null>(null);
+  const [settings,  setSettings]  = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   /* ================= LOAD ================= */
@@ -65,10 +63,9 @@ export function SettingsProvider({
     }
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/user/settings`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`${API_URL}/api/user/settings`, {
+        credentials: 'include',
+      });
 
       if (!res.ok) {
         setSettings(null);
@@ -76,7 +73,9 @@ export function SettingsProvider({
       }
 
       const data = await res.json();
-      setSettings(data.settings);
+      if (data?.success && data?.settings) {
+        setSettings(data.settings);
+      }
     } catch {
       setSettings(null);
     } finally {
@@ -84,27 +83,34 @@ export function SettingsProvider({
     }
   }
 
-  /* ================= UPDATE ================= */
+  /* ================= UPDATE =================
+   *
+   * PATCH /api/user/settings expects the actual field names directly:
+   *   { emailNotifications: true }
+   *   { theme: 'dark' }
+   *
+   * NOT { key: 'theme', value: 'dark' } — that was wrong.
+   * =========================================== */
 
-  async function update<
-    K extends keyof UserSettings
-  >(key: K, value: UserSettings[K]) {
-    if (!isAuthenticated) return;
+  async function update(patch: Partial<UserSettings>) {
+    if (!isAuthenticated || !patch || !Object.keys(patch).length) return;
 
     // Optimistic update
-    setSettings(prev =>
-      prev ? { ...prev, [key]: value } : prev
-    );
+    setSettings(prev => prev ? { ...prev, ...patch } : prev);
 
     try {
-      await fetch(`${API_URL}/api/user/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`${API_URL}/api/user/settings`, {
+        method:      'PATCH',
+        headers:     { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ key, value }),
+        body:        JSON.stringify(patch),
       });
+
+      if (!res.ok) {
+        // Rollback on failure
+        await refresh();
+      }
     } catch {
-      // Rollback on failure
       await refresh();
     }
   }
@@ -113,17 +119,11 @@ export function SettingsProvider({
 
   useEffect(() => {
     refresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   return (
-    <SettingsContext.Provider
-      value={{
-        settings,
-        isLoading,
-        update,
-        refresh,
-      }}
-    >
+    <SettingsContext.Provider value={{ settings, isLoading, update, refresh }}>
       {children}
     </SettingsContext.Provider>
   );
@@ -136,9 +136,7 @@ export function SettingsProvider({
 export function useSettings() {
   const ctx = useContext(SettingsContext);
   if (!ctx) {
-    throw new Error(
-      'useSettings must be used within SettingsProvider'
-    );
+    throw new Error('useSettings must be used within SettingsProvider');
   }
   return ctx;
 }
