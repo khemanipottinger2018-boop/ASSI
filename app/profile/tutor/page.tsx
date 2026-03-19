@@ -4,21 +4,34 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { User, Star, BookOpen, DollarSign, Edit3 } from 'lucide-react';
-import { userApi } from '@/lib/api';
-import type { UserProfileView } from '@/components/types/profile.view';
+import { Star, BookOpen, DollarSign, Edit3, Clock } from 'lucide-react';
+import { userApi, tutorsApi } from '@/lib/api';
+import type { UserMe } from '@/lib/api/user';
+import type { SubjectSummary } from '@/lib/api/tutors';
 
 export default function TutorProfilePage() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfileView | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [profile,  setProfile]  = useState<UserMe | null>(null);
+  const [subjects, setSubjects] = useState<SubjectSummary[]>([]);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
-    userApi.getMe()
-      .then((d) => { if (d.success) setProfile(d.user); })
+    if (!user?.username) return;
+
+    // Fetch own profile + public profile in parallel
+    // /api/user/me         → id, username, email, role, tier, createdAt, tutor.{id,hourlyRate,isAvailable,bio,timezone}
+    // /api/users-public/:u → subjects (not on /api/user/me)
+    Promise.all([
+      userApi.getMe(),
+      tutorsApi.getPublicProfile(user.username),
+    ]).then(([meData, publicData]) => {
+      if (meData.success)     setProfile(meData.user);
+      if (publicData.success) setSubjects(publicData.user.subjects ?? []);
+    }).catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.username]);
 
   const handleLogout = async () => {
     await logout();
@@ -29,8 +42,15 @@ export default function TutorProfilePage() {
 
   const p = profile;
 
+  // bio and timezone live on the tutor sub-object (tutors table)
+  const bio      = p?.tutor?.bio      ?? null;
+  const timezone = p?.tutor?.timezone ?? null;
+  const rate     = p?.tutor?.hourlyRate;
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+
+      {/* ── Header card ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -40,11 +60,9 @@ export default function TutorProfilePage() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center overflow-hidden flex-shrink-0">
-                {p?.avatarUrl
-                  ? <img src={p.avatarUrl} alt={p.username} className="w-full h-full object-cover" />
-                  : <User size={24} className="text-white/40" />
-                }
+              {/* No avatarUrl — backend never returns it */}
+              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
+                {p?.username?.[0]?.toUpperCase()}
               </div>
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-black/30 flex items-center justify-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -59,6 +77,11 @@ export default function TutorProfilePage() {
                 </span>
               </div>
               <p className="text-white/40 text-xs mt-0.5">{p?.email}</p>
+              {timezone && (
+                <p className="text-white/25 text-xs mt-0.5 flex items-center gap-1">
+                  <Clock size={10} /> {timezone}
+                </p>
+              )}
             </div>
           </div>
 
@@ -70,25 +93,28 @@ export default function TutorProfilePage() {
           </button>
         </div>
 
-        {p?.bio && (
+        {/* Bio from tutor sub-object */}
+        {bio && (
           <p className="mt-4 text-white/55 text-sm leading-relaxed border-t border-white/8 pt-4">
-            {p.bio}
+            {bio}
           </p>
         )}
       </motion.div>
 
+      {/* ── Stats ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
         className="grid grid-cols-3 gap-3"
       >
-        <StatCard icon={DollarSign} label="Hourly rate" value={p?.hourlyRate ? `$${p.hourlyRate}` : '—'} />
+        <StatCard icon={DollarSign} label="Hourly rate" value={rate != null ? `$${rate}` : '—'} />
         <StatCard icon={BookOpen}   label="Sessions"    value="—" />
         <StatCard icon={Star}       label="Rating"      value="—" />
       </motion.div>
 
-      {p?.subjects && p.subjects.length > 0 && (
+      {/* ── Subjects from /api/users-public/:username ── */}
+      {subjects.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -97,7 +123,7 @@ export default function TutorProfilePage() {
         >
           <p className="text-white/25 text-xs font-medium uppercase tracking-widest mb-3">Subjects</p>
           <div className="flex flex-wrap gap-2">
-            {p.subjects.map((s) => (
+            {subjects.map((s) => (
               <span key={s.id} className={`
                 px-2.5 py-1 rounded-full text-xs font-medium border
                 ${s.category === 'CAPE'
@@ -112,6 +138,7 @@ export default function TutorProfilePage() {
         </motion.div>
       )}
 
+      {/* ── Account actions ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

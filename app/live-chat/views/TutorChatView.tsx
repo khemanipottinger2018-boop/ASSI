@@ -10,10 +10,24 @@ import { useTyping }       from '../hooks/useTyping';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
+// Accept timeout — if socket never confirms tutor_joined within this window,
+// reset accepting so the tutor can try again rather than being stuck forever
+const ACCEPT_TIMEOUT_MS = 8_000;
+
 interface Props {
   sessionId:        string;
   currentUserId:    string;
   currentUsername?: string;
+}
+
+function friendlyEndReason(reason: string): string {
+  switch (reason) {
+    case 'inactivity':         return 'Ended due to inactivity.';
+    case 'system':             return 'The session was ended by the platform.';
+    case 'ended_by_student':   return 'The student ended the session.';
+    case 'ended_by_tutor':     return 'You ended the session.';
+    default:                   return reason || 'The session has ended.';
+  }
 }
 
 export function TutorChatView({ sessionId, currentUserId, currentUsername }: Props) {
@@ -28,12 +42,20 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [hydrating,     setHydrating]     = useState(true);
 
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const joinedRef = useRef(false);
+  const bottomRef      = useRef<HTMLDivElement>(null);
+  const joinedRef      = useRef(false);
+  const acceptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const presence = useChatRoom(accepted ? sessionId : '');
   const { messages, sendMessage } = useChatMessages(accepted ? sessionId : '');
   const { onKeystroke, stopTyping, someoneIsTyping } = useTyping(accepted ? sessionId : '');
+
+  // Clear accept timer on unmount
+  useEffect(() => {
+    return () => {
+      if (acceptTimerRef.current) clearTimeout(acceptTimerRef.current);
+    };
+  }, []);
 
   /* ── Hydrate session state on mount ── */
   useEffect(() => {
@@ -46,24 +68,20 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
           const { status, tutorId, endedReason } = d.session;
           if (status === 'ended') {
             setSessionEnded(true);
-            setEndReason(endedReason ?? 'The session has ended.');
+            setEndReason(endedReason ?? '');
           } else if (status === 'paused' && tutorId === currentUserId) {
             setAccepted(true);
             setSessionPaused(true);
           } else if (status === 'active' && tutorId === currentUserId) {
             setAccepted(true);
           }
-          // status === 'waiting' → show pre-accept screen
         }
       })
       .catch(() => {})
       .finally(() => setHydrating(false));
   }, [sessionId, currentUserId]);
 
-  /* ── BUG FIX #8: emit session:join on connect AND reconnect ──
-     Cleanup resets joinedRef when isConnected goes false (disconnect).
-     On reconnect, the effect re-runs and re-joins the session room.
-  ─────────────────────────────────────────────────────────────── */
+  /* ── BUG FIX #8: emit session:join on connect AND reconnect ── */
   useEffect(() => {
     if (!isConnected || !accepted || !sessionId) return;
     if (joinedRef.current) return;
@@ -71,15 +89,14 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
     joinedRef.current = true;
     emit('session:join', { sessionId });
 
-    return () => {
-      joinedRef.current = false;
-    };
+    return () => { joinedRef.current = false; };
   }, [isConnected, accepted, sessionId, emit]);
 
   /* ── Socket listeners ── */
   useEffect(() => {
     const onTutorJoined = ({ sessionId: sid, tutorId }: { sessionId: string; tutorId: string }) => {
       if (sid !== sessionId || tutorId !== currentUserId) return;
+      if (acceptTimerRef.current) clearTimeout(acceptTimerRef.current);
       setAccepted(true);
       setAccepting(false);
     };
@@ -113,14 +130,19 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
   const handleAccept = () => {
     if (accepting) return;
     setAccepting(true);
-    emit('session:accept', { sessionId }); // canonical — not chat:accept_session
+    emit('session:accept', { sessionId });
+
+    // Safety reset — if socket never confirms tutor_joined, unblock the button
+    acceptTimerRef.current = setTimeout(() => {
+      setAccepting(false);
+    }, ACCEPT_TIMEOUT_MS);
   };
 
   const handleEndSession = () => {
     if (!confirmingEnd) { setConfirmingEnd(true); return; }
     emit('session:end', { sessionId, reason: 'ended_by_tutor' });
     setSessionEnded(true);
-    setEndReason('You ended the session.');
+    setEndReason('ended_by_tutor');
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -144,11 +166,7 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
       <div className="h-full flex items-center justify-center px-4">
         <div className="glass rounded-2xl px-10 py-12 text-center max-w-sm w-full">
           <p className="text-white font-semibold text-lg mb-2">Session ended</p>
-          <p className="text-white/50 text-sm">
-            {endReason === 'inactivity'
-              ? 'Ended due to inactivity.'
-              : endReason || 'The session has ended.'}
-          </p>
+          <p className="text-white/50 text-sm">{friendlyEndReason(endReason)}</p>
         </div>
       </div>
     );
@@ -179,6 +197,9 @@ export function TutorChatView({ sessionId, currentUserId, currentUsername }: Pro
               : <><CheckCircle size={16} /> Accept Session</>
             }
           </button>
+          {accepting && (
+            <p className="text-white/25 text-xs mt-3">Connecting to session…</p>
+          )}
         </motion.div>
       </div>
     );

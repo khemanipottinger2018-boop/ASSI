@@ -5,7 +5,7 @@ import { useChatSocket } from './useChatSocket';
 
 interface Presence {
   participants: string[];
-  count: number;
+  count:        number;
 }
 
 export function useChatRoom(sessionId: string) {
@@ -20,7 +20,11 @@ export function useChatRoom(sessionId: string) {
     joinedRef.current = true;
     emit('chat:join', sessionId);
 
-    const handlePresence = ({ sessionId: sid, participants, count }: { sessionId: string; participants: string[]; count: number }) => {
+    const handlePresence = ({ sessionId: sid, participants, count }: {
+      sessionId:    string;
+      participants: string[];
+      count:        number;
+    }) => {
       if (sid !== sessionId) return;
       setPresence({ participants, count });
     };
@@ -28,6 +32,8 @@ export function useChatRoom(sessionId: string) {
     on('chat:presence', handlePresence);
 
     return () => {
+      // Reset joinedRef so re-join fires if sessionId changes
+      // or socket reconnects (isConnected flips false → true)
       joinedRef.current = false;
       emit('chat:leave', sessionId);
       off('chat:presence', handlePresence);

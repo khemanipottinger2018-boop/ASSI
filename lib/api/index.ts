@@ -1,6 +1,13 @@
 export { api }              from './client';
+
 export { userApi }          from './user';
-export type { UserMe }      from './user';
+export type {
+  UserMe,
+  UserStreak,
+  UserBadge,
+  UserFeatures,
+  UserFeaturesResponse,
+}                           from './user';
 
 export { sessionsApi }      from './sessions';
 export type {
@@ -20,8 +27,6 @@ export type {
 }                           from './tutors';
 
 export { notificationsApi } from './notifications';
-// Notification type is the canonical one from components/types/notification
-// re-exported through notifications.ts — single source of truth
 export type { Notification } from './notifications';
 
 export { adminApi }         from './admin';

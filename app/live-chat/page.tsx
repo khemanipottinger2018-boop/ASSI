@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams }               from 'next/navigation';
 import { motion, AnimatePresence }                  from 'framer-motion';
 import {
-  Loader2, Users, ArrowLeft, X, Star,
+  Loader2, Users, ArrowLeft, X,
   Wifi, WifiOff, Clock, ChevronRight,
 } from 'lucide-react';
 import { useAuth }           from '@/contexts/AuthContext';
@@ -299,9 +299,9 @@ export default function LiveChatPage() {
                             {/* Subjects taught */}
                             {tutor.subjects.length > 0 && (
                               <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                {tutor.subjects.slice(0, 3).map(s => (
+                                {tutor.subjects.slice(0, 3).map((s, i) => (
                                   <span key={s.name} className="text-[10px] text-white/35">
-                                    {s.name}{tutor.subjects.indexOf(s) < Math.min(tutor.subjects.length, 3) - 1 ? ' ·' : ''}
+                                    {s.name}{i < Math.min(tutor.subjects.length, 3) - 1 ? ' ·' : ''}
                                   </span>
                                 ))}
                                 {tutor.subjects.length > 3 && (

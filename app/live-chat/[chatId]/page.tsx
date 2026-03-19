@@ -1,11 +1,11 @@
 'use client';
 
-import { use } from 'react';
-import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { StudentChatView } from '../views/StudentChatView';
-import { TutorChatView } from '../views/TutorChatView';
+import { use, useEffect } from 'react';
+import { useRouter }      from 'next/navigation';
+import { Loader2 }        from 'lucide-react';
+import { useAuth }        from '@/contexts/AuthContext';
+import { StudentChatView }  from '../views/StudentChatView';
+import { TutorChatView }    from '../views/TutorChatView';
 import { AdminMonitorView } from '../views/AdminMonitorView';
 
 interface Props {
@@ -17,6 +17,14 @@ export default function ChatRoomPage({ params }: Props) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
+  // router.replace must be in useEffect — calling it during render
+  // causes a React warning and may cause double-renders in Strict Mode
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace('/signin');
+    }
+  }, [isLoading, user, router]);
+
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -26,7 +34,7 @@ export default function ChatRoomPage({ params }: Props) {
   }
 
   if (!user) {
-    router.replace('/signin');
+    // Redirect is in flight via useEffect — render nothing to avoid flash
     return null;
   }
 

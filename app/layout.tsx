@@ -2,46 +2,45 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './styles/globals.css';
 
-import { ThemeProvider } from '@/components/shared/themes/ThemeProvider';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider }    from '@/components/shared/themes/ThemeProvider';
+import { AuthProvider }     from '@/contexts/AuthContext';
 import { SettingsProvider } from '@/contexts/SettingsContext';
-import { SocketProvider } from '@/contexts/SocketContext';
+import { FeaturesProvider } from '@/contexts/FeaturesContext';
+import { SocketProvider }   from '@/contexts/SocketContext';
 
 import AnimatedGradient from '@/components/shared/themes/AnimatedGradient';
-import FloatingBlobs from '@/components/shared/themes/FloatingBlobs';
-import AppShell from '@/components/AppShell';
+import FloatingBlobs    from '@/components/shared/themes/FloatingBlobs';
+import AppShell         from '@/components/AppShell';
 
 const inter = Inter({
-  subsets: ['latin'],
+  subsets:  ['latin'],
   variable: '--font-inter',
 });
 
 export const metadata: Metadata = {
-  title: 'ASSI',
-  description:
-    'Get instant help from AI or live tutors. Built for Caribbean students.',
+  title:       'ASSI',
+  description: 'Get instant help from AI or live tutors. Built for Caribbean students.',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
-          {/* Background layers — fixed position, behind everything */}
           <AnimatedGradient />
           <FloatingBlobs />
 
-          {/* Auth first, then Socket (needs auth), then Settings, then shell */}
+          {/* Provider order matters:
+              Auth first → Socket needs auth → Settings + Features need auth
+              FeaturesProvider fetches /api/user/features on mount            */}
           <AuthProvider>
             <SocketProvider>
               <SettingsProvider>
-                <div className="h-screen w-screen overflow-hidden">
-                  <AppShell>{children}</AppShell>
-                </div>
+                <FeaturesProvider>
+                  <div className="h-screen w-screen overflow-hidden">
+                    <AppShell>{children}</AppShell>
+                  </div>
+                </FeaturesProvider>
               </SettingsProvider>
             </SocketProvider>
           </AuthProvider>

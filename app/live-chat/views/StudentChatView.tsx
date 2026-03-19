@@ -18,6 +18,17 @@ interface Props {
   currentUsername?: string;
 }
 
+function friendlyEndReason(reason: string): string {
+  switch (reason) {
+    case 'inactivity':          return 'Ended due to inactivity.';
+    case 'no_tutor_available':  return 'No tutors were available. Please try again in a few minutes.';
+    case 'system':              return 'The session was ended by the platform.';
+    case 'ended_by_tutor':      return 'The tutor ended the session.';
+    case 'ended_by_student':    return 'You ended the session.';
+    default:                    return reason || 'The session has ended.';
+  }
+}
+
 export function StudentChatView({ sessionId, currentUserId, currentUsername }: Props) {
   const { emit, on, off, isConnected } = useChatSocket();
   const presence = useChatRoom(sessionId);
@@ -47,7 +58,7 @@ export function StudentChatView({ sessionId, currentUserId, currentUsername }: P
           const { status, tutorId, endedReason } = d.session;
           if (status === 'ended') {
             setSessionEnded(true);
-            setEndReason(endedReason ?? 'The session has ended.');
+            setEndReason(endedReason ?? '');
           } else if (status === 'paused') {
             setSessionPaused(true);
             if (tutorId) setTutorJoined(true);
@@ -60,14 +71,7 @@ export function StudentChatView({ sessionId, currentUserId, currentUsername }: P
       .finally(() => setHydrating(false));
   }, [sessionId]);
 
-  /* ── BUG FIX #8: emit session:join on connect AND reconnect ──
-     Previously joinedRef stayed true after disconnect, so the
-     session room was never re-joined after a network blip.
-     Fix: cleanup resets joinedRef to false on disconnect (when
-     isConnected flips false → effect cleanup runs → ref reset).
-     On reconnect (isConnected true again) the effect re-runs and
-     re-emits session:join so the server re-adds this socket to the room.
-  ─────────────────────────────────────────────────────────────── */
+  /* ── BUG FIX #8: emit session:join on connect AND reconnect ── */
   useEffect(() => {
     if (!isConnected || !sessionId) return;
     if (joinedRef.current) return;
@@ -75,11 +79,7 @@ export function StudentChatView({ sessionId, currentUserId, currentUsername }: P
     joinedRef.current = true;
     emit('session:join', { sessionId });
 
-    // Cleanup runs when isConnected goes false (disconnect)
-    // Resetting joinedRef here ensures re-join fires on reconnect
-    return () => {
-      joinedRef.current = false;
-    };
+    return () => { joinedRef.current = false; };
   }, [isConnected, sessionId, emit]);
 
   /* ── Socket listeners ── */
@@ -136,7 +136,7 @@ export function StudentChatView({ sessionId, currentUserId, currentUsername }: P
     if (!confirmingEnd) { setConfirmingEnd(true); return; }
     emit('session:end', { sessionId, reason: 'ended_by_student' });
     setSessionEnded(true);
-    setEndReason('You ended the session.');
+    setEndReason('ended_by_student');
   };
 
   const handleInviteAccept = () => {
@@ -171,13 +171,7 @@ export function StudentChatView({ sessionId, currentUserId, currentUsername }: P
       <div className="h-full flex items-center justify-center px-4">
         <div className="glass rounded-2xl px-10 py-12 text-center max-w-sm w-full">
           <p className="text-white font-semibold text-lg mb-2">Session ended</p>
-          <p className="text-white/50 text-sm">
-            {endReason === 'inactivity'
-              ? 'Ended due to inactivity.'
-              : endReason === 'no_tutor_available'
-              ? 'No tutors were available. Please try again in a few minutes.'
-              : endReason || 'The session has ended.'}
-          </p>
+          <p className="text-white/50 text-sm">{friendlyEndReason(endReason)}</p>
         </div>
       </div>
     );

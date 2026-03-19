@@ -4,17 +4,20 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { User, Mail, BookOpen, Calendar, Edit3, ShieldCheck } from 'lucide-react';
+import { Mail, BookOpen, Calendar, Edit3 } from 'lucide-react';
 import { userApi } from '@/lib/api';
-import type { UserProfileView } from '@/components/types/profile.view';
+import type { UserMe } from '@/lib/api/user';
 
 export default function StudentProfilePage() {
   const { logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfileView | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [profile,  setProfile]  = useState<UserMe | null>(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
+    // /api/user/me returns: id, username, email, role, tier, createdAt, tutor (null for students)
+    // Students have no bio, timezone, or subjects on this endpoint
     userApi.getMe()
       .then((d) => { if (d.success) setProfile(d.user); })
       .finally(() => setLoading(false));
@@ -31,6 +34,8 @@ export default function StudentProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+
+      {/* ── Header card ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -40,11 +45,9 @@ export default function StudentProfilePage() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-                {p?.avatarUrl
-                  ? <img src={p.avatarUrl} alt={p.username} className="w-full h-full object-cover" />
-                  : <User size={24} className="text-white/40" />
-                }
+              {/* No avatarUrl — backend never returns it, always use initials */}
+              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
+                {p?.username?.[0]?.toUpperCase()}
               </div>
               <span className="absolute -bottom-1 -right-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">
                 Student
@@ -67,14 +70,12 @@ export default function StudentProfilePage() {
             <Edit3 size={15} />
           </button>
         </div>
-
-        {p?.bio && (
-          <p className="mt-4 text-white/55 text-sm leading-relaxed border-t border-white/8 pt-4">
-            {p.bio}
-          </p>
-        )}
+        {/* Note: students have no bio on /api/user/me
+            Bio editing for students is not yet supported by the backend.
+            Add here if/when a student bio field is added to UserProfile. */}
       </motion.div>
 
+      {/* ── Stats ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -83,10 +84,13 @@ export default function StudentProfilePage() {
       >
         <StatCard icon={BookOpen} label="Sessions" value="—" />
         <StatCard icon={Calendar} label="Member since" value={
-          p?.createdAt ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'
+          p?.createdAt
+            ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+            : '—'
         } />
       </motion.div>
 
+      {/* ── Account actions ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -95,8 +99,8 @@ export default function StudentProfilePage() {
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
         <ActionRow label="Edit profile" onClick={() => router.push('/profile/student/edit')} />
-        <ActionRow label="Settings" onClick={() => router.push('/settings')} />
-        <ActionRow label="Sign out" onClick={handleLogout} destructive />
+        <ActionRow label="Settings"     onClick={() => router.push('/settings')} />
+        <ActionRow label="Sign out"     onClick={handleLogout} destructive />
       </motion.div>
     </div>
   );

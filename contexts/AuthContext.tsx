@@ -10,14 +10,15 @@ import {
 
 /* =====================================================
  * TYPES
- * =====================================================
  *
  * Mirrors /api/auth/me response exactly.
- * Backend returns camelCase — no mapping needed.
+ * Note: /api/auth/me and /api/user/me are different endpoints.
+ *   /api/auth/me  → lightweight, used for auth checks
+ *   /api/user/me  → full profile including tier, tutor.bio, tutor.timezone
  *
- * Role enum matches backend prisma schema:
- *   student | tutor | tutor_applicant | admin
- */
+ * AuthUser reflects /api/auth/me only.
+ * For full profile data use userApi.getMe() directly.
+ * ===================================================== */
 
 export type AuthUser = {
   id:                 string;
@@ -30,24 +31,22 @@ export type AuthUser = {
 };
 
 type AuthContextType = {
-  user:            AuthUser | null;
-  isLoading:       boolean;
-  isAuthenticated: boolean;
+  user:             AuthUser | null;
+  isLoading:        boolean;
+  isAuthenticated:  boolean;
 
-  // Convenience role booleans — derived from user.role
-  isStudent:       boolean;
-  isTutor:         boolean;
+  // Convenience role booleans
+  isStudent:        boolean;
+  isTutor:          boolean;
   isTutorApplicant: boolean;
-  isAdmin:         boolean;
+  isAdmin:          boolean;
 
   login:   (email: string, password: string) => Promise<void>;
   logout:  () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
 };
 
-/* =====================================================
- * CONTEXT
- * ===================================================== */
+/* ===================================================== */
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -55,12 +54,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /* =====================================================
  * HELPERS
+ *
+ * /api/auth/me returns camelCase — map directly.
+ * Fields: id, email, username, role, disclaimerAccepted, isDemo, demoExpiresAt
  * ===================================================== */
 
-/**
- * /api/auth/me returns camelCase — map directly, no snake_case conversion.
- * Fields: id, email, username, role, disclaimerAccepted, isDemo, demoExpiresAt
- */
 function mapUser(raw: any): AuthUser {
   return {
     id:                 String(raw.id),
@@ -87,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isTutorApplicant = user?.role === 'tutor_applicant';
   const isAdmin          = user?.role === 'admin';
 
-  /* ================= REHYDRATE SESSION ================= */
+  /* ── Rehydrate session ── */
 
   async function refresh(): Promise<AuthUser | null> {
     try {
@@ -95,17 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: 'include',
       });
 
-      if (!res.ok) {
-        setUser(null);
-        return null;
-      }
+      if (!res.ok) { setUser(null); return null; }
 
       const data = await res.json();
 
-      if (!data?.success || !data?.user) {
-        setUser(null);
-        return null;
-      }
+      if (!data?.success || !data?.user) { setUser(null); return null; }
 
       const mapped = mapUser(data.user);
       setUser(mapped);
@@ -116,8 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /* ================= INITIAL BOOTSTRAP ================= */
-
   useEffect(() => {
     (async () => {
       await refresh();
@@ -126,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ================= LOGIN ================= */
+  /* ── Login ── */
 
   async function login(email: string, password: string) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
@@ -142,11 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.error || 'Login failed');
     }
 
-    // /api/auth/login response shape matches /api/auth/me user shape
     setUser(mapUser(data.user));
   }
 
-  /* ================= LOGOUT ================= */
+  /* ── Logout ── */
 
   async function logout() {
     try {
@@ -158,8 +147,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     }
   }
-
-  /* ===================================================== */
 
   return (
     <AuthContext.Provider
@@ -181,14 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/* =====================================================
- * HOOK
- * ===================================================== */
-
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }

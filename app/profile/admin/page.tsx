@@ -4,15 +4,16 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Shield, Users, AlertTriangle, BarChart2, User } from 'lucide-react';
+import { Shield, Users, AlertTriangle, BarChart2 } from 'lucide-react';
 import { userApi } from '@/lib/api';
-import type { UserProfileView } from '@/components/types/profile.view';
+import type { UserMe } from '@/lib/api/user';
 
 export default function AdminProfilePage() {
   const { logout } = useAuth();
   const router = useRouter();
-  const [profile, setProfile] = useState<UserProfileView | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const [profile,  setProfile]  = useState<UserMe | null>(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     userApi.getMe()
@@ -31,6 +32,8 @@ export default function AdminProfilePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+
+      {/* ── Header card ── */}
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -38,8 +41,8 @@ export default function AdminProfilePage() {
         className="glass rounded-3xl p-6"
       >
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
-            <User size={15} className="text-white/35" />
+          <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
+            {p?.username?.[0]?.toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -53,6 +56,7 @@ export default function AdminProfilePage() {
         </div>
       </motion.div>
 
+      {/* ── Admin actions ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -60,12 +64,13 @@ export default function AdminProfilePage() {
         className="glass rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Admin</p>
-        <AdminAction icon={Users}         label="Manage users"          onClick={() => router.push('/admin/users')} />
-        <AdminAction icon={Shield}        label="Tutor applications"    onClick={() => router.push('/admin/tutor-applications')} />
-        <AdminAction icon={AlertTriangle} label="Support tickets"       onClick={() => router.push('/admin/support')} />
-        <AdminAction icon={BarChart2}     label="System metrics"        onClick={() => router.push('/admin/metrics')} />
+        <AdminAction icon={Users}         label="Manage users"       onClick={() => router.push('/admin/users')} />
+        <AdminAction icon={Shield}        label="Tutor applications" onClick={() => router.push('/admin/tutor-applications')} />
+        <AdminAction icon={AlertTriangle} label="Support tickets"    onClick={() => router.push('/admin/support')} />
+        <AdminAction icon={BarChart2}     label="System metrics"     onClick={() => router.push('/admin/metrics')} />
       </motion.div>
 
+      {/* ── Account actions ── */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
