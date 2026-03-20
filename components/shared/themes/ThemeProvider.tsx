@@ -311,7 +311,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Apply data-color-mode on <html>
+  // Apply data attributes on <html> for CSS targeting
   useEffect(() => {
     document.documentElement.setAttribute('data-color-mode', colorMode);
   }, [colorMode]);
@@ -363,6 +363,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }
 
   const isSentinel = activeVariant === 'sentinel';
+
+  // Sync theme data attributes to <html> for CSS targeting
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme-group', activeGroup);
+    document.documentElement.setAttribute('data-theme-variant', activeVariant as string);
+  }, [activeGroup, activeVariant]);
 
   const value = useMemo(() => ({
     themeGroup: activeGroup,

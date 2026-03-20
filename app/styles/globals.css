@@ -4,11 +4,10 @@
    ROOT DESIGN TOKENS  (dark mode — default)
    ===================================================== */
 :root {
-  --foreground:      #ffffff;
-  --foreground-muted:#ffffffcc;  /* 80% — secondary text */
-  --foreground-dim:  #ffffff99;  /* 60% — tertiary / labels */
+  --foreground:       #ffffff;
+  --foreground-muted: #ffffffcc;
+  --foreground-dim:   #ffffff99;
 
-  /* ASSI lava background */
   --assi-bg:
     radial-gradient(
       1200px 700px at 50% 15%,
@@ -22,43 +21,243 @@
     ),
     linear-gradient(135deg, #ff2d2d, #ff5a1f, #ff7a18);
 
-  /* ── Panel surfaces ── */
-  /* "panel" = content card — semi-opaque dark so bg bleeds through */
   --panel-bg:        rgba(0, 0, 0, 0.38);
   --panel-border:    rgba(255, 255, 255, 0.10);
   --panel-hover:     rgba(0, 0, 0, 0.48);
 
-  /* Glass (decorative / sidebar) */
   --glass-bg:        rgba(255, 255, 255, 0.08);
   --glass-border:    rgba(255, 255, 255, 0.15);
   --glass-highlight: rgba(255, 255, 255, 0.12);
 
-  /* Sidebar */
   --sidebar-bg:      rgba(0, 0, 0, 0.28);
   --sidebar-border:  rgba(255, 255, 255, 0.08);
 
-  /* Accent */
-  --accent:          #f97316; /* orange-500 */
+  --accent:          #f97316;
+
+  /* Light mode surface tokens (unused in dark, ready for light) */
+  --light-surface:   #ffffff;
+  --light-tint:      rgba(249, 115, 22, 0.0);
+  --light-shadow:    rgba(0, 0, 0, 0.08);
 }
 
 /* =====================================================
-   LIGHT MODE OVERRIDES
+   LIGHT MODE — BASE
+   Applied when data-color-mode="light"
    ===================================================== */
 [data-color-mode="light"] {
-  --foreground:      #111111;
-  --foreground-muted:#333333;
-  --foreground-dim:  #555555;
+  --foreground:       #0f0f0f;
+  --foreground-muted: #2a2a2a;
+  --foreground-dim:   #666666;
 
-  --panel-bg:        rgba(255, 255, 255, 0.82);
-  --panel-border:    rgba(0, 0, 0, 0.08);
+  --panel-bg:        rgba(255, 255, 255, 0.78);
+  --panel-border:    rgba(0, 0, 0, 0.07);
   --panel-hover:     rgba(255, 255, 255, 0.92);
 
-  --glass-bg:        rgba(255, 255, 255, 0.65);
-  --glass-border:    rgba(0, 0, 0, 0.10);
-  --glass-highlight: rgba(255, 255, 255, 0.80);
+  --glass-bg:        rgba(255, 255, 255, 0.72);
+  --glass-border:    rgba(0, 0, 0, 0.09);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
 
-  --sidebar-bg:      rgba(255, 255, 255, 0.70);
-  --sidebar-border:  rgba(0, 0, 0, 0.08);
+  --sidebar-bg:      rgba(255, 255, 255, 0.80);
+  --sidebar-border:  rgba(0, 0, 0, 0.07);
+
+  --light-shadow:    rgba(0, 0, 0, 0.10);
+}
+
+/* ── Lava Lamp light: frosted warm glass ── */
+[data-color-mode="light"][data-theme-group="lavalamp"],
+[data-color-mode="light"]:not([data-theme-group]) {
+  --light-tint:   rgba(249, 115, 22, 0.04);
+  --panel-bg:     rgba(255, 253, 250, 0.82);
+  --glass-bg:     rgba(255, 248, 240, 0.75);
+  --glass-border: rgba(249, 115, 22, 0.12);
+  --light-shadow: rgba(200, 80, 20, 0.10);
+}
+
+/* ── Space light: stark navy/white star chart feel ── */
+[data-color-mode="light"][data-theme-group="space"] {
+  --panel-bg:        rgba(248, 249, 255, 0.90);
+  --panel-border:    rgba(30, 55, 153, 0.12);
+  --glass-bg:        rgba(240, 244, 255, 0.85);
+  --glass-border:    rgba(30, 55, 153, 0.15);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --light-shadow:    rgba(30, 55, 153, 0.10);
+  --light-tint:      rgba(30, 55, 153, 0.03);
+}
+
+/* ── Seasons light: varies per season via body classes ── */
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="spring"],
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="summer"],
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="dry"] {
+  /* Sunrise — warm cream to peach */
+  --panel-bg:     rgba(255, 252, 245, 0.84);
+  --glass-bg:     rgba(255, 247, 235, 0.78);
+  --glass-border: rgba(230, 140, 60, 0.12);
+  --light-shadow: rgba(200, 120, 40, 0.10);
+  --light-tint:   rgba(255, 180, 80, 0.05);
+}
+
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="autumn"],
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="winter"],
+[data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="rainy"] {
+  /* Paper & ink — cool cream */
+  --panel-bg:     rgba(252, 251, 248, 0.88);
+  --glass-bg:     rgba(247, 245, 240, 0.80);
+  --glass-border: rgba(100, 90, 80, 0.10);
+  --light-shadow: rgba(80, 70, 60, 0.09);
+  --light-tint:   rgba(120, 100, 80, 0.03);
+}
+
+/* ── Subjects light: tinted per subject ── */
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="mathematics"] {
+  --glass-border: rgba(25, 118, 210, 0.14);
+  --light-shadow: rgba(25, 118, 210, 0.09);
+  --light-tint:   rgba(25, 118, 210, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="sciences"] {
+  --glass-border: rgba(46, 125, 50, 0.14);
+  --light-shadow: rgba(46, 125, 50, 0.09);
+  --light-tint:   rgba(46, 125, 50, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="languages"] {
+  --glass-border: rgba(142, 36, 170, 0.14);
+  --light-shadow: rgba(142, 36, 170, 0.09);
+  --light-tint:   rgba(142, 36, 170, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="business"] {
+  --glass-border: rgba(0, 105, 92, 0.14);
+  --light-shadow: rgba(0, 105, 92, 0.09);
+  --light-tint:   rgba(0, 105, 92, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="technology"] {
+  --glass-border: rgba(40, 53, 147, 0.14);
+  --light-shadow: rgba(40, 53, 147, 0.09);
+  --light-tint:   rgba(40, 53, 147, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="arts"] {
+  --glass-border: rgba(230, 74, 25, 0.14);
+  --light-shadow: rgba(230, 74, 25, 0.09);
+  --light-tint:   rgba(230, 74, 25, 0.03);
+}
+[data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="health"] {
+  --glass-border: rgba(194, 24, 91, 0.14);
+  --light-shadow: rgba(194, 24, 91, 0.09);
+  --light-tint:   rgba(194, 24, 91, 0.03);
+}
+
+/* =====================================================
+   LIGHT MODE — COMPONENT OVERRIDES
+   Premium quality — real shadows, sharp borders,
+   nothing muddy or washed out
+   ===================================================== */
+
+/* Panel: frosted card with real shadow */
+[data-color-mode="light"] .panel {
+  background:    var(--panel-bg);
+  border-color:  var(--panel-border);
+  box-shadow:
+    0 1px 3px var(--light-shadow),
+    0 8px 24px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+[data-color-mode="light"] .panel:hover {
+  box-shadow:
+    0 2px 8px var(--light-shadow),
+    0 16px 40px rgba(0, 0, 0, 0.08),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
+}
+
+/* Glass: tinted frosted surface */
+[data-color-mode="light"] .glass {
+  background:    var(--glass-bg);
+  border-color:  var(--glass-border);
+  box-shadow:
+    0 4px 16px var(--light-shadow),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 var(--glass-highlight);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Glass-soft: subtle inset surfaces */
+[data-color-mode="light"] .glass-soft {
+  background:   rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.07);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Sidebar */
+[data-color-mode="light"] .sidebar-bg {
+  background:   var(--sidebar-bg);
+  border-color: var(--sidebar-border);
+  box-shadow:   2px 0 20px rgba(0, 0, 0, 0.06);
+}
+
+/* Text on light backgrounds */
+[data-color-mode="light"] .text-white       { color: var(--foreground) !important; }
+[data-color-mode="light"] .text-white\/80   { color: var(--foreground-muted) !important; }
+[data-color-mode="light"] .text-white\/70   { color: var(--foreground-muted) !important; }
+[data-color-mode="light"] .text-white\/60   { color: var(--foreground-dim) !important; }
+[data-color-mode="light"] .text-white\/55   { color: var(--foreground-dim) !important; }
+[data-color-mode="light"] .text-white\/50   { color: #777777 !important; }
+[data-color-mode="light"] .text-white\/40   { color: #888888 !important; }
+[data-color-mode="light"] .text-white\/35   { color: #999999 !important; }
+[data-color-mode="light"] .text-white\/30   { color: #aaaaaa !important; }
+[data-color-mode="light"] .text-white\/25   { color: #bbbbbb !important; }
+[data-color-mode="light"] .text-white\/20   { color: #cccccc !important; }
+
+/* Borders on light backgrounds */
+[data-color-mode="light"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
+[data-color-mode="light"] .border-white\/8  { border-color: rgba(0, 0, 0, 0.06) !important; }
+[data-color-mode="light"] .border-white\/15 { border-color: rgba(0, 0, 0, 0.09) !important; }
+[data-color-mode="light"] .border-white\/20 { border-color: rgba(0, 0, 0, 0.11) !important; }
+[data-color-mode="light"] .border-white\/30 { border-color: rgba(0, 0, 0, 0.14) !important; }
+
+/* Background tints on light */
+[data-color-mode="light"] .bg-white\/4   { background: rgba(0, 0, 0, 0.025) !important; }
+[data-color-mode="light"] .bg-white\/5   { background: rgba(0, 0, 0, 0.03) !important; }
+[data-color-mode="light"] .bg-white\/6   { background: rgba(0, 0, 0, 0.035) !important; }
+[data-color-mode="light"] .bg-white\/8   { background: rgba(0, 0, 0, 0.045) !important; }
+[data-color-mode="light"] .bg-white\/10  { background: rgba(0, 0, 0, 0.055) !important; }
+[data-color-mode="light"] .bg-white\/12  { background: rgba(0, 0, 0, 0.065) !important; }
+[data-color-mode="light"] .bg-white\/15  { background: rgba(0, 0, 0, 0.08) !important; }
+
+/* Inputs on light */
+[data-color-mode="light"] input,
+[data-color-mode="light"] textarea,
+[data-color-mode="light"] select {
+  color: var(--foreground);
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.10);
+}
+
+[data-color-mode="light"] input::placeholder,
+[data-color-mode="light"] textarea::placeholder {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+[data-color-mode="light"] input:focus,
+[data-color-mode="light"] textarea:focus,
+[data-color-mode="light"] select:focus {
+  border-color: rgba(249, 115, 22, 0.40);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.08);
+}
+
+/* Scrollbar on light */
+[data-color-mode="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+[data-color-mode="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Selection on light */
+[data-color-mode="light"] ::selection {
+  background: rgba(249, 115, 22, 0.20);
+  color: #0f0f0f;
 }
 
 /* =====================================================
@@ -93,10 +292,10 @@ body {
 }
 
 /* =====================================================
-   GLASS UTILITIES  (kept for decorative / sidebar use)
+   GLASS UTILITIES
    ===================================================== */
 .glass {
-  background: var(--glass-bg);
+  background:    var(--glass-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--glass-border);
@@ -106,20 +305,18 @@ body {
 }
 
 .glass-soft {
-  background: rgba(255, 255, 255, 0.06);
+  background:    rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* =====================================================
-   PANEL  — use instead of glass for content-heavy cards
-   Background is semi-opaque dark so the gradient shows
-   through subtly, but text stays readable.
+   PANEL
    ===================================================== */
 .panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
+  background:    var(--panel-bg);
+  border:        1px solid var(--panel-border);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -132,21 +329,21 @@ body {
    SIDEBAR
    ===================================================== */
 .sidebar-bg {
-  background: var(--sidebar-bg);
-  border-color: var(--sidebar-border);
+  background:    var(--sidebar-bg);
+  border-color:  var(--sidebar-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
 
 /* =====================================================
-   TEXT UTILITIES  — using CSS vars for light/dark swap
+   TEXT UTILITIES
    ===================================================== */
 .text-primary   { color: var(--foreground); }
 .text-secondary { color: var(--foreground-muted); }
 .text-tertiary  { color: var(--foreground-dim); }
 
 /* =====================================================
-   LAVALAMP / ORGANIC SHAPES
+   LAVA LAMP / ORGANIC SHAPES
    ===================================================== */
 @keyframes blob {
   0%   { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
@@ -165,10 +362,10 @@ body {
   color: #fff;
 }
 
-::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar       { width: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.25);
+  background:    rgba(255, 255, 255, 0.25);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
