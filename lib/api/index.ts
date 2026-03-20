@@ -39,3 +39,9 @@ export type {
   LiveSession,
   ApplicationStatus,
 }                           from './admin';
+
+export { messagesApi, adminMessagesApi } from './messages';
+export type {
+  InboxMessage,
+  MessageThread,
+} from './messages';

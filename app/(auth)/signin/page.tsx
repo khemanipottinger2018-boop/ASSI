@@ -17,35 +17,33 @@ type DemoCredentials = {
 export default function SignIn() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, login } = useAuth();
+  const { user, login, isLoading } = useAuth();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [copied, setCopied] = useState<string | null>(null);
+  const [email,           setEmail]           = useState('');
+  const [password,        setPassword]        = useState('');
+  const [rememberMe,      setRememberMe]      = useState(false);
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState('');
+  const [copied,          setCopied]          = useState<string | null>(null);
   const [demoCredentials, setDemoCredentials] = useState<DemoCredentials | null>(null);
 
+  // Only redirect once auth context has finished loading — prevents
+  // auto-redirect on page load when browser autofills credentials
   useEffect(() => {
-    if (user) router.replace('/');
-  }, [user, router]);
+    if (!isLoading && user) router.replace('/');
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     const raw = sessionStorage.getItem('assi_demo_credentials');
     if (!raw) return;
-
     try {
       const parsed = JSON.parse(raw) as DemoCredentials;
-
       if (parsed?.email && parsed?.password) {
         setDemoCredentials(parsed);
         setEmail(parsed.email);
         setPassword(parsed.password);
       }
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, []);
 
   async function copyText(value: string, key: string) {
@@ -53,9 +51,7 @@ export default function SignIn() {
       await navigator.clipboard.writeText(value);
       setCopied(key);
       setTimeout(() => setCopied(null), 1400);
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,7 +63,6 @@ export default function SignIn() {
 
     try {
       await login(email.trim().toLowerCase(), password);
-
       sessionStorage.removeItem('assi_demo_credentials');
       router.replace('/');
     } catch (err: any) {
@@ -131,14 +126,12 @@ export default function SignIn() {
                 copied={copied === 'username'}
                 onCopy={() => copyText(demoCredentials.username, 'username')}
               />
-
               <CredentialRow
                 label="Email"
                 value={demoCredentials.email}
                 copied={copied === 'email'}
                 onCopy={() => copyText(demoCredentials.email, 'email')}
               />
-
               <CredentialRow
                 label="Password"
                 value={demoCredentials.password}
@@ -263,7 +256,6 @@ function CredentialRow({
             {value}
           </div>
         </div>
-
         <button
           type="button"
           onClick={onCopy}

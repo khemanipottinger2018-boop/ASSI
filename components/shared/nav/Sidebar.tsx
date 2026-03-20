@@ -8,9 +8,8 @@ import { useNotifications } from '@/hooks/useGlobalNotifications';
 import { getNav, type NavItem } from './navConfig';
 
 interface SidebarProps {
-  collapsed:      boolean;
-  onToggle:       () => void;
-  /** Admin undercover role — overrides the nav shown */
+  collapsed:       boolean;
+  onToggle:        () => void;
   undercoverRole?: 'student' | 'tutor' | null;
 }
 
@@ -29,24 +28,34 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
     return pathname.startsWith(item.href);
   }
 
+  function getBadgeCount(item: NavItem) {
+    if (item.badge === 'notifications') return unreadCount;
+    // messages badge — hook into later
+    return 0;
+  }
+
   function NavLink({ item }: { item: NavItem }) {
     const active = isActive(item);
-    const count  = item.badge === 'notifications' ? unreadCount : 0;
+    const count  = getBadgeCount(item);
+    const soon   = item.soon;
 
     return (
       <button
-        onClick={() => router.push(item.href)}
+        onClick={() => !soon && router.push(item.href)}
         title={collapsed ? item.label : undefined}
+        disabled={soon}
         className={`
           relative w-full flex items-center gap-3 rounded-xl transition-all duration-150
           ${collapsed ? 'justify-center px-0 py-3' : 'px-3 py-2.5'}
-          ${active
-            ? 'bg-white/15 text-white'
-            : 'text-white/70 hover:text-white hover:bg-white/8'
+          ${soon
+            ? 'opacity-35 cursor-not-allowed'
+            : active
+              ? 'bg-white/15 text-white'
+              : 'text-white/70 hover:text-white hover:bg-white/8'
           }
         `}
       >
-        {active && (
+        {active && !soon && (
           <span className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-orange-400" />
         )}
 
@@ -59,14 +68,19 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
               animate={{ opacity: 1, width: 'auto' }}
               exit={{ opacity: 0, width: 0 }}
               transition={{ duration: 0.18 }}
-              className="text-sm font-medium whitespace-nowrap overflow-hidden"
+              className="text-sm font-medium whitespace-nowrap overflow-hidden flex items-center gap-2"
             >
               {item.label}
+              {soon && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/8 text-white/30 border border-white/10 uppercase tracking-wide">
+                  Soon
+                </span>
+              )}
             </motion.span>
           )}
         </AnimatePresence>
 
-        {count > 0 && (
+        {count > 0 && !soon && (
           <span className={`
             flex-shrink-0 min-w-[18px] h-[18px] rounded-full
             bg-orange-500 text-white text-[10px] font-bold
@@ -143,8 +157,6 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
       `}
         style={{ borderColor: 'var(--sidebar-border)' }}
       >
-        {/* User info when expanded
-            ⚠️  backend does not return avatarUrl — always use initials */}
         <AnimatePresence initial={false}>
           {!collapsed && user && (
             <motion.div

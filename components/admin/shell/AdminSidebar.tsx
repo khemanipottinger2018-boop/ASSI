@@ -1,8 +1,16 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Users, BookOpen, Activity, AlertTriangle, BarChart2, Cpu } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  LayoutDashboard, Users, BookOpen, Activity,
+  AlertTriangle, BarChart2, Cpu, LogOut,
+  GraduationCap, UserCheck, EyeOff, Eye,
+} from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+const UNDERCOVER_KEY = 'sentinel:undercover';
 
 const items = [
   { label: 'Overview',      href: '/admin',                    icon: LayoutDashboard },
@@ -15,7 +23,39 @@ const items = [
 ];
 
 export default function AdminSidebar() {
-  const path = usePathname();
+  const path   = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const [undercover,    setUndercover]    = useState<string | null>(null);
+  const [signingOut,    setSigningOut]    = useState(false);
+
+  useEffect(() => {
+    setUndercover(localStorage.getItem(UNDERCOVER_KEY));
+  }, []);
+
+  function goUndercover(role: 'student' | 'tutor') {
+    localStorage.setItem(UNDERCOVER_KEY, role);
+    setUndercover(role);
+    router.push('/');
+  }
+
+  function exitUndercover() {
+    localStorage.removeItem(UNDERCOVER_KEY);
+    setUndercover(null);
+    router.push('/admin');
+  }
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+    } catch { /* silent */ }
+    finally {
+      localStorage.removeItem(UNDERCOVER_KEY);
+      router.push('/signin');
+    }
+  }
 
   return (
     <aside style={{
@@ -28,7 +68,7 @@ export default function AdminSidebar() {
       position: 'relative',
       flexShrink: 0,
     }}>
-      {/* Corner accent */}
+      {/* Top accent */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: 2,
         background: 'linear-gradient(90deg, transparent, rgba(0,180,255,0.6), transparent)',
@@ -63,11 +103,11 @@ export default function AdminSidebar() {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '4px 12px' }}>
+      <nav style={{ flex: 1, padding: '4px 12px', overflowY: 'auto' }}>
         <p style={{ color: 'rgba(0,180,255,0.3)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>Navigation</p>
         {items.map((item) => {
-          const active = path === item.href || (item.href !== '/admin' && path.startsWith(item.href));
-          const Icon = item.icon;
+          const active     = path === item.href || (item.href !== '/admin' && path.startsWith(item.href));
+          const Icon       = item.icon;
           const isSentinel = item.href === '/admin/sentinel';
 
           return (
@@ -75,12 +115,8 @@ export default function AdminSidebar() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 10px', borderRadius: 8,
-                background: active
-                  ? 'rgba(0,180,255,0.1)'
-                  : isSentinel ? 'rgba(0,180,255,0.04)' : 'transparent',
-                border: active
-                  ? '1px solid rgba(0,180,255,0.25)'
-                  : isSentinel ? '1px solid rgba(0,180,255,0.1)' : '1px solid transparent',
+                background: active ? 'rgba(0,180,255,0.1)' : isSentinel ? 'rgba(0,180,255,0.04)' : 'transparent',
+                border: active ? '1px solid rgba(0,180,255,0.25)' : isSentinel ? '1px solid rgba(0,180,255,0.1)' : '1px solid transparent',
                 transition: 'all 0.15s ease',
               }}>
                 <Icon size={14} style={{ color: active ? '#00b4ff' : isSentinel ? 'rgba(0,180,255,0.5)' : 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
@@ -98,10 +134,91 @@ export default function AdminSidebar() {
             </Link>
           );
         })}
+
+        {/* ── Undercover ── */}
+        <div style={{ marginTop: 16, marginBottom: 4 }}>
+          <p style={{ color: 'rgba(0,180,255,0.3)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>
+            Undercover
+          </p>
+
+          {undercover ? (
+            <button onClick={exitUndercover} style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+              background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.25)',
+              transition: 'all 0.15s ease',
+            }}>
+              <Eye size={14} style={{ color: 'rgba(251,146,60,0.8)', flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: 'rgba(251,146,60,0.8)', flex: 1, textAlign: 'left' }}>
+                Exit ({undercover})
+              </span>
+              <span style={{ fontSize: 9, color: 'rgba(251,146,60,0.5)', letterSpacing: '0.1em' }}>LIVE</span>
+            </button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <button onClick={() => goUndercover('student')} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                background: 'transparent', border: '1px solid transparent',
+                transition: 'all 0.15s ease',
+              }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)';
+                  (e.currentTarget as HTMLButtonElement).style.border = '1px solid rgba(255,255,255,0.08)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.border = '1px solid transparent';
+                }}
+              >
+                <GraduationCap size={14} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>As Student</span>
+                <EyeOff size={11} style={{ color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }} />
+              </button>
+
+              <button onClick={() => goUndercover('tutor')} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                background: 'transparent', border: '1px solid transparent',
+                transition: 'all 0.15s ease',
+              }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)';
+                  (e.currentTarget as HTMLButtonElement).style.border = '1px solid rgba(255,255,255,0.08)';
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.border = '1px solid transparent';
+                }}
+              >
+                <UserCheck size={14} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>As Tutor</span>
+                <EyeOff size={11} style={{ color: 'rgba(255,255,255,0.15)', marginLeft: 'auto' }} />
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
 
-      {/* Footer */}
-      <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(0,180,255,0.08)' }}>
+      {/* ── Footer: sign out ── */}
+      <div style={{ padding: '12px', borderTop: '1px solid rgba(0,180,255,0.08)' }}>
+        <button
+          onClick={signOut}
+          disabled={signingOut}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+            padding: '9px 10px', borderRadius: 8, cursor: signingOut ? 'default' : 'pointer',
+            background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.15)',
+            opacity: signingOut ? 0.5 : 1, transition: 'all 0.15s ease',
+            marginBottom: 10,
+          }}
+        >
+          <LogOut size={13} style={{ color: 'rgba(255,69,58,0.6)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'rgba(255,69,58,0.6)', letterSpacing: '0.05em' }}>
+            {signingOut ? 'Signing out…' : 'Sign Out'}
+          </span>
+        </button>
+
         <p style={{ color: 'rgba(0,180,255,0.2)', fontSize: 9, letterSpacing: '0.15em' }}>CLEARANCE: LEVEL A</p>
         <p style={{ color: 'rgba(0,180,255,0.15)', fontSize: 9, marginTop: 2 }}>SENTINEL v1.0 // ASSI PLATFORM</p>
       </div>

@@ -1,18 +1,18 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useGlobalNotifications';
 import { getNav, type NavItem } from './navConfig';
 
 export default function MobileNav() {
-  const { user } = useAuth();
-  const pathname = usePathname();
-  const router   = useRouter();
+  const { user }        = useAuth();
+  const pathname        = usePathname();
+  const router          = useRouter();
   const { unreadCount } = useNotifications();
 
-  // Don't render on auth pages or live-chat (full-screen)
+  // Hide on auth pages and full-screen experiences
   const hideOn = ['/signin', '/signup', '/live-chat'];
   if (hideOn.some((p) => pathname.startsWith(p))) return null;
   if (!user) return null;
@@ -24,51 +24,92 @@ export default function MobileNav() {
     return pathname.startsWith(item.href);
   }
 
+  function getBadgeCount(item: NavItem) {
+    if (item.badge === 'notifications') return unreadCount;
+    return 0;
+  }
+
   return (
-    <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 safe-area-pb"
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(20px)' }}
-    >
-      <div className="flex items-stretch h-16">
-        {mobileItems.map((item) => {
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-4 px-4 safe-area-pb pointer-events-none">
+      <motion.nav
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="pointer-events-auto flex items-stretch rounded-2xl overflow-hidden"
+        style={{
+          background:           'rgba(10, 8, 20, 0.85)',
+          border:               '1px solid rgba(255,255,255,0.12)',
+          backdropFilter:       'blur(28px)',
+          WebkitBackdropFilter: 'blur(28px)',
+          boxShadow:            '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
+        }}
+      >
+        {mobileItems.map((item, index) => {
           const active = isActive(item);
-          const count  = item.badge === 'notifications' ? unreadCount : 0;
+          const count  = getBadgeCount(item);
+          const isLast = index === mobileItems.length - 1;
 
           return (
             <button
               key={item.href}
               onClick={() => router.push(item.href)}
-              className="flex-1 flex flex-col items-center justify-center gap-1 relative"
+              className="relative flex flex-col items-center justify-center gap-1.5 px-5 py-3"
+              style={{
+                borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
+                minWidth: 60,
+              }}
             >
-              {/* Active pill */}
+              {/* Active glow background */}
               {active && (
                 <motion.div
-                  layoutId="mobile-active"
-                  className="absolute inset-x-3 top-1 h-0.5 rounded-full bg-orange-400"
+                  layoutId="mobile-nav-active"
+                  className="absolute inset-1 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}
                   transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                 />
               )}
 
-              <div className="relative">
+              {/* Icon */}
+              <div className="relative z-10">
                 <item.icon
-                  size={20}
-                  className={active ? 'text-white' : 'text-white/40'}
+                  size={19}
+                  className={`transition-all duration-150 ${
+                    active ? 'text-white' : 'text-white/35'
+                  }`}
                   strokeWidth={active ? 2.2 : 1.8}
                 />
+
+                {/* Badge */}
                 {count > 0 && (
-                  <span className="absolute -top-1 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5">
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5"
+                  >
                     {count > 9 ? '9+' : count}
-                  </span>
+                  </motion.span>
                 )}
               </div>
 
-              <span className={`text-[10px] font-medium ${active ? 'text-white' : 'text-white/35'}`}>
+              {/* Label */}
+              <span className={`relative z-10 text-[10px] font-medium transition-all duration-150 ${
+                active ? 'text-white' : 'text-white/30'
+              }`}>
                 {item.label}
               </span>
+
+              {/* Active dot */}
+              {active && (
+                <motion.div
+                  layoutId="mobile-nav-dot"
+                  className="absolute bottom-1.5 w-1 h-1 rounded-full bg-orange-400"
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                />
+              )}
             </button>
           );
         })}
-      </div>
-    </nav>
+      </motion.nav>
+    </div>
   );
 }
