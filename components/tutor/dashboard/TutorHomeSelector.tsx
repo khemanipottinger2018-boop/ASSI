@@ -1,21 +1,17 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter }           from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Wifi, WifiOff, Bell, LayoutDashboard,
   Calendar, ChevronRight, Loader2, BookOpen,
-  Users, Clock,
+  Users, Clock, Radio,
 } from 'lucide-react';
 import { useAuth }    from '@/contexts/AuthContext';
-import { usePresence, type PresenceStatus } from '@/hooks/usePresence';
+import { usePresence } from '@/hooks/usePresence';
 import { useSocket }  from '@/hooks/useSocket';
 
-type AvailabilityStatus = PresenceStatus;
-
-// Queue entries arrive via socket event 'session:request'
-// There is no REST polling endpoint for the tutor queue
 type QueueEntry = {
   sessionId:   string;
   studentName: string;
@@ -23,84 +19,103 @@ type QueueEntry = {
   requestedAt: number;
 };
 
-const STATUS_CFG: Record<AvailabilityStatus, {
-  label: string; sub: string; dot: string; glow: string;
-  bg: string; border: string; labelColor: string;
-}> = {
+const STATUS_CFG = {
   online: {
-    label: "You're Live",
-    sub:   'Students can request your help right now',
-    dot: '#34d399', glow: 'rgba(52,211,153,0.5)',
-    bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.25)',
-    labelColor: '#34d399',
+    label:      "You're Live",
+    sub:        'Students can request your help right now',
+    icon:       Wifi,
+    dotColor:   'bg-emerald-400',
+    dotGlow:    'shadow-emerald-400/50',
+    cardBg:     'bg-emerald-500/8',
+    cardBorder: 'border-emerald-500/25',
+    labelColor: 'text-emerald-400',
+    actionLabel:'Go Offline',
+    actionCls:  'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/15',
   },
   offline: {
-    label: "You're Offline",
-    sub:   'Go online to start receiving student requests',
-    dot: 'rgba(255,255,255,0.25)', glow: 'transparent',
-    bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)',
-    labelColor: 'rgba(255,255,255,0.5)',
+    label:      "You're Offline",
+    sub:        'Go online to receive student requests',
+    icon:       WifiOff,
+    dotColor:   'bg-white/20',
+    dotGlow:    '',
+    cardBg:     'bg-white/4',
+    cardBorder: 'border-white/10',
+    labelColor: 'text-white/50',
+    actionLabel:'Go Online',
+    actionCls:  'bg-emerald-500/12 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/20',
   },
   busy: {
-    label: 'In a Session',
-    sub:   "You're currently with a student",
-    dot: '#fb923c', glow: 'rgba(251,146,60,0.5)',
-    bg: 'rgba(251,146,60,0.08)', border: 'rgba(251,146,60,0.25)',
-    labelColor: '#fb923c',
+    label:      'In a Session',
+    sub:        "You're currently with a student",
+    icon:       Users,
+    dotColor:   'bg-orange-400',
+    dotGlow:    'shadow-orange-400/50',
+    cardBg:     'bg-orange-500/8',
+    cardBorder: 'border-orange-500/25',
+    labelColor: 'text-orange-400',
+    actionLabel:'',
+    actionCls:  '',
   },
-};
+} as const;
+
+function elapsed(ts: number) {
+  const m = Math.floor((Date.now() - ts) / 60_000);
+  return m < 1 ? 'just now' : `${m}m ago`;
+}
 
 export default function TutorHomeSelector() {
   const router   = useRouter();
   const { user } = useAuth();
 
-  const { status, setStatus } = usePresence();
-  const { subscribe }         = useSocket();
+  // Presence from Redis (status, hydrated, discoverable)
+  const { status, setStatus, hydrated, discoverable } = usePresence();
 
-  const [toggling, setToggling] = useState(false);
-  const [queue,    setQueue]    = useState<QueueEntry[]>([]);
+  // Live socket connection state — reactive, no Redis roundtrip
+  const { isConnected, subscribe } = useSocket();
 
-  // Queue is populated via socket — no REST polling endpoint exists
+  const [toggling,         setToggling]         = useState(false);
+  const [queue,            setQueue]            = useState<QueueEntry[]>([]);
+  const [showSocketStatus, setShowSocketStatus] = useState(false);
+
+  // Wait 2s before showing socket status to avoid misleading
+  // "Socket offline" flash while connection is still establishing
   useEffect(() => {
-    const unsub = subscribe('session:request', (payload: any) => {
-      const entry: QueueEntry = {
-        sessionId:   payload.sessionId,
-        studentName: payload.studentName ?? 'Student',
-        subjectName: payload.subjectName ?? '',
-        requestedAt: payload.requestedAt ?? Date.now(),
-      };
+    const t = setTimeout(() => setShowSocketStatus(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
+
+  /* ── Socket: incoming requests ── */
+  useEffect(() => {
+    const unsubReq = subscribe('session:request', (payload: any) => {
       setQueue(prev => {
-        if (prev.some(q => q.sessionId === entry.sessionId)) return prev;
-        return [entry, ...prev];
+        if (prev.some(q => q.sessionId === payload.sessionId)) return prev;
+        return [{
+          sessionId:   payload.sessionId,
+          studentName: payload.studentName ?? 'Student',
+          subjectName: payload.subjectName ?? '',
+          requestedAt: payload.requestedAt ?? Date.now(),
+        }, ...prev];
       });
     });
 
-    // Also clear queue entry when session ends or is accepted
     const unsubEnd = subscribe('session:ended', (payload: any) => {
       setQueue(prev => prev.filter(q => q.sessionId !== payload.sessionId));
     });
 
-    return () => { unsub(); unsubEnd(); };
+    return () => { unsubReq(); unsubEnd(); };
   }, [subscribe]);
 
   const toggle = async () => {
-    if (toggling || status === 'busy') return;
-    const next: AvailabilityStatus = status === 'online' ? 'offline' : 'online';
+    if (toggling || status === 'busy' || !hydrated) return;
     setToggling(true);
-    await setStatus(next);
+    await setStatus(status === 'online' ? 'offline' : 'online');
     setToggling(false);
   };
 
-  const cfg         = STATUS_CFG[status];
+  const isTutorApp  = user?.role === 'tutor_applicant';
+  const cfg         = STATUS_CFG[status] ?? STATUS_CFG.offline;
+  const StatusIcon  = cfg.icon;
   const hasRequests = queue.length > 0;
-
-  // role uses underscore: tutor_applicant (not tutor-applicant)
-  const isTutorApp = user?.role === 'tutor_applicant';
-
-  const elapsed = (ts: number) => {
-    const m = Math.floor((Date.now() - ts) / 60000);
-    return m < 1 ? 'just now' : `${m}m ago`;
-  };
 
   return (
     <motion.div
@@ -117,24 +132,17 @@ export default function TutorHomeSelector() {
         <p className="text-white/45 text-sm mt-1">
           {isTutorApp
             ? 'Your application is under review.'
-            : 'Manage your availability and incoming requests.'
-          }
+            : 'Manage your availability and incoming requests.'}
         </p>
       </div>
 
       {/* ── Applicant state ── */}
       {isTutorApp ? (
-        <div style={{
-          padding: '16px', borderRadius: 14, marginBottom: 16,
-          background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)',
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-        }}>
-          <Bell size={14} style={{ color: '#a78bfa', flexShrink: 0, marginTop: 1 }} />
+        <div className="panel rounded-2xl p-4 border border-purple-500/20 bg-purple-500/8 flex items-start gap-3 mb-4">
+          <Bell size={14} className="text-purple-400 flex-shrink-0 mt-0.5" />
           <div>
-            <p style={{ color: '#a78bfa', fontSize: 12, fontWeight: 600, marginBottom: 3 }}>
-              Application Under Review
-            </p>
-            <p style={{ color: 'rgba(200,185,255,0.5)', fontSize: 12, lineHeight: 1.6 }}>
+            <p className="text-purple-400 text-xs font-semibold mb-1">Application Under Review</p>
+            <p className="text-purple-200/50 text-xs leading-relaxed">
               Our team is reviewing your submission. You'll be notified within 24–48 hours.
             </p>
           </div>
@@ -142,190 +150,134 @@ export default function TutorHomeSelector() {
       ) : (
         <>
           {/* ── Availability toggle ── */}
-          <div style={{ marginBottom: 12 }}>
-            <button
-              onClick={toggle}
-              disabled={toggling || status === 'busy'}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '16px 18px', borderRadius: 14, cursor: status === 'busy' ? 'default' : 'pointer',
-                background: cfg.bg, border: `1px solid ${cfg.border}`,
-                transition: 'all 0.2s ease', opacity: toggling ? 0.7 : 1,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ position: 'relative', width: 40, height: 40, flexShrink: 0 }}>
-                  {status === 'online' && (
-                    <motion.div
-                      animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-                      style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: cfg.dot, opacity: 0.3 }}
-                    />
+          <button
+            onClick={toggle}
+            disabled={toggling || status === 'busy' || !hydrated}
+            className={`w-full panel rounded-2xl p-4 border flex items-center justify-between gap-4 mb-3 transition-all duration-200 disabled:cursor-not-allowed ${cfg.cardBg} ${cfg.cardBorder}`}
+          >
+            <div className="flex items-center gap-4">
+              {/* Status orb */}
+              <div className="relative flex-shrink-0">
+                {status === 'online' && (
+                  <motion.div
+                    animate={{ scale: [1, 1.8], opacity: [0.4, 0] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
+                    className="absolute inset-0 rounded-full bg-emerald-400/30"
+                  />
+                )}
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${cfg.cardBg} border ${cfg.cardBorder}`}>
+                  {toggling || !hydrated ? (
+                    <Loader2 size={16} className="text-white/60 animate-spin" />
+                  ) : (
+                    <StatusIcon size={16} className={cfg.labelColor} />
                   )}
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '50%',
-                    background: `radial-gradient(circle at 35% 35%, ${cfg.dot}, ${cfg.dot}88)`,
-                    boxShadow: `0 0 16px ${cfg.glow}`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {toggling
-                      ? <Loader2 size={16} style={{ color: 'white', animation: 'spin 1s linear infinite' }} />
-                      : status === 'online'
-                        ? <Wifi size={16} color="white" />
-                        : status === 'busy'
-                          ? <Users size={16} color="white" />
-                          : <WifiOff size={16} color="rgba(255,255,255,0.6)" />
-                    }
-                  </div>
                 </div>
-
-                <div style={{ textAlign: 'left' }}>
-                  <p style={{ color: cfg.labelColor, fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>
-                    {cfg.label}
-                  </p>
-                  <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 3 }}>
-                    {cfg.sub}
-                  </p>
-                </div>
+                <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black ${cfg.dotColor} ${status !== 'offline' ? 'shadow-lg ' + cfg.dotGlow : ''}`} />
               </div>
 
-              {status !== 'busy' && (
-                <div style={{
-                  padding: '6px 14px', borderRadius: 20, fontSize: 11, fontWeight: 600,
-                  background: status === 'online' ? 'rgba(255,69,58,0.1)' : 'rgba(52,211,153,0.12)',
-                  border: `1px solid ${status === 'online' ? 'rgba(255,69,58,0.25)' : 'rgba(52,211,153,0.28)'}`,
-                  color: status === 'online' ? '#ff6b6b' : '#34d399',
-                  flexShrink: 0,
-                }}>
-                  {status === 'online' ? 'Go Offline' : 'Go Online'}
-                </div>
-              )}
-            </button>
-          </div>
+              <div className="text-left">
+                <p className={`text-sm font-semibold ${cfg.labelColor}`}>{cfg.label}</p>
+                <p className="text-white/35 text-xs mt-0.5">{cfg.sub}</p>
 
-          {/* ── Incoming requests preview ── */}
-          <div style={{ marginBottom: 12 }}>
-            <div style={{
-              borderRadius: 14, overflow: 'hidden',
-              background: 'rgba(255,255,255,0.03)',
-              border: hasRequests ? '1px solid rgba(251,146,60,0.25)' : '1px solid rgba(255,255,255,0.07)',
-              transition: 'border-color 0.2s ease',
-            }}>
-              <button
-                onClick={() => router.push('/dashboard/tutor')}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', background: 'transparent', border: 'none', cursor: 'pointer',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Bell size={13} style={{ color: hasRequests ? '#fb923c' : 'rgba(255,255,255,0.3)' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 500 }}>
-                    Incoming Requests
-                  </span>
-                  <AnimatePresence>
-                    {hasRequests && (
-                      <motion.span
-                        initial={{ opacity: 0, scale: 0.7 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.7 }}
-                        style={{
-                          padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700,
-                          background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.3)',
-                          color: '#fb923c',
-                        }}
-                      >
-                        {queue.length}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </div>
-                <ChevronRight size={13} style={{ color: 'rgba(255,255,255,0.2)' }} />
-              </button>
-
-              {hasRequests && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                  {queue.slice(0, 2).map((req, i) => (
-                    <div key={req.sessionId} style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 16px',
-                      borderBottom: i < Math.min(queue.length, 2) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                    }}>
-                      <div style={{
-                        width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                        background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.2)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fb923c', fontSize: 11, fontWeight: 700,
-                      }}>
-                        {req.studentName?.[0]?.toUpperCase() ?? 'S'}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 500 }}>{req.studentName}</p>
-                        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{req.subjectName} · {elapsed(req.requestedAt)}</p>
-                      </div>
-                      <Clock size={10} style={{ color: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
-                    </div>
-                  ))}
-                  {queue.length > 2 && (
-                    <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                      <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, textAlign: 'center' }}>
-                        +{queue.length - 2} more — open dashboard to manage
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!hasRequests && status === 'online' && (
-                <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
-                    No requests yet — students will appear here
-                  </p>
-                </div>
-              )}
-
-              {!hasRequests && status === 'offline' && (
-                <div style={{ padding: '10px 16px', borderTop: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                  <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}>
-                    Go online to receive requests
-                  </p>
-                </div>
-              )}
+                {/* Socket status — live from useSocket, shown after 2s delay */}
+                {hydrated && showSocketStatus && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <Radio size={9} className={isConnected ? 'text-emerald-400/60' : 'text-white/20'} />
+                    <span className="text-[10px] text-white/25">
+                      {isConnected
+                        ? discoverable ? 'Discoverable' : 'Connected'
+                        : 'Socket offline'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {status !== 'busy' && hydrated && (
+              <span className={`text-[11px] font-semibold px-3 py-1.5 rounded-full border flex-shrink-0 transition ${cfg.actionCls}`}>
+                {cfg.actionLabel}
+              </span>
+            )}
+          </button>
+
+          {/* ── Incoming requests ── */}
+          <div className={`panel rounded-2xl border overflow-hidden mb-3 transition-all ${hasRequests ? 'border-orange-500/25' : 'border-white/8'}`}>
+            <button
+              onClick={() => router.push('/dashboard/tutor')}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/4 transition"
+            >
+              <div className="flex items-center gap-2">
+                <Bell size={13} className={hasRequests ? 'text-orange-400' : 'text-white/30'} />
+                <span className="text-white/60 text-xs font-medium">Incoming Requests</span>
+                <AnimatePresence>
+                  {hasRequests && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.7 }}
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400"
+                    >
+                      {queue.length}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </div>
+              <ChevronRight size={13} className="text-white/20" />
+            </button>
+
+            {hasRequests && (
+              <div className="border-t border-white/6">
+                {queue.slice(0, 2).map((req, i) => (
+                  <div key={req.sessionId}
+                    className={`flex items-center gap-3 px-4 py-2.5 ${i < Math.min(queue.length, 2) - 1 ? 'border-b border-white/4' : ''}`}
+                  >
+                    <div className="w-7 h-7 rounded-lg glass-soft flex items-center justify-center flex-shrink-0 text-orange-400 text-xs font-bold">
+                      {req.studentName?.[0]?.toUpperCase() ?? 'S'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white/70 text-xs font-medium truncate">{req.studentName}</p>
+                      <p className="text-white/30 text-[10px]">{req.subjectName} · {elapsed(req.requestedAt)}</p>
+                    </div>
+                    <Clock size={10} className="text-white/20 flex-shrink-0" />
+                  </div>
+                ))}
+                {queue.length > 2 && (
+                  <div className="px-4 py-2 border-t border-white/4 text-center">
+                    <p className="text-white/25 text-[10px]">+{queue.length - 2} more — open dashboard</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!hasRequests && (
+              <div className="px-4 py-2.5 border-t border-white/6 text-center">
+                <p className="text-white/20 text-[11px]">
+                  {status === 'online'
+                    ? 'No requests yet — students will appear here'
+                    : 'Go online to receive requests'}
+                </p>
+              </div>
+            )}
           </div>
         </>
       )}
 
-      {/* ── Quick action buttons ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      {/* ── Quick actions ── */}
+      <div className="grid grid-cols-2 gap-2">
         {[
-          { label: 'Full Dashboard', sub: 'Stats, queue, subjects', icon: LayoutDashboard, color: '#60a5fa', path: '/dashboard/tutor', show: true },
-          { label: 'My Sessions',    sub: 'History and schedule',  icon: Calendar,        color: '#a78bfa', path: '/sessions',        show: true },
-          { label: 'Notifications',  sub: 'Updates and alerts',    icon: Bell,            color: '#34d399', path: '/notifications',   show: !isTutorApp },
-          { label: 'My Subjects',    sub: 'View coverage',         icon: BookOpen,        color: '#fb923c', path: '/dashboard/tutor', show: !isTutorApp },
-        ].filter(b => b.show).map(({ label, sub, icon: Icon, color, path }) => (
-          <button
-            key={label}
-            onClick={() => router.push(path)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '11px 14px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.03)'; }}
-          >
-            <div style={{
-              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-              background: `${color}15`, border: `1px solid ${color}25`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Icon size={13} style={{ color }} />
+          { label: 'Full Dashboard', sub: 'Stats & queue',      icon: LayoutDashboard, color: 'text-blue-400',    bg: 'bg-blue-500/8   border-blue-500/15',   path: '/dashboard/tutor', show: true        },
+          { label: 'My Sessions',    sub: 'History & schedule', icon: Calendar,        color: 'text-purple-400', bg: 'bg-purple-500/8  border-purple-500/15',  path: '/sessions',        show: true        },
+          { label: 'Notifications',  sub: 'Updates & alerts',   icon: Bell,            color: 'text-emerald-400',bg: 'bg-emerald-500/8 border-emerald-500/15', path: '/notifications',   show: !isTutorApp },
+          { label: 'My Subjects',    sub: 'View coverage',      icon: BookOpen,        color: 'text-orange-400', bg: 'bg-orange-500/8  border-orange-500/15',  path: '/dashboard/tutor', show: !isTutorApp },
+        ].filter(b => b.show).map(({ label, sub, icon: Icon, color, bg, path }) => (
+          <button key={label} onClick={() => router.push(path)}
+            className={`panel rounded-xl p-3 border flex items-center gap-3 hover:bg-white/8 transition text-left ${bg}`}>
+            <div className="glass-soft w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Icon size={14} className={color} />
             </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 500 }}>{label}</p>
-              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, marginTop: 1 }}>{sub}</p>
+            <div className="min-w-0">
+              <p className="text-white/75 text-xs font-medium truncate">{label}</p>
+              <p className="text-white/30 text-[10px] mt-0.5">{sub}</p>
             </div>
           </button>
         ))}

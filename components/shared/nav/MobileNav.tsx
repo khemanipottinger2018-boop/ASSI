@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth }          from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useGlobalNotifications';
 import { getNav, type NavItem } from './navConfig';
 
@@ -12,7 +12,6 @@ export default function MobileNav() {
   const router          = useRouter();
   const { unreadCount } = useNotifications();
 
-  // Hide on auth pages and full-screen experiences
   const hideOn = ['/signin', '/signup', '/live-chat'];
   if (hideOn.some((p) => pathname.startsWith(p))) return null;
   if (!user) return null;
@@ -30,18 +29,14 @@ export default function MobileNav() {
   }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-4 px-4 safe-area-pb pointer-events-none">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex justify-center pb-5 px-6 safe-area-pb pointer-events-none">
       <motion.nav
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="pointer-events-auto flex items-stretch rounded-2xl overflow-hidden"
+        className="pointer-events-auto flex items-stretch glass rounded-2xl overflow-hidden"
         style={{
-          background:           'rgba(10, 8, 20, 0.85)',
-          border:               '1px solid rgba(255,255,255,0.12)',
-          backdropFilter:       'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          boxShadow:            '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
         }}
       >
         {mobileItems.map((item, index) => {
@@ -53,46 +48,43 @@ export default function MobileNav() {
             <button
               key={item.href}
               onClick={() => router.push(item.href)}
-              className="relative flex flex-col items-center justify-center gap-1.5 px-5 py-3"
+              className="relative flex flex-col items-center justify-center gap-1 px-5 py-3 min-w-[60px]"
               style={{
                 borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                minWidth: 60,
               }}
             >
-              {/* Active glow background */}
+              {/* Active background pill */}
               {active && (
                 <motion.div
                   layoutId="mobile-nav-active"
-                  className="absolute inset-1 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.08)' }}
+                  className="absolute inset-1 rounded-xl bg-white/8"
                   transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                 />
               )}
 
-              {/* Icon */}
+              {/* Icon + badge */}
               <div className="relative z-10">
                 <item.icon
                   size={19}
-                  className={`transition-all duration-150 ${
-                    active ? 'text-white' : 'text-white/35'
-                  }`}
+                  className={`transition-all duration-150 ${active ? 'text-white' : 'text-white/35'}`}
                   strokeWidth={active ? 2.2 : 1.8}
                 />
-
-                {/* Badge */}
-                {count > 0 && (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5"
-                  >
-                    {count > 9 ? '9+' : count}
-                  </motion.span>
-                )}
+                <AnimatePresence>
+                  {count > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5"
+                    >
+                      {count > 9 ? '9+' : count}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </div>
 
               {/* Label */}
-              <span className={`relative z-10 text-[10px] font-medium transition-all duration-150 ${
+              <span className={`relative z-10 text-[10px] font-medium transition-all duration-150 leading-none ${
                 active ? 'text-white' : 'text-white/30'
               }`}>
                 {item.label}
@@ -102,7 +94,7 @@ export default function MobileNav() {
               {active && (
                 <motion.div
                   layoutId="mobile-nav-dot"
-                  className="absolute bottom-1.5 w-1 h-1 rounded-full bg-orange-400"
+                  className="absolute bottom-1 w-1 h-1 rounded-full bg-orange-400"
                   transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                 />
               )}
