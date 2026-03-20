@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Search, GraduationCap, BookOpen } from 'lucide-react';
+import { ChevronDown, Search, GraduationCap, BookOpen, X } from 'lucide-react';
 import { api } from '@/lib/api/client';
 
 export interface Subject {
@@ -15,11 +15,12 @@ export interface Subject {
 interface Props {
   selected:         Subject | null;
   onSelect:         (subject: Subject) => void;
+  onClear?:         () => void;
   onOpenChange?:    (open: boolean) => void;
   onLoadingChange?: (loading: boolean) => void;
 }
 
-export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLoadingChange }: Props) {
+export default function SubjectDropdown({ selected, onSelect, onClear, onOpenChange, onLoadingChange }: Props) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [open, setOpen]         = useState(false);
   const [search, setSearch]     = useState('');
@@ -72,24 +73,21 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
 
   return (
     <div ref={wrapperRef} className="relative w-full">
+
       {/* ── Trigger ── */}
       <button
         onClick={() => toggle(!open)}
-        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl transition-all duration-200"
-        style={{
-          background:     open ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.09)',
-          border:         `1px solid ${open ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.14)'}`,
-          backdropFilter: 'blur(12px)',
-        }}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 ${
+          open
+            ? 'bg-white/10 border-white/20'
+            : 'glass-soft border-white/10 hover:border-white/20 hover:bg-white/8'
+        }`}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(255,255,255,0.12)' }}
-          >
+          <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
             {selected
-              ? <GraduationCap size={16} className="text-white/90" />
-              : <BookOpen size={15} className="text-white/50" />
+              ? <GraduationCap size={15} className="text-white/80" />
+              : <BookOpen size={14} className="text-white/40" />
             }
           </div>
 
@@ -98,60 +96,63 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
               <>
                 <div className="text-sm font-semibold text-white truncate">{selected.name}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full
-                    ${selected.category === 'CAPE'
-                      ? 'bg-purple-500/35 text-purple-200'
-                      : 'bg-emerald-500/35 text-emerald-200'
-                    }`}
-                  >
+                  <span className={`text-[10px] font-bold px-1.5 py-px rounded-full ${
+                    selected.category === 'CAPE'
+                      ? 'bg-purple-500/20 text-purple-300'
+                      : 'bg-emerald-500/20 text-emerald-300'
+                  }`}>
                     {selected.category}
                   </span>
-                  <span className="text-[11px] text-white/40">
+                  <span className="text-[11px] text-white/35">
                     {selected.tutorCount} registered
                   </span>
                 </div>
               </>
             ) : (
-              <span className="text-white/45 text-sm">
+              <span className="text-white/40 text-sm">
                 {loading ? 'Loading subjects…' : 'Select a subject'}
               </span>
             )}
           </div>
         </div>
 
-        <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
-          <ChevronDown size={15} className="text-white/40 flex-shrink-0" />
-        </motion.div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Clear button — only shown when something is selected */}
+          {selected && onClear && (
+            <span
+              role="button"
+              onClick={(e) => { e.stopPropagation(); onClear(); toggle(false); setSearch(''); }}
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 hover:bg-white/10 transition"
+            >
+              <X size={12} />
+            </span>
+          )}
+          <motion.div animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.2 }}>
+            <ChevronDown size={14} className="text-white/35" />
+          </motion.div>
+        </div>
       </button>
 
       {/* ── Dropdown panel ── */}
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: -6, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
-            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute left-0 right-0 mt-2 z-50 overflow-hidden rounded-2xl"
-            style={{
-              background:           'rgba(10,8,24,0.88)',
-              border:               '1px solid rgba(255,255,255,0.14)',
-              backdropFilter:       'blur(32px)',
-              WebkitBackdropFilter: 'blur(32px)',
-              boxShadow:            '0 24px 60px rgba(0,0,0,0.5)',
-            }}
+            exit={{ opacity: 0, y: -4, scale: 0.99 }}
+            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute left-0 right-0 mt-2 z-50 overflow-hidden rounded-2xl panel border border-white/10"
           >
             {/* Search bar */}
-            <div className="p-3 border-b border-white/8">
+            <div className="p-2.5 border-b border-white/8">
               <div className="relative">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/35" />
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
                 <input
                   ref={inputRef}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Search ${subjects.length} subjects…`}
-                  className="w-full rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-white/25 outline-none transition"
-                  style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)' }}
+                  className="w-full glass-soft rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition"
                 />
               </div>
             </div>
@@ -164,10 +165,10 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
               ].map(({ label, items }) =>
                 items.length === 0 ? null : (
                   <div key={label} className="mb-1">
-                    <div className="px-3 pt-2.5 pb-1.5">
-                      <span className={`text-[10px] font-bold tracking-[0.15em] uppercase
-                        ${label === 'CAPE' ? 'text-purple-400/60' : 'text-emerald-400/60'}`}
-                      >
+                    <div className="px-3 pt-2 pb-1">
+                      <span className={`text-[10px] font-bold tracking-widest uppercase ${
+                        label === 'CAPE' ? 'text-purple-400/50' : 'text-emerald-400/50'
+                      }`}>
                         {label}
                       </span>
                     </div>
@@ -175,24 +176,26 @@ export default function SubjectDropdown({ selected, onSelect, onOpenChange, onLo
                       <button
                         key={sub.id}
                         onClick={() => { onSelect(sub); toggle(false); setSearch(''); }}
-                        className="w-full text-left px-3 py-2.5 rounded-xl transition-colors flex items-center justify-between gap-3 hover:bg-white/8"
-                        style={selected?.id === sub.id ? { background: 'rgba(255,255,255,0.10)' } : {}}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl transition-colors flex items-center justify-between gap-3 ${
+                          selected?.id === sub.id
+                            ? 'bg-white/10'
+                            : 'hover:bg-white/6'
+                        }`}
                       >
                         <div className="min-w-0">
-                          <div className="text-sm font-medium text-white/90 truncate">{sub.name}</div>
-                          <div className="text-[11px] text-white/35 mt-0.5">
+                          <div className="text-sm font-medium text-white/85 truncate">{sub.name}</div>
+                          <div className="text-[11px] text-white/30 mt-0.5">
                             {sub.tutorCount > 0
                               ? `${sub.tutorCount} tutor${sub.tutorCount !== 1 ? 's' : ''} registered`
                               : 'No tutors yet'}
                           </div>
                         </div>
                         {sub.tutorCount > 0 && (
-                          <span className={`flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full
-                            ${label === 'CAPE'
-                              ? 'bg-purple-500/25 text-purple-300'
-                              : 'bg-emerald-500/25 text-emerald-300'
-                            }`}
-                          >
+                          <span className={`flex-shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            label === 'CAPE'
+                              ? 'bg-purple-500/15 text-purple-300/80'
+                              : 'bg-emerald-500/15 text-emerald-300/80'
+                          }`}>
                             {sub.tutorCount}
                           </span>
                         )}

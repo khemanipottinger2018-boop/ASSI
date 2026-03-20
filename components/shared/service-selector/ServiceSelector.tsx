@@ -4,13 +4,12 @@ import { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
-import { useAuth }     from '@/contexts/AuthContext';
-import { useTheme }    from '@/components/shared/themes/core/ThemeProvider';
+import { useAuth }  from '@/contexts/AuthContext';
+import { useTheme } from '@/components/shared/themes/core/ThemeProvider';
 
 import SubjectDropdown, { Subject } from './SubjectDropdown';
 import ServiceButtons               from './ServiceButtons';
 import StatusIndicator              from './StatusIndicator';
-import { subjectToTheme }           from './utils/subjectToTheme';
 
 interface Props {
   onOpenLogin?:  () => void;
@@ -18,19 +17,23 @@ interface Props {
 }
 
 export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
-  const router     = useRouter();
-  const { user }   = useAuth();
-  const { setTheme } = useTheme();
+  const router                   = useRouter();
+  const { user }                 = useAuth();
+  const { setSubjectOverride }   = useTheme();
 
-  const [selectedSubject,   setSelectedSubject]   = useState<Subject | null>(null);
-  const [dropdownOpen,      setDropdownOpen]       = useState(false);
-  // Real loading state lifted from SubjectDropdown via onLoadingChange callback
-  const [loadingSubjects,   setLoadingSubjects]    = useState(true);
+  const [selectedSubject,  setSelectedSubject]  = useState<Subject | null>(null);
+  const [dropdownOpen,     setDropdownOpen]      = useState(false);
+  const [loadingSubjects,  setLoadingSubjects]   = useState(true);
 
   const handleSubjectSelect = useCallback((subject: Subject) => {
     setSelectedSubject(subject);
-    setTheme(subjectToTheme(subject.name) as any);
-  }, [setTheme]);
+    setSubjectOverride(subject.name); // ephemeral — never saved to DB
+  }, [setSubjectOverride]);
+
+  const handleSubjectClear = useCallback(() => {
+    setSelectedSubject(null);
+    setSubjectOverride(null); // snaps back to user's saved theme
+  }, [setSubjectOverride]);
 
   const noTutors = selectedSubject !== null && selectedSubject.tutorCount === 0;
 
@@ -111,11 +114,12 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
         <SubjectDropdown
           selected={selectedSubject}
           onSelect={handleSubjectSelect}
+          onClear={handleSubjectClear}
           onOpenChange={setDropdownOpen}
           onLoadingChange={setLoadingSubjects}
         />
 
-        {/* ── Status indicator — loading is real now ── */}
+        {/* ── Status indicator ── */}
         <StatusIndicator
           hasSelection={!!selectedSubject}
           loading={loadingSubjects}

@@ -320,11 +320,11 @@ interface ThemeContextProps {
   customPreset:  LavaLampVariant;
   timeOfDay:     TimeOfDay;
   isSentinel:    boolean;
-  isSyncing:     boolean; // true while a DB save is in flight
+  isSyncing:     boolean;
 
-  setThemeGroup:      (group: ThemeGroup)     => void;
-  setThemeVariant:    (variant: ThemeVariant) => void;
-  setColorMode:       (mode: ColorMode)       => void;
+  setThemeGroup:      (group: ThemeGroup)       => void;
+  setThemeVariant:    (variant: ThemeVariant)   => void;
+  setColorMode:       (mode: ColorMode)         => void;
   setCustomPreset:    (preset: LavaLampVariant) => void;
   setSubjectOverride: (subjectName: string | null) => void;
 
@@ -337,39 +337,21 @@ interface ThemeContextProps {
 
 const ThemeContext = createContext<ThemeContextProps | undefined>(undefined);
 
-const LS_GROUP   = 'assi:theme-group';
-const LS_VARIANT = 'assi:theme-variant';
-const LS_MODE    = 'assi:color-mode';
-const LS_PRESET  = 'assi:custom-preset';
-
 // How long to wait after the last change before persisting to DB (ms)
 const DB_DEBOUNCE_MS = 800;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeGroup,   setGroupState]   = useState<ThemeGroup>('lavalamp');
-  const [themeVariant, setVariantState] = useState<ThemeVariant>('assi');
-  const [colorMode,    setModeState]    = useState<ColorMode>('dark');
-  const [customPreset, setPresetState]  = useState<LavaLampVariant>('assi');
+  const [themeGroup,      setGroupState]   = useState<ThemeGroup>('lavalamp');
+  const [themeVariant,    setVariantState] = useState<ThemeVariant>('assi');
+  const [colorMode,       setModeState]    = useState<ColorMode>('dark');
+  const [customPreset,    setPresetState]  = useState<LavaLampVariant>('assi');
   const [subjectOverride, setSubjectOverrideState] = useState<string | null>(null);
-  const [timeOfDay,    setTimeOfDay]    = useState<TimeOfDay>('day');
-  const [isSyncing,    setIsSyncing]    = useState(false);
+  const [timeOfDay,       setTimeOfDay]    = useState<TimeOfDay>('day');
+  const [isSyncing,       setIsSyncing]    = useState(false);
 
-  // Track whether we've hydrated from the server yet — prevents the
-  // debounced save from firing on the initial hydration write
-  const hydratedRef  = useRef(false);
-  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // ── Hydrate from localStorage on first mount (fast — before server responds) ──
-  useEffect(() => {
-    const g = localStorage.getItem(LS_GROUP)   as ThemeGroup | null;
-    const v = localStorage.getItem(LS_VARIANT) as ThemeVariant | null;
-    const m = localStorage.getItem(LS_MODE)    as ColorMode | null;
-    const p = localStorage.getItem(LS_PRESET)  as LavaLampVariant | null;
-    if (g) setGroupState(g);
-    if (v) setVariantState(v);
-    if (m) setModeState(m);
-    if (p) setPresetState(p);
-  }, []);
+  // Prevents the debounced save from firing on the initial hydration write
+  const hydratedRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Time of day ticker ──
   useEffect(() => {
@@ -384,13 +366,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [colorMode]);
 
   // ── Debounced DB persist ──
-  // Fires whenever the three persisted values change, but only after hydration
   const persistToDb = useCallback((
     mode: ColorMode,
     group: ThemeGroup,
     variant: ThemeVariant,
   ) => {
-    if (!hydratedRef.current) return; // don't save during hydration
+    if (!hydratedRef.current) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -416,7 +397,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── Called by SettingsContext once GET /api/user/settings resolves ──
-  // Overwrites localStorage + state with the server truth, then marks hydrated
+  // Server is the single source of truth — no localStorage involved
   const hydrateFromServer = useCallback((prefs: {
     colorMode: string;
     themeGroup: string;
@@ -429,10 +410,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setModeState(mode);
     setGroupState(group);
     setVariantState(variant);
-
-    localStorage.setItem(LS_MODE,    mode);
-    localStorage.setItem(LS_GROUP,   group);
-    localStorage.setItem(LS_VARIANT, variant);
 
     // Mark hydrated — future changes will trigger DB saves
     hydratedRef.current = true;
@@ -457,30 +434,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme-variant', activeVariant as string);
   }, [activeGroup, activeVariant]);
 
-  // ── Setters — update state, localStorage, and trigger DB debounce ──
+  // ── Setters — update state and trigger DB debounce ──
   function setThemeGroup(next: ThemeGroup) {
     setGroupState(next);
-    localStorage.setItem(LS_GROUP, next);
     persistToDb(colorMode, next, themeVariant);
   }
 
   function setThemeVariant(next: ThemeVariant) {
     setVariantState(next);
-    localStorage.setItem(LS_VARIANT, next);
     persistToDb(colorMode, themeGroup, next);
   }
 
   function setColorMode(next: ColorMode) {
     setModeState(next);
-    localStorage.setItem(LS_MODE, next);
     persistToDb(next, themeGroup, themeVariant);
   }
 
   function setCustomPreset(next: LavaLampVariant) {
     setPresetState(next);
     setVariantState(next);
-    localStorage.setItem(LS_PRESET,  next);
-    localStorage.setItem(LS_VARIANT, next);
     persistToDb(colorMode, themeGroup, next);
   }
 
