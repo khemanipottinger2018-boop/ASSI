@@ -8,9 +8,9 @@ import {
   SEASON_GRADIENTS,
   SUBJECT_GRADIENTS,
   getTimeOverlay,
-} from '@/components/shared/themes/ThemeProvider';
-import type { LavaLampVariant, SpaceVariant, SeasonVariant, SubjectVariant, PremiumVariant } from '@/components/shared/themes/ThemeProvider';
-import { PREMIUM_GRADIENTS } from '@/components/shared/themes/ThemeProvider';
+} from '@/components/shared/themes/core/ThemeProvider';
+import type { LavaLampVariant, SpaceVariant, SeasonVariant, SubjectVariant, PremiumVariant } from '@/components/shared/themes/core/ThemeProvider';
+import { PREMIUM_GRADIENTS } from '@/components/shared/themes/core/ThemeProvider';
 
 function resolveGradient(group: string, variant: string): string {
   switch (group) {
@@ -25,23 +25,25 @@ function resolveGradient(group: string, variant: string): string {
 
 // Per-theme atmospheric top layer — adds depth and character
 const ATMOSPHERE: Record<string, string> = {
-  // Lava lamp variants: warm glow at top
-  assi:     'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(255,120,60,0.35) 0%, transparent 70%)',
-  midnight: 'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(100,80,200,0.30) 0%, transparent 70%)',
-  forest:   'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(50,160,80,0.25) 0%, transparent 70%)',
-  ocean:    'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(0,150,220,0.30) 0%, transparent 70%)',
-  sunset:   'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(247,151,30,0.35) 0%, transparent 70%)',
-  aurora:   'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(0,195,255,0.30) 0%, transparent 70%)',
-  rose:     'radial-gradient(ellipse 80% 40% at 50% 0%, rgba(200,75,75,0.35) 0%, transparent 70%)',
-  // Space: horizon glow from below
-  stars:    'radial-gradient(ellipse 100% 30% at 50% 100%, rgba(76,195,247,0.12) 0%, transparent 60%)',
-  starfall: 'radial-gradient(ellipse 100% 30% at 50% 100%, rgba(124,77,255,0.15) 0%, transparent 60%)',
-  nebula:   'radial-gradient(ellipse 100% 40% at 50% 100%, rgba(123,47,247,0.20) 0%, transparent 60%)',
-  galaxy:   'radial-gradient(ellipse 80% 50% at 50% 50%, rgba(157,78,221,0.18) 0%, transparent 60%)',
+  // LavaLamp
+  lavalamp_assi: 'radial-gradient(circle at 20% 30%, rgba(255,120,80,0.25), transparent 60%)',
+  lavalamp_midnight: 'radial-gradient(circle at 80% 20%, rgba(120,80,255,0.25), transparent 60%)',
+  lavalamp_forest: 'radial-gradient(circle at 30% 70%, rgba(80,200,120,0.25), transparent 60%)',
+  lavalamp_ocean: 'radial-gradient(circle at 70% 60%, rgba(80,160,255,0.25), transparent 60%)',
+  lavalamp_sunset: 'radial-gradient(circle at 50% 50%, rgba(255,140,80,0.25), transparent 60%)',
+  lavalamp_aurora: 'radial-gradient(circle at 40% 20%, rgba(120,255,200,0.25), transparent 60%)',
+  lavalamp_rose: 'radial-gradient(circle at 60% 80%, rgba(255,120,160,0.25), transparent 60%)',
+
+  // Space
+  space_stars: 'radial-gradient(circle, rgba(255,255,255,0.15) 1px, transparent 1px)',
+  space_starfall: 'linear-gradient(120deg, rgba(255,255,255,0.15), transparent)',
+  space_nebula: 'radial-gradient(circle at 30% 30%, rgba(180,120,255,0.2), transparent)',
+  space_galaxy: 'radial-gradient(circle at 70% 70%, rgba(120,160,255,0.2), transparent)',
+
   // Premium
-  cyberpunk: 'radial-gradient(ellipse 100% 40% at 50% 100%, rgba(0,255,255,0.08) 0%, transparent 60%)',
-  ocean:     'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,150,255,0.15) 0%, transparent 60%)',
-  lofi:      'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,190,60,0.18) 0%, transparent 70%)',
+  premium_cyberpunk: 'linear-gradient(135deg, rgba(255,0,128,0.2), rgba(0,255,255,0.2))',
+  premium_ocean: 'radial-gradient(circle at 50% 50%, rgba(0,180,255,0.2), transparent)',
+  premium_lofi: 'linear-gradient(135deg, rgba(255,200,150,0.15), rgba(150,180,255,0.15))',
 };
 
 export default function AnimatedGradient() {
@@ -78,7 +80,8 @@ export default function AnimatedGradient() {
   }
 
   const baseGradient  = resolveGradient(themeGroup, themeVariant as string);
-  const atmosphere    = ATMOSPHERE[themeVariant as string] ?? '';
+  const atmosphereKey = `${themeGroup}_${themeVariant}`;
+  const atmosphere = ATMOSPHERE[atmosphereKey] ?? '';
   const timeOverlay   = mounted ? getTimeOverlay(timeOfDay) : 'rgba(0,0,0,0)';
   const isSpace       = themeGroup === 'space';
   const isPremium     = themeGroup === 'premium';

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
 import { useAuth }     from '@/contexts/AuthContext';
-import { useTheme }    from '@/components/shared/themes/ThemeProvider';
+import { useTheme }    from '@/components/shared/themes/core/ThemeProvider';
 
 import SubjectDropdown, { Subject } from './SubjectDropdown';
 import ServiceButtons               from './ServiceButtons';

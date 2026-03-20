@@ -1,4 +1,4 @@
-import { ThemeType } from '@/components/shared/themes/ThemeProvider';
+import { ThemeType } from '@/components/shared/themes/core/ThemeProvider';
 
 export function subjectToTheme(name: string): ThemeType {
   const n = name.toLowerCase();

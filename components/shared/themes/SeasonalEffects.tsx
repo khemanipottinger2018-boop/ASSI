@@ -18,7 +18,7 @@ export type JamaicaEvent =
   | 'boxing_day'
   | null;
 
-export type SeasonalPeriod = 'winter' | 'spring' | 'summer' | 'autumn';
+export type SeasonalPeriod = 'winter' | 'spring' | 'summer' | 'autumn' | 'dry' | 'rainy';
 
 export function detectJamaicaEvent(): JamaicaEvent {
   const now   = new Date();

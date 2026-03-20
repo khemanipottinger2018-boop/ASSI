@@ -17,6 +17,7 @@ export type ThemeGroup =
   | 'lavalamp'   // Lava lamp blob themes
   | 'space'      // Space / cosmic themes
   | 'seasons'    // Seasonal themes
+  | 'events'     // Jamaica / holiday events
   | 'subjects'   // Subject-based themes
   | 'premium'    // 🔒 ASSI+ exclusive themes
   | 'sentinel';  // 🔒 Admin only
@@ -51,10 +52,12 @@ export type SeasonVariant =
   | 'autumn'
   | 'winter'
   | 'dry'        // Caribbean dry season
-  | 'rainy'      // Caribbean rainy season
-  | 'christmas'  // 🎄 Christmas
-  | 'halloween'  // 🎃 Halloween
-  | 'new_year'   // 🎆 New Year
+  | 'rainy';     // Caribbean rainy season
+
+export type EventVariant =
+  | 'christmas'    // 🎄 Christmas
+  | 'halloween'    // 🎃 Halloween
+  | 'new_year'     // 🎆 New Year
   | 'independence'; // 🇯🇲 Jamaica Independence
 
 export type SubjectVariant =
@@ -70,6 +73,7 @@ export type ThemeVariant =
   | LavaLampVariant
   | SpaceVariant
   | SeasonVariant
+  | EventVariant
   | SubjectVariant
   | PremiumVariant
   | 'sentinel';
@@ -126,21 +130,35 @@ export const SPACE_BLOB_COLORS: Record<SpaceVariant, string[]> = {
 };
 
 export const SEASON_GRADIENTS: Record<SeasonVariant, string> = {
-  spring: 'linear-gradient(135deg, #a8edea, #fed6e3, #c3f5c8)',
-  summer: 'linear-gradient(135deg, #f7971e, #ffd200, #21d190)',
-  autumn: 'linear-gradient(135deg, #c94b4b, #e67e22, #f39c12)',
-  winter: 'linear-gradient(135deg, #e0eafc, #cfdef3, #a8c0ff)',
-  dry:    'linear-gradient(135deg, #f7971e, #ffd200, #56ab2f)',
-  rainy:  'linear-gradient(135deg, #373b44, #4286f4, #5c6bc0)',
+  spring: 'linear-gradient(135deg, #a8e063, #56ab2f)',
+  summer: 'linear-gradient(135deg, #f7971e, #ffd200)',
+  autumn: 'linear-gradient(135deg, #e96443, #904e95)',
+  winter: 'linear-gradient(135deg, #83a4d4, #b6fbff)',
+  dry:    'linear-gradient(135deg, #f4a261, #e76f51)',
+  rainy:  'linear-gradient(135deg, #4facfe, #00f2fe)',
 };
 
 export const SEASON_BLOB_COLORS: Record<SeasonVariant, string[]> = {
-  spring: ['#f48fb1', '#a5d6a7', '#80deea'],
-  summer: ['#ffd54f', '#4db6ac', '#ff8a65'],
-  autumn: ['#ff7043', '#ffa726', '#8d6e63'],
-  winter: ['#90caf9', '#b0bec5', '#e0e0e0'],
-  dry:    ['#ffcc02', '#ff9800', '#8bc34a'],
-  rainy:  ['#5c6bc0', '#4fc3f7', '#7986cb'],
+  spring: ['#a8e063', '#56ab2f'],
+  summer: ['#f7971e', '#ffd200'],
+  autumn: ['#e96443', '#904e95'],
+  winter: ['#83a4d4', '#b6fbff'],
+  dry:    ['#f4a261', '#e76f51'],
+  rainy:  ['#4facfe', '#00f2fe'],
+};
+
+export const EVENT_GRADIENTS: Record<EventVariant, string> = {
+  christmas:    'linear-gradient(135deg, #0f5132, #198754, #dc3545)',
+  halloween:    'linear-gradient(135deg, #1a1a1a, #ff7518, #ff0000)',
+  new_year:     'linear-gradient(135deg, #000000, #1a1a2e, #4fc3f7)',
+  independence: 'linear-gradient(135deg, #009b3a, #fed100, #000000)',
+};
+
+export const EVENT_BLOB_COLORS: Record<EventVariant, string[]> = {
+  christmas:    ['#198754', '#dc3545'],
+  halloween:    ['#ff7518', '#ff0000'],
+  new_year:     ['#1a1a2e', '#4fc3f7'],
+  independence: ['#009b3a', '#fed100', '#000000'],
 };
 
 export const SUBJECT_GRADIENTS: Record<SubjectVariant, string> = {
@@ -162,6 +180,28 @@ export const SUBJECT_BLOB_COLORS: Record<SubjectVariant, string[]> = {
   arts:        ['#e64a19', '#ff8a65', '#ffccbc'],
   health:      ['#c2185b', '#f48fb1', '#fce4ec'],
 };
+
+export function detectJamaicaEvent(): EventVariant | null {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+
+  if (month === 12 && day >= 20) return 'christmas';
+  if (month === 10 && day >= 25) return 'halloween';
+  if (month === 1  && day === 1) return 'new_year';
+  if (month === 8  && day <= 10) return 'independence';
+
+  return null;
+}
+
+export function detectSeason(): SeasonVariant {
+  const month = new Date().getMonth() + 1;
+
+  if (month >= 12 || month <= 2) return 'winter';
+  if (month >= 3 && month <= 5)  return 'spring';
+  if (month >= 6 && month <= 8)  return 'summer';
+  return 'autumn';
+}
 
 // Subject → variant mapping (for auto-switching)
 export const SUBJECT_NAME_TO_VARIANT: Record<string, SubjectVariant> = {
