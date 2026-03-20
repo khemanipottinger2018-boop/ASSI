@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Users, MessageCircle, BarChart2, ClipboardList,
-  AlertTriangle, ShieldCheck, TrendingUp, Loader2,
-  RefreshCw, ArrowRight, Wifi, Clock,
+  AlertTriangle, ShieldCheck, Loader2,
+  RefreshCw, ArrowRight, Wifi, Clock, Inbox, Cpu,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -20,11 +20,11 @@ type Metrics = {
 };
 
 type RecentError = {
-  id:         string;
-  severity:   string;
+  id:            string;
+  severity:      string;
   error_message: string;
-  endpoint:   string | null;
-  created_at: string;
+  endpoint:      string | null;
+  created_at:    string;
 };
 
 type PendingApp = {
@@ -44,12 +44,12 @@ const fade = {
 export default function AdminDashboard() {
   const router = useRouter();
 
-  const [metrics,      setMetrics]      = useState<Metrics | null>(null);
-  const [errors,       setErrors]       = useState<RecentError[]>([]);
-  const [pendingApps,  setPendingApps]  = useState<PendingApp[]>([]);
-  const [activeSess,   setActiveSess]   = useState(0);
-  const [loading,      setLoading]      = useState(true);
-  const [lastSync,     setLastSync]     = useState<Date>(new Date());
+  const [metrics,     setMetrics]     = useState<Metrics | null>(null);
+  const [errors,      setErrors]      = useState<RecentError[]>([]);
+  const [pendingApps, setPendingApps] = useState<PendingApp[]>([]);
+  const [activeSess,  setActiveSess]  = useState(0);
+  const [loading,     setLoading]     = useState(true);
+  const [lastSync,    setLastSync]    = useState<Date>(new Date());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,60 +82,84 @@ export default function AdminDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const stats = metrics ? [
-    { icon: Users,         label: 'Total Users',    value: metrics.totalUsers,      accent: 'text-white/80',      bg: 'bg-white/5'           },
-    { icon: Users,         label: 'Tutors',          value: metrics.totalTutors,     accent: 'text-orange-400',    bg: 'bg-orange-500/8'      },
-    { icon: Users,         label: 'Students',        value: metrics.totalStudents,   accent: 'text-purple-400',    bg: 'bg-purple-500/8'      },
-    { icon: Wifi,          label: 'Online Now',      value: metrics.onlineUsers,     accent: 'text-emerald-400',   bg: 'bg-emerald-500/8'     },
-    { icon: MessageCircle, label: 'Active Sessions', value: activeSess,              accent: 'text-blue-400',      bg: 'bg-blue-500/8'        },
-    { icon: BarChart2,     label: 'Total Sessions',  value: metrics.totalSessions,   accent: 'text-white/60',      bg: 'bg-white/5'           },
+    { icon: Users,         label: 'Total Users',    value: metrics.totalUsers,    accent: 'text-white/80',    bg: 'bg-white/5'       },
+    { icon: Users,         label: 'Tutors',          value: metrics.totalTutors,   accent: 'text-orange-400',  bg: 'bg-orange-500/8'  },
+    { icon: Users,         label: 'Students',        value: metrics.totalStudents, accent: 'text-purple-400',  bg: 'bg-purple-500/8'  },
+    { icon: Wifi,          label: 'Online Now',      value: metrics.onlineUsers,   accent: 'text-emerald-400', bg: 'bg-emerald-500/8' },
+    { icon: MessageCircle, label: 'Active Sessions', value: activeSess,            accent: 'text-blue-400',    bg: 'bg-blue-500/8'    },
+    { icon: BarChart2,     label: 'Total Sessions',  value: metrics.totalSessions, accent: 'text-white/60',    bg: 'bg-white/5'       },
   ] : [];
 
   const navCards = [
     {
-      icon: Users,
-      label: 'Users',
-      desc: 'Manage accounts, roles & suspensions',
-      href: '/admin/users',
-      accent: 'border-blue-500/20 hover:border-blue-500/40',
-      iconColor: 'text-blue-400',
+      icon:       Users,
+      label:      'Users',
+      desc:       'Manage accounts, roles & suspensions',
+      href:       '/admin/users',
+      accent:     'border-blue-500/20 hover:border-blue-500/40',
+      iconColor:  'text-blue-400',
+      badge:      null,
+      badgeColor: '',
     },
     {
-      icon: MessageCircle,
-      label: 'Live Sessions',
-      desc: 'Monitor & force-end active sessions',
-      href: '/admin/sessions',
-      accent: 'border-emerald-500/20 hover:border-emerald-500/40',
-      iconColor: 'text-emerald-400',
-      badge: activeSess > 0 ? `${activeSess} active` : null,
+      icon:       MessageCircle,
+      label:      'Live Sessions',
+      desc:       'Monitor & force-end active sessions',
+      href:       '/admin/sessions',
+      accent:     'border-emerald-500/20 hover:border-emerald-500/40',
+      iconColor:  'text-emerald-400',
+      badge:      activeSess > 0 ? `${activeSess} active` : null,
       badgeColor: 'bg-emerald-500/15 text-emerald-400',
     },
     {
-      icon: ClipboardList,
-      label: 'Tutor Applications',
-      desc: 'Review and approve applicants',
-      href: '/admin/tutor-applications',
-      accent: 'border-purple-500/20 hover:border-purple-500/40',
-      iconColor: 'text-purple-400',
-      badge: pendingApps.length > 0 ? `${pendingApps.length} pending` : null,
+      icon:       ClipboardList,
+      label:      'Tutor Applications',
+      desc:       'Review and approve applicants',
+      href:       '/admin/tutor-applications',
+      accent:     'border-purple-500/20 hover:border-purple-500/40',
+      iconColor:  'text-purple-400',
+      badge:      pendingApps.length > 0 ? `${pendingApps.length} pending` : null,
       badgeColor: 'bg-purple-500/15 text-purple-400',
     },
     {
-      icon: BarChart2,
-      label: 'Metrics',
-      desc: 'Platform-wide stats and usage data',
-      href: '/admin/metrics',
-      accent: 'border-orange-500/20 hover:border-orange-500/40',
-      iconColor: 'text-orange-400',
+      icon:       Inbox,
+      label:      'Messages',
+      desc:       'Broadcast announcements or DM users',
+      href:       '/admin/messages',
+      accent:     'border-blue-500/20 hover:border-blue-500/40',
+      iconColor:  'text-blue-400',
+      badge:      null,
+      badgeColor: '',
     },
     {
-      icon: AlertTriangle,
-      label: 'Error Logs',
-      desc: 'View and diagnose backend errors',
-      href: '/admin/errors',
-      accent: errors.length > 0 ? 'border-red-500/25 hover:border-red-500/45' : 'border-white/10 hover:border-white/20',
-      iconColor: errors.length > 0 ? 'text-red-400' : 'text-white/40',
-      badge: errors.length > 0 ? `${errors.length} in 24h` : null,
+      icon:       BarChart2,
+      label:      'Metrics',
+      desc:       'Platform-wide stats and usage data',
+      href:       '/admin/metrics',
+      accent:     'border-orange-500/20 hover:border-orange-500/40',
+      iconColor:  'text-orange-400',
+      badge:      null,
+      badgeColor: '',
+    },
+    {
+      icon:       AlertTriangle,
+      label:      'Error Logs',
+      desc:       'View and diagnose backend errors',
+      href:       '/admin/errors',
+      accent:     errors.length > 0 ? 'border-red-500/25 hover:border-red-500/45' : 'border-white/10 hover:border-white/20',
+      iconColor:  errors.length > 0 ? 'text-red-400' : 'text-white/40',
+      badge:      errors.length > 0 ? `${errors.length} in 24h` : null,
       badgeColor: 'bg-red-500/15 text-red-400',
+    },
+    {
+      icon:       Cpu,
+      label:      'Sentinel',
+      desc:       'AI co-pilot — platform awareness',
+      href:       '/admin/sentinel',
+      accent:     'border-orange-500/20 hover:border-orange-500/40',
+      iconColor:  'text-orange-400',
+      badge:      null,
+      badgeColor: '',
     },
   ];
 
@@ -144,8 +168,7 @@ export default function AdminDashboard() {
 
       {/* ── Header ── */}
       <motion.div custom={0} variants={fade} initial="initial" animate="animate"
-        className="flex items-center justify-between"
-      >
+        className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
             <ShieldCheck size={16} className="text-orange-400" />
@@ -170,8 +193,7 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <motion.div custom={1} variants={fade} initial="initial" animate="animate"
-          className="grid grid-cols-3 gap-3"
-        >
+          className="grid grid-cols-3 gap-3">
           {stats.map((s) => (
             <div key={s.label} className={`panel rounded-2xl px-4 py-4 ${s.bg}`}>
               <div className="flex items-center gap-2 mb-2">
@@ -188,15 +210,13 @@ export default function AdminDashboard() {
 
       {/* ── Nav cards ── */}
       <motion.div custom={2} variants={fade} initial="initial" animate="animate"
-        className="space-y-2"
-      >
+        className="space-y-2">
         <p className="text-white/25 text-[10px] font-semibold uppercase tracking-widest px-1 mb-3">
           Sections
         </p>
         {navCards.map((card) => (
           <button key={card.href} onClick={() => router.push(card.href)}
-            className={`w-full panel rounded-2xl p-4 flex items-center gap-4 border transition-all group ${card.accent}`}
-          >
+            className={`w-full panel rounded-2xl p-4 flex items-center gap-4 border transition-all group ${card.accent}`}>
             <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
               <card.icon size={15} className={card.iconColor} />
             </div>
@@ -219,8 +239,7 @@ export default function AdminDashboard() {
       {/* ── Recent errors preview ── */}
       {!loading && errors.length > 0 && (
         <motion.div custom={3} variants={fade} initial="initial" animate="animate"
-          className="space-y-2"
-        >
+          className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <p className="text-white/25 text-[10px] font-semibold uppercase tracking-widest">
               Recent Errors (24h)
@@ -251,8 +270,7 @@ export default function AdminDashboard() {
       {/* ── Pending applications preview ── */}
       {!loading && pendingApps.length > 0 && (
         <motion.div custom={4} variants={fade} initial="initial" animate="animate"
-          className="space-y-2"
-        >
+          className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <p className="text-white/25 text-[10px] font-semibold uppercase tracking-widest">
               Pending Applications
