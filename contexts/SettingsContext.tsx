@@ -47,7 +47,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
  * ===================================================== */
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authIsLoading } = useAuth();
   const [settings,  setSettings]  = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -108,9 +108,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   /* ================= HYDRATE ================= */
 
   useEffect(() => {
+    if (authIsLoading) return;
     refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, authIsLoading]);
 
   return (
     <SettingsContext.Provider value={{ settings, isLoading, update, refresh }}>
