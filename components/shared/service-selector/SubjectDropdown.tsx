@@ -142,6 +142,7 @@ export default function SubjectDropdown({ selected, onSelect, onClear, onOpenCha
             exit={{ opacity: 0, y: -4, scale: 0.99 }}
             transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="absolute left-0 right-0 mt-2 z-50 overflow-hidden rounded-2xl panel border border-white/10"
+            style={{ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}
           >
             {/* Search bar */}
             <div className="p-2.5 border-b border-white/8">
