@@ -15,12 +15,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
  * TYPES
  *
  * Mirrors GET /api/user/settings response exactly.
- * Backend returns:
- *   emailNotifications, pushNotifications, theme, language, timezone
- *
- * Note: assi_enabled, assi_position, theme_preference, reduce_motion
- * exist in the DB schema but are NOT returned by /api/user/settings yet.
- * Do not add them here until the backend selects them.
  * ===================================================== */
 
 export type UserSettings = {
@@ -29,6 +23,10 @@ export type UserSettings = {
   theme:              'light' | 'dark' | 'system';
   language:           string;
   timezone:           string;
+  assiEnabled:        boolean;
+  assiPosition:       { x: number; y: number } | null;
+  themePreference:    string;
+  reduceMotion:       boolean;
 };
 
 type SettingsContextType = {
@@ -83,14 +81,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /* ================= UPDATE =================
-   *
-   * PATCH /api/user/settings expects the actual field names directly:
-   *   { emailNotifications: true }
-   *   { theme: 'dark' }
-   *
-   * NOT { key: 'theme', value: 'dark' } — that was wrong.
-   * =========================================== */
+  /* ================= UPDATE ================= */
 
   async function update(patch: Partial<UserSettings>) {
     if (!isAuthenticated || !patch || !Object.keys(patch).length) return;
@@ -107,7 +98,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       });
 
       if (!res.ok) {
-        // Rollback on failure
         await refresh();
       }
     } catch {

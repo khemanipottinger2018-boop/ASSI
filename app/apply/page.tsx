@@ -100,7 +100,7 @@ export default function ApplyPage() {
           {[
             'Strong command of at least one CSEC or CAPE subject',
             'Ability to communicate clearly and patiently',
-            'At least 16 years old',
+            'At least 18 years old',
           ].map((req, i) => (
             <div key={i} className="flex items-center gap-2">
               <CheckCircle size={13} className="text-emerald-400 flex-shrink-0" />

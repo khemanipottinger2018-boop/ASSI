@@ -12,15 +12,25 @@ type Message = { role: 'user' | 'assistant'; content: string };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-const GREETING: Message = {
+const GUEST_GREETING: Message = {
+  role: 'assistant',
+  content: "Hey! I'm ASSI 👋 I can help you figure out if ASSI is right for you. Ask me anything about the platform, or what subjects we cover!",
+};
+
+const AUTH_GREETING: Message = {
   role: 'assistant',
   content: "Hey! I'm ASSI 👋 I'm here to help you study smarter, find the right tutor, or just get your bearings. What's on your mind?",
 };
 
-type Props = { onClose: () => void };
+type Props = {
+  onClose: () => void;
+  isGuest?: boolean;
+};
 
-export default function AssiChatBot({ onClose }: Props) {
-  const [messages, setMessages] = useState<Message[]>([GREETING]);
+export default function AssiChatBot({ onClose, isGuest = false }: Props) {
+  const [messages, setMessages] = useState<Message[]>([
+    isGuest ? GUEST_GREETING : AUTH_GREETING,
+  ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -29,6 +39,10 @@ export default function AssiChatBot({ onClose }: Props) {
   const [showSignup, setShowSignup] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Guest message limit — 3 messages then nudge to sign up
+  const guestMessageCount = useRef(0);
+  const GUEST_LIMIT = 3;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,15 +57,24 @@ export default function AssiChatBot({ onClose }: Props) {
     if (!trimmed || loading || locked) return;
 
     const userMsg: Message = { role: 'user', content: trimmed };
-    const history = messages.slice(-6); // last 6 turns for context
+    const history = messages.slice(-6);
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
     setIsTyping(true);
 
+    // Enforce guest message limit
+    if (isGuest) {
+      guestMessageCount.current += 1;
+      if (guestMessageCount.current >= GUEST_LIMIT) {
+        setLocked(true);
+      }
+    }
+
     try {
-      const res = await fetch(`${API_URL}/api/ai/assist`, {
+      const endpoint = isGuest ? '/api/ai/guest' : '/api/ai/assist';
+      const res = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -64,7 +87,9 @@ export default function AssiChatBot({ onClose }: Props) {
         setLocked(true);
         setMessages((prev) => [...prev, {
           role: 'assistant',
-          content: "You've reached the limit for now. Sign in to keep chatting with me!",
+          content: isGuest
+            ? "You've reached the guest limit. Sign up for free to keep chatting!"
+            : "You've reached the limit for now. Try again shortly!",
         }]);
         return;
       }
@@ -116,7 +141,9 @@ export default function AssiChatBot({ onClose }: Props) {
             </div>
             <div>
               <p className="text-white text-sm font-semibold leading-none">ASSI</p>
-              <p className="text-white/35 text-[10px] mt-0.5">Academic Assistant</p>
+              <p className="text-white/35 text-[10px] mt-0.5">
+                {isGuest ? 'Ask me anything about ASSI' : 'Academic Assistant'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -149,12 +176,18 @@ export default function AssiChatBot({ onClose }: Props) {
               className="px-4 py-2.5 text-center text-xs flex items-center justify-center gap-2"
               style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' }}
             >
-              <span className="text-white/40">Want to keep going?</span>
-              <button onClick={() => setShowLogin(true)}
-                className="font-medium transition"
-                style={{ color: '#b84cff' }}>
-                Sign in →
-              </button>
+              {isGuest ? (
+                <>
+                  <span className="text-white/40">Want to keep going?</span>
+                  <button onClick={() => setShowSignup(true)}
+                    className="font-medium transition"
+                    style={{ color: '#b84cff' }}>
+                    Create free account →
+                  </button>
+                </>
+              ) : (
+                <span className="text-white/40">You've reached the limit. Try again shortly.</span>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -167,7 +200,7 @@ export default function AssiChatBot({ onClose }: Props) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder={locked ? 'Sign in to continue…' : 'Ask me anything…'}
+            placeholder={locked ? (isGuest ? 'Sign up to continue…' : 'Try again shortly…') : 'Ask me anything…'}
             disabled={locked || loading}
             className="flex-1 rounded-xl px-3.5 py-2.5 text-sm text-white/85 placeholder:text-white/25 outline-none transition disabled:opacity-40"
             style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}

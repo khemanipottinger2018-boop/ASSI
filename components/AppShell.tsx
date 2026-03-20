@@ -66,23 +66,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // Public / signed-out app view
+  // Public / signed-out app view — guest ASSI for landing page
   if (!user && mounted) {
     return (
       <>
         {children}
         <AuthModals />
+        <AssiFloatingLauncher enabled isGuest />
       </>
     );
   }
 
   const isAdmin = user?.role === 'admin';
   const isStudent = user?.role === 'student';
-  const isTutor = user?.role === 'tutor' || user?.role === 'tutor-applicant';
+  const isTutor = user?.role === 'tutor' || user?.role === 'tutor_applicant';
 
   const showAssi =
     (isStudent || isTutor || (isAdmin && undercoverRole !== null)) &&
-    (settings?.assi_enabled !== false);
+    (settings?.assiEnabled !== false);
 
   return (
     <PresenceProvider>
@@ -101,6 +102,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <MobileNav />
         </div>
 
+        {/* Full ASSI — authenticated users only */}
         {mounted && showAssi && <AssiFloatingLauncher enabled />}
 
         {mounted && isAdmin && (

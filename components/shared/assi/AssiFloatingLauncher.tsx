@@ -10,7 +10,12 @@ const PAD = 20;
 
 type Pos = { x: number; y: number };
 
-export default function AssiFloatingLauncher({ enabled = true }: { enabled?: boolean }) {
+interface Props {
+  enabled?: boolean;
+  isGuest?: boolean;
+}
+
+export default function AssiFloatingLauncher({ enabled = true, isGuest = false }: Props) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Pos | null>(null);
   const dragging = useRef(false);
@@ -19,6 +24,11 @@ export default function AssiFloatingLauncher({ enabled = true }: { enabled?: boo
   /* ── Init position ── */
   useEffect(() => {
     if (!enabled) return;
+
+    // Listen for assi:open event from landing page CTA
+    const handleOpen = () => setOpen(true);
+    window.addEventListener('assi:open', handleOpen);
+
     const def: Pos = { x: window.innerWidth - ORB - PAD, y: window.innerHeight - ORB - PAD };
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -27,6 +37,8 @@ export default function AssiFloatingLauncher({ enabled = true }: { enabled?: boo
     } catch {
       setPos(def);
     }
+
+    return () => window.removeEventListener('assi:open', handleOpen);
   }, [enabled]);
 
   function clamp(p: Pos): Pos {
@@ -122,7 +134,7 @@ export default function AssiFloatingLauncher({ enabled = true }: { enabled?: boo
               zIndex: 10000,
             }}
           >
-            <AssiChatBot onClose={() => setOpen(false)} />
+            <AssiChatBot onClose={() => setOpen(false)} isGuest={isGuest} />
           </motion.div>
         )}
       </AnimatePresence>
