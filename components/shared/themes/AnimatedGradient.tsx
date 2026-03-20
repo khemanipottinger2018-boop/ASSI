@@ -1,29 +1,38 @@
 'use client';
 
-import { useTheme, ThemeType, CUSTOM_PRESET_GRADIENTS } from '@/components/shared/themes/ThemeProvider';
+import { useEffect, useState } from 'react';
+import {
+  useTheme,
+  LAVA_GRADIENTS,
+  SPACE_GRADIENTS,
+  SEASON_GRADIENTS,
+  SUBJECT_GRADIENTS,
+  getTimeOverlay,
+} from '@/components/shared/themes/ThemeProvider';
+import type {
+  LavaLampVariant,
+  SpaceVariant,
+  SeasonVariant,
+  SubjectVariant,
+} from '@/components/shared/themes/ThemeProvider';
 
-/* =====================================================
- * GRADIENT DEFINITIONS  (used in dark + subject modes)
- * ===================================================== */
-
-const THEME_GRADIENTS: Record<ThemeType, string> = {
-  assi:           'linear-gradient(135deg, #ff703c, #ff2c2c, #ffca4f)',
-  math:           'linear-gradient(135deg, #2980b9, #3498db, #5dade2)',
-  english:        'linear-gradient(135deg, #8e44ad, #9b59b6, #bb8fce)',
-  science:        'linear-gradient(135deg, #27ae60, #2ecc71, #58d68d)',
-  business:       'linear-gradient(135deg, #16a085, #1abc9c, #48c9b0)',
-  accounts:       'linear-gradient(135deg, #2c3e50, #34495e, #7f8c8d)',
-  it:             'linear-gradient(135deg, #674172, #7d66a8, #a29bfe)',
-  physics:        'linear-gradient(135deg, #1e3799, #3867d6, #56ccf2)',
-  chemistry:      'linear-gradient(135deg, #e67e22, #f39c12, #f8c471)',
-  'social-studies':'linear-gradient(135deg, #8d6e63, #aa8e83, #c7b2a9)',
-  sentinel:       'none',
-};
+function resolveGradient(group: string, variant: string): string {
+  switch (group) {
+    case 'lavalamp': return LAVA_GRADIENTS[variant as LavaLampVariant] ?? LAVA_GRADIENTS.assi;
+    case 'space':    return SPACE_GRADIENTS[variant as SpaceVariant]   ?? SPACE_GRADIENTS.stars;
+    case 'seasons':  return SEASON_GRADIENTS[variant as SeasonVariant] ?? SEASON_GRADIENTS.summer;
+    case 'subjects': return SUBJECT_GRADIENTS[variant as SubjectVariant] ?? SUBJECT_GRADIENTS.mathematics;
+    default:         return LAVA_GRADIENTS.assi;
+  }
+}
 
 export default function AnimatedGradient() {
-  const { theme, colorMode, customPreset, timeOfDay, isSentinel } = useTheme();
+  const { themeGroup, themeVariant, colorMode, timeOfDay, isSentinel } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  /* ── Sentinel: always pitch dark ── */
+  useEffect(() => setMounted(true), []);
+
+  /* ── Sentinel: pitch dark ── */
   if (isSentinel) {
     return (
       <div
@@ -34,47 +43,79 @@ export default function AnimatedGradient() {
     );
   }
 
-  /* ── Light mode: soft neutral background ── */
+  /* ── Light mode: clean white ── */
   if (colorMode === 'light') {
     return (
       <div
         aria-hidden
         className="fixed inset-0 -z-20 pointer-events-none"
-        style={{ backgroundColor: '#f0f0f0' }}
+        style={{ backgroundColor: '#f5f5f5' }}
       />
     );
   }
 
-  /* ── Custom mode: user's chosen preset gradient ── */
-  const baseGradient =
-    colorMode === 'custom'
-      ? CUSTOM_PRESET_GRADIENTS[customPreset]
-      : THEME_GRADIENTS[theme];
+  /* ── Dark mode: black + orange accent glow ── */
+  if (colorMode === 'dark') {
+    return (
+      <div
+        aria-hidden
+        className="fixed inset-0 -z-20 pointer-events-none"
+        style={{ backgroundColor: '#0a0a0a' }}
+      >
+        {/* Subtle orange accent glow in corners */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse at 15% 85%, rgba(255,112,60,0.08) 0%, transparent 50%), radial-gradient(ellipse at 85% 15%, rgba(255,202,79,0.06) 0%, transparent 50%)',
+        }} />
+      </div>
+    );
+  }
 
-  const gradient =
-    timeOfDay === 'night'
-      ? `linear-gradient(135deg,rgba(0,0,0,0.35),rgba(0,0,0,0.35)), ${baseGradient}`
-      : baseGradient;
+  /* ── Custom / subject / space / seasons: full gradient ── */
+  const baseGradient = resolveGradient(themeGroup, themeVariant as string);
+  const timeOverlay  = mounted ? getTimeOverlay(timeOfDay) : 'rgba(0,0,0,0)';
+
+  /* Space themes get a darker base */
+  const isSpace = themeGroup === 'space';
 
   return (
     <div
       aria-hidden
-      className="fixed inset-0 -z-20 pointer-events-none animate-gradient-shift"
+      className="fixed inset-0 -z-20 pointer-events-none"
       style={{
-        backgroundImage: gradient,
+        backgroundImage: baseGradient,
         backgroundSize: '400% 400%',
         backgroundRepeat: 'no-repeat',
-        backgroundPosition: '0% 50%',
+        animation: 'gradient-shift 18s ease-in-out infinite',
       }}
     >
-      <style jsx>{`
+      {/* Time-of-day overlay — darkens/warms by clock */}
+      {mounted && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: timeOverlay,
+            transition: 'background 4s ease',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+
+      {/* Space themes: extra deep darkness */}
+      {isSpace && (
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(0,0,0,0.35)',
+          pointerEvents: 'none',
+        }} />
+      )}
+
+      <style>{`
         @keyframes gradient-shift {
           0%   { background-position: 0% 50%; }
           50%  { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
-        }
-        .animate-gradient-shift {
-          animation: gradient-shift 16s ease-in-out infinite;
         }
       `}</style>
     </div>
