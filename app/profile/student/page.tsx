@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Mail, BookOpen, Calendar, Edit3 } from 'lucide-react';
 import { userApi } from '@/lib/api';
 import type { UserMe } from '@/lib/api/user';
+import ProfileEditModal from '@/components/shared/ui/ProfileEditModal';
 
 export default function StudentProfilePage() {
   const { logout } = useAuth();
@@ -14,13 +15,17 @@ export default function StudentProfilePage() {
 
   const [profile,  setProfile]  = useState<UserMe | null>(null);
   const [loading,  setLoading]  = useState(true);
+  const [showEdit, setShowEdit] = useState(false);
+
+  async function fetchProfile() {
+    try {
+      const d = await userApi.getMe();
+      if (d.success) setProfile(d.user);
+    } catch {}
+  }
 
   useEffect(() => {
-    // /api/user/me returns: id, username, email, role, tier, createdAt, tutor (null for students)
-    // Students have no bio, timezone, or subjects on this endpoint
-    userApi.getMe()
-      .then((d) => { if (d.success) setProfile(d.user); })
-      .finally(() => setLoading(false));
+    fetchProfile().finally(() => setLoading(false));
   }, []);
 
   const handleLogout = async () => {
@@ -33,76 +38,93 @@ export default function StudentProfilePage() {
   const p = profile;
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+    <>
+      <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
 
-      {/* ── Header card ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-6"
-      >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              {/* No avatarUrl — backend never returns it, always use initials */}
-              <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
-                {p?.username?.[0]?.toUpperCase()}
+        {/* ── Header card ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="glass rounded-3xl p-6"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
+                  {p?.username?.[0]?.toUpperCase()}
+                </div>
+                <span className="absolute -bottom-1 -right-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">
+                  Student
+                </span>
               </div>
-              <span className="absolute -bottom-1 -right-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full px-1.5 py-0.5 text-[9px] font-semibold text-emerald-400 uppercase tracking-wide">
-                Student
-              </span>
+
+              <div>
+                <h1 className="text-white font-semibold text-lg tracking-tight">{p?.username}</h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Mail size={11} className="text-white/35" />
+                  <span className="text-white/40 text-xs">{p?.email}</span>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <h1 className="text-white font-semibold text-lg tracking-tight">{p?.username}</h1>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Mail size={11} className="text-white/35" />
-                <span className="text-white/40 text-xs">{p?.email}</span>
-              </div>
-            </div>
+            <button
+              onClick={() => setShowEdit(true)}
+              className="glass-soft rounded-xl p-2.5 text-white/40 hover:text-white/70 transition"
+            >
+              <Edit3 size={15} />
+            </button>
           </div>
+        </motion.div>
 
-          <button
-            onClick={() => router.push('/profile/student/edit')}
-            className="glass-soft rounded-xl p-2.5 text-white/40 hover:text-white/70 transition"
-          >
-            <Edit3 size={15} />
-          </button>
-        </div>
-        {/* Note: students have no bio on /api/user/me
-            Bio editing for students is not yet supported by the backend.
-            Add here if/when a student bio field is added to UserProfile. */}
-      </motion.div>
+        {/* ── Stats ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+          className="grid grid-cols-2 gap-3"
+        >
+          <StatCard icon={BookOpen} label="Sessions" value="—" />
+          <StatCard icon={Calendar} label="Member since" value={
+            p?.createdAt
+              ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+              : '—'
+          } />
+        </motion.div>
 
-      {/* ── Stats ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-        className="grid grid-cols-2 gap-3"
-      >
-        <StatCard icon={BookOpen} label="Sessions" value="—" />
-        <StatCard icon={Calendar} label="Member since" value={
-          p?.createdAt
-            ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-            : '—'
-        } />
-      </motion.div>
+        {/* ── Account actions ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+          className="glass rounded-3xl p-4 space-y-1"
+        >
+          <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
+          <ActionRow label="Edit profile" onClick={() => setShowEdit(true)} />
+          <ActionRow label="Settings"     onClick={() => router.push('/settings')} />
+          <ActionRow label="Sign out"     onClick={handleLogout} destructive />
+        </motion.div>
+      </div>
 
-      {/* ── Account actions ── */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-4 space-y-1"
-      >
-        <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
-        <ActionRow label="Edit profile" onClick={() => router.push('/profile/student/edit')} />
-        <ActionRow label="Settings"     onClick={() => router.push('/settings')} />
-        <ActionRow label="Sign out"     onClick={handleLogout} destructive />
-      </motion.div>
-    </div>
+      {/* ── Edit modal ── */}
+      {showEdit && profile && (
+        <ProfileEditModal
+          profile={{
+            id:         profile.id,
+            username:   profile.username,
+            role:       profile.role,
+            tutorBio:   null,
+            hourlyRate: null,
+            tutor:      null,
+          }}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => {
+            setShowEdit(false);
+            fetchProfile();
+          }}
+        />
+      )}
+    </>
   );
 }
 

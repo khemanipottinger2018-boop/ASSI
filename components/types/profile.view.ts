@@ -6,9 +6,9 @@
 //   id, username, role, tutorBio, hourlyRate,
 //   subjects                                     → /api/users-public/:username
 //
-// ⚠️  bio, phoneNumber, timezone are NOT returned by any endpoint directly.
-//     bio lives as tutorBio on the public profile.
-//     phoneNumber / timezone only travel through PATCH /api/user/profile.
+// ⚠️  phoneNumber is NOT returned by any endpoint directly.
+//     It only travels through PATCH /api/user/profile.
+//     bio and timezone live on the tutor sub-object from /api/user/me.
 
 export type UserProfileView = {
   id:        string;
@@ -29,5 +29,7 @@ export type UserProfileView = {
     id:          string;
     hourlyRate:  number | null;
     isAvailable: boolean;
+    bio:         string | null;
+    timezone:    string | null;
   } | null;
 };

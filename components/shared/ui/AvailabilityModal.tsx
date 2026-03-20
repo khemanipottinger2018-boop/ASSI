@@ -1,0 +1,133 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { X, Wifi, WifiOff } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+
+interface Props {
+  onClose: () => void;
+}
+
+export default function AvailabilityModal({ onClose }: Props) {
+  const [available, setAvailable] = useState(false);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/tutors/availability`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => { if (data.success) setAvailable(data.available); })
+      .catch(() => setError('Failed to load availability'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleToggle(value: boolean) {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_URL}/api/tutors/availability`, {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body:        JSON.stringify({ available: value }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to update');
+      setAvailable(value);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update availability');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div onClick={onClose} className="absolute inset-0" />
+
+      <div className="relative w-full max-w-sm rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-6 space-y-6">
+
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-white">Availability</h2>
+            <p className="text-sm text-white/50 mt-1">Let students know if you're open for sessions</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Status */}
+        {loading ? (
+          <div className="h-24 rounded-2xl bg-white/5 animate-pulse" />
+        ) : (
+          <div className={`rounded-2xl p-5 border transition-all ${
+            available
+              ? 'bg-emerald-500/10 border-emerald-500/20'
+              : 'bg-white/5 border-white/10'
+          }`}>
+            <div className="flex items-center gap-3 mb-4">
+              {available ? (
+                <Wifi size={20} className="text-emerald-400" />
+              ) : (
+                <WifiOff size={20} className="text-white/30" />
+              )}
+              <div>
+                <p className={`font-semibold text-sm ${available ? 'text-emerald-400' : 'text-white/50'}`}>
+                  {available ? 'Available for sessions' : 'Not available'}
+                </p>
+                <p className="text-xs text-white/30 mt-0.5">
+                  {available
+                    ? 'Students can find and request you'
+                    : 'You won\'t appear in available tutors'}
+                </p>
+              </div>
+            </div>
+
+            {/* Toggle */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleToggle(true)}
+                disabled={saving || available}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${
+                  available
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-default'
+                    : 'bg-white/8 text-white/60 hover:bg-emerald-500/15 hover:text-emerald-400 border border-white/10'
+                }`}
+              >
+                Go online
+              </button>
+              <button
+                onClick={() => handleToggle(false)}
+                disabled={saving || !available}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition ${
+                  !available
+                    ? 'bg-white/10 text-white/40 border border-white/10 cursor-default'
+                    : 'bg-white/8 text-white/60 hover:bg-red-500/15 hover:text-red-400 border border-white/10'
+                }`}
+              >
+                Go offline
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <p className="text-xs text-white/25 text-center leading-relaxed">
+          Availability is live — changes take effect immediately for students browsing tutors.
+        </p>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl glass-soft text-white/60 hover:text-white text-sm transition"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
