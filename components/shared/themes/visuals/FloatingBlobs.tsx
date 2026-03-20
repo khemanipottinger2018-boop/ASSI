@@ -287,26 +287,9 @@ export default function FloatingBlobs() {
   const colors  = getBlobColors(themeGroup, themeVariant);
   const opacity = getBlobOpacity(timeOfDay);
 
-  /* ---------- DARK MODE ---------- */
-  if (colorMode === 'dark') {
-    return (
-      <>
-        <StandardBlobs colors={colors} opacity={opacity * 0.7} motionScale={0.7} />
-        <GrainOverlay opacity={0.025} />
-        <Vignette intensity={0.5} />
-      </>
-    );
-  }
-
-  /* ---------- LIGHT MODE ---------- */
-  if (colorMode === 'light') {
-    return (
-      <>
-        <GrainOverlay opacity={0.018} />
-        <Vignette intensity={0.06} />
-      </>
-    );
-  }
+  /* ---------- DARK / LIGHT MODE ---------- */
+  // Clean flat backgrounds — no blobs, no effects
+  if (colorMode === 'dark' || colorMode === 'light') return null;
 
   /* ---------- SPACE ---------- */
   if (themeGroup === 'space') {
