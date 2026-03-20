@@ -4,9 +4,9 @@
    ROOT DESIGN TOKENS  (dark mode — default)
    ===================================================== */
 :root {
-  --foreground:       #ffffff;
-  --foreground-muted: #ffffffcc;
-  --foreground-dim:   #ffffff99;
+  --foreground:       #f8f8f8;   /* near-white — slightly warmer than pure white */
+  --foreground-muted: #e8e8e8;   /* visible secondary text — not gray */
+  --foreground-dim:   #c0c0c0;   /* tertiary — still readable, not washed out */
 
   --assi-bg:
     radial-gradient(
@@ -196,18 +196,18 @@
   box-shadow:   2px 0 20px rgba(0, 0, 0, 0.06);
 }
 
-/* Text on light backgrounds */
-[data-color-mode="light"] .text-white       { color: var(--foreground) !important; }
-[data-color-mode="light"] .text-white\/80   { color: var(--foreground-muted) !important; }
-[data-color-mode="light"] .text-white\/70   { color: var(--foreground-muted) !important; }
-[data-color-mode="light"] .text-white\/60   { color: var(--foreground-dim) !important; }
-[data-color-mode="light"] .text-white\/55   { color: var(--foreground-dim) !important; }
-[data-color-mode="light"] .text-white\/50   { color: #777777 !important; }
-[data-color-mode="light"] .text-white\/40   { color: #888888 !important; }
-[data-color-mode="light"] .text-white\/35   { color: #999999 !important; }
-[data-color-mode="light"] .text-white\/30   { color: #aaaaaa !important; }
-[data-color-mode="light"] .text-white\/25   { color: #bbbbbb !important; }
-[data-color-mode="light"] .text-white\/20   { color: #cccccc !important; }
+/* Text on light backgrounds — crisp black hierarchy */
+[data-color-mode="light"] .text-white       { color: #0f0f0f !important; }
+[data-color-mode="light"] .text-white\/80   { color: #1a1a1a !important; }
+[data-color-mode="light"] .text-white\/70   { color: #2a2a2a !important; }
+[data-color-mode="light"] .text-white\/60   { color: #404040 !important; }
+[data-color-mode="light"] .text-white\/55   { color: #4a4a4a !important; }
+[data-color-mode="light"] .text-white\/50   { color: #555555 !important; }
+[data-color-mode="light"] .text-white\/40   { color: #6a6a6a !important; }
+[data-color-mode="light"] .text-white\/35   { color: #777777 !important; }
+[data-color-mode="light"] .text-white\/30   { color: #888888 !important; }
+[data-color-mode="light"] .text-white\/25   { color: #999999 !important; }
+[data-color-mode="light"] .text-white\/20   { color: #aaaaaa !important; }
 
 /* Borders on light backgrounds */
 [data-color-mode="light"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
@@ -260,6 +260,34 @@
   color: #0f0f0f;
 }
 
+
+/* =====================================================
+   PREMIUM THEMES (ASSI+)
+   ===================================================== */
+
+/* Cyberpunk */
+[data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="cyberpunk"] {
+  --panel-bg:     rgba(5, 5, 20, 0.75);
+  --panel-border: rgba(0, 255, 255, 0.12);
+  --glass-bg:     rgba(10, 10, 30, 0.65);
+  --glass-border: rgba(0, 255, 255, 0.18);
+}
+
+/* Ocean Depths */
+[data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="ocean"] {
+  --panel-bg:     rgba(0, 15, 40, 0.72);
+  --panel-border: rgba(0, 150, 255, 0.14);
+  --glass-bg:     rgba(0, 20, 60, 0.60);
+  --glass-border: rgba(0, 180, 255, 0.18);
+}
+
+/* Lo-fi Study */
+[data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="lofi"] {
+  --panel-bg:     rgba(20, 12, 0, 0.75);
+  --panel-border: rgba(255, 180, 60, 0.12);
+  --glass-bg:     rgba(30, 18, 0, 0.65);
+  --glass-border: rgba(255, 160, 40, 0.18);
+}
 /* =====================================================
    BASE DOCUMENT
    ===================================================== */

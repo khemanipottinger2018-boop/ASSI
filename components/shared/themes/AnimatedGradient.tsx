@@ -9,7 +9,8 @@ import {
   SUBJECT_GRADIENTS,
   getTimeOverlay,
 } from '@/components/shared/themes/ThemeProvider';
-import type { LavaLampVariant, SpaceVariant, SeasonVariant, SubjectVariant } from '@/components/shared/themes/ThemeProvider';
+import type { LavaLampVariant, SpaceVariant, SeasonVariant, SubjectVariant, PremiumVariant } from '@/components/shared/themes/ThemeProvider';
+import { PREMIUM_GRADIENTS } from '@/components/shared/themes/ThemeProvider';
 
 function resolveGradient(group: string, variant: string): string {
   switch (group) {
@@ -17,6 +18,7 @@ function resolveGradient(group: string, variant: string): string {
     case 'space':    return SPACE_GRADIENTS[variant as SpaceVariant]       ?? SPACE_GRADIENTS.stars;
     case 'seasons':  return SEASON_GRADIENTS[variant as SeasonVariant]     ?? SEASON_GRADIENTS.summer;
     case 'subjects': return SUBJECT_GRADIENTS[variant as SubjectVariant]   ?? SUBJECT_GRADIENTS.mathematics;
+    case 'premium':  return PREMIUM_GRADIENTS[variant as PremiumVariant]   ?? PREMIUM_GRADIENTS.cyberpunk;
     default:         return LAVA_GRADIENTS.assi;
   }
 }
@@ -36,6 +38,10 @@ const ATMOSPHERE: Record<string, string> = {
   starfall: 'radial-gradient(ellipse 100% 30% at 50% 100%, rgba(124,77,255,0.15) 0%, transparent 60%)',
   nebula:   'radial-gradient(ellipse 100% 40% at 50% 100%, rgba(123,47,247,0.20) 0%, transparent 60%)',
   galaxy:   'radial-gradient(ellipse 80% 50% at 50% 50%, rgba(157,78,221,0.18) 0%, transparent 60%)',
+  // Premium
+  cyberpunk: 'radial-gradient(ellipse 100% 40% at 50% 100%, rgba(0,255,255,0.08) 0%, transparent 60%)',
+  ocean:     'radial-gradient(ellipse 80% 50% at 50% 0%, rgba(0,150,255,0.15) 0%, transparent 60%)',
+  lofi:      'radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,190,60,0.18) 0%, transparent 70%)',
 };
 
 export default function AnimatedGradient() {
@@ -75,6 +81,7 @@ export default function AnimatedGradient() {
   const atmosphere    = ATMOSPHERE[themeVariant as string] ?? '';
   const timeOverlay   = mounted ? getTimeOverlay(timeOfDay) : 'rgba(0,0,0,0)';
   const isSpace       = themeGroup === 'space';
+  const isPremium     = themeGroup === 'premium';
 
   return (
     <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none"
@@ -100,8 +107,8 @@ export default function AnimatedGradient() {
         }} />
       )}
 
-      {/* Space: extra deep darkness for star contrast */}
-      {isSpace && (
+      {/* Space / cyberpunk: extra deep darkness */}
+      {(isSpace || isPremium) && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.42)', pointerEvents: 'none' }} />
       )}
 

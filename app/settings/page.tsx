@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Bell, Palette, Sliders, Check,
   Sun, Moon, Sparkles, Star, Leaf, BookOpen,
-  User, Globe, Lock, Zap, Eye, EyeOff,
+  User, Globe, Lock, Zap, Eye, EyeOff, Crown,
 } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,7 +22,9 @@ import type {
   SeasonVariant,
   SubjectVariant,
   ThemeGroup,
+  PremiumVariant,
 } from '@/components/shared/themes/ThemeProvider';
+import { ASSI_PLUS_VARIANTS, requiresAssisPlus } from '@/components/shared/themes/ThemeProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -40,11 +42,25 @@ const COLOR_MODES: { value: ColorMode; label: string; icon: React.ElementType; d
   { value: 'custom', label: 'Custom', icon: Sparkles, desc: 'Your chosen theme' },
 ];
 
-const THEME_GROUPS: { value: ThemeGroup; label: string; icon: React.ElementType; desc: string }[] = [
+const THEME_GROUPS: { value: ThemeGroup; label: string; icon: React.ElementType; desc: string; plus?: boolean }[] = [
   { value: 'lavalamp', label: 'Lava Lamp', icon: Sparkles, desc: 'Flowing gradient blobs' },
   { value: 'space',    label: 'Space',     icon: Star,     desc: 'Stars, nebulae & galaxies' },
   { value: 'seasons',  label: 'Seasons',   icon: Leaf,     desc: 'Seasonal atmospheres' },
   { value: 'subjects', label: 'Subjects',  icon: BookOpen, desc: 'Based on what you study' },
+  { value: 'premium',  label: 'ASSI+',     icon: Crown,    desc: 'Exclusive premium themes', plus: true },
+];
+
+const PREMIUM_VARIANTS: { value: PremiumVariant; label: string; colors: [string, string]; desc: string }[] = [
+  { value: 'cyberpunk', label: 'Cyberpunk',     colors: ['#00ffff', '#ff00ff'], desc: 'Neon grid + digital rain' },
+  { value: 'ocean',     label: 'Ocean Depths',  colors: ['#0077b6', '#48cae4'], desc: 'Bubbles + caustic light' },
+  { value: 'lofi',      label: 'Lo-fi Study',   colors: ['#ff9a3c', '#8B4513'], desc: 'Warm desk lamp glow' },
+];
+
+const EVENT_SEASON_VARIANTS = [
+  { value: 'christmas',    label: '🎄 Christmas',     colors: ['#c41e3a', '#0a7c3e'] as [string,string] },
+  { value: 'halloween',    label: '🎃 Halloween',     colors: ['#ff6b00', '#1a0030'] as [string,string] },
+  { value: 'new_year',     label: '🎆 New Year',      colors: ['#FFD700', '#4ECDC4'] as [string,string] },
+  { value: 'independence', label: '🇯🇲 Independence', colors: ['#FFD700', '#009B3A'] as [string,string] },
 ];
 
 const SPACE_VARIANTS: { value: SpaceVariant; label: string; colors: [string, string] }[] = [
@@ -118,8 +134,9 @@ export default function SettingsPage() {
   const [profileError,  setProfileError]  = useState<string | null>(null);
   const [profileSaved,  setProfileSaved]  = useState(false);
 
-  const tier     = (user as any)?.tier ?? 'standard';
-  const tierInfo = TIER_INFO[tier] ?? TIER_INFO.standard;
+  const tier        = (user as any)?.tier ?? 'standard';
+  const tierInfo    = TIER_INFO[tier] ?? TIER_INFO.standard;
+  const hasAssisPlus = tier !== 'standard';
 
   async function handleUpdate(patch: Partial<UserSettings>) {
     await update(patch);
@@ -310,26 +327,36 @@ export default function SettingsPage() {
               <div>
                 <p className="text-white/75 text-xs font-medium mb-3">Theme Style</p>
                 <div className="grid grid-cols-2 gap-2">
-                  {THEME_GROUPS.map(({ value, label, icon: Icon, desc }) => {
-                    const active = themeGroup === value;
+                  {THEME_GROUPS.map(({ value, label, icon: Icon, desc, plus }) => {
+                    const active  = themeGroup === value;
+                    const locked  = plus && !hasAssisPlus;
                     return (
                       <button key={value}
                         onClick={() => {
+                          if (locked) return;
                           setThemeGroup(value);
                           if (value === 'lavalamp') setThemeVariant('assi');
                           if (value === 'space')    setThemeVariant('stars');
                           if (value === 'seasons')  setThemeVariant('summer');
                           if (value === 'subjects') setThemeVariant('mathematics');
+                          if (value === 'premium')  setThemeVariant('cyberpunk');
                         }}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
-                          active ? 'border-white/30 bg-white/12' : 'border-white/8 bg-white/4 hover:bg-white/8'
+                          active  ? 'border-white/30 bg-white/12' :
+                          locked  ? 'border-white/5 bg-white/2 opacity-60 cursor-not-allowed' :
+                          'border-white/8 bg-white/4 hover:bg-white/8'
                         }`}>
-                        <Icon size={15} className={active ? 'text-orange-400' : 'text-white/40'} />
+                        <Icon size={15} className={active ? 'text-orange-400' : locked ? 'text-white/25' : 'text-white/40'} />
                         <div className="text-left">
-                          <p className={`text-sm font-medium ${active ? 'text-white' : 'text-white/60'}`}>{label}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/35' : 'text-white/60'}`}>{label}</p>
+                            {plus && !hasAssisPlus && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
+                            {plus && hasAssisPlus && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
+                          </div>
                           <p className="text-[10px] text-white/30">{desc}</p>
                         </div>
-                        {active && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
+                        {active && !locked && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
+                        {locked && <Lock size={11} className="ml-auto text-white/20 flex-shrink-0" />}
                       </button>
                     );
                   })}
@@ -352,6 +379,34 @@ export default function SettingsPage() {
               {themeGroup === 'subjects' && (
                 <VariantGrid label="Subject Theme" items={SUBJECT_VARIANTS}
                   active={themeVariant as string} onSelect={(v) => setThemeVariant(v as SubjectVariant)} />
+              )}
+              {themeGroup === 'seasons' && (
+                <VariantGrid label="Events (auto-detected by date)" items={EVENT_SEASON_VARIANTS}
+                  active={themeVariant as string} onSelect={(v) => setThemeVariant(v as any)} cols={2} />
+              )}
+              {themeGroup === 'premium' && hasAssisPlus && (
+                <div>
+                  <p className="text-white/75 text-xs font-medium mb-3">Premium Style</p>
+                  <div className="space-y-2">
+                    {PREMIUM_VARIANTS.map(({ value, label, colors, desc }) => {
+                      const isActive = themeVariant === value;
+                      return (
+                        <button key={value} onClick={() => setThemeVariant(value as PremiumVariant)}
+                          className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border transition-all ${
+                            isActive ? 'border-white/30 bg-white/12' : 'border-white/8 bg-white/4 hover:bg-white/8'
+                          }`}>
+                          <span className="w-8 h-8 rounded-xl flex-shrink-0 ring-1 ring-white/10"
+                            style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }} />
+                          <div className="text-left">
+                            <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-white/65'}`}>{label}</p>
+                            <p className="text-[10px] text-white/30">{desc}</p>
+                          </div>
+                          {isActive && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
               <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
                 <span className="text-orange-400 text-xs mt-0.5">✦</span>
