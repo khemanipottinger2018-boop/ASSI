@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Bell, Palette, Sliders, Check,
   Sun, Moon, Sparkles, Star, Leaf, BookOpen,
-  User, Globe, Lock, Zap, Eye, EyeOff, Crown,
+  User, Globe, Lock, Zap, Eye, EyeOff, Crown, Calendar,
 } from 'lucide-react';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,7 @@ import type {
   LavaLampVariant,
   SpaceVariant,
   SeasonVariant,
+  EventVariant,
   SubjectVariant,
   ThemeGroup,
   PremiumVariant,
@@ -43,24 +44,25 @@ const COLOR_MODES: { value: ColorMode; label: string; icon: React.ElementType; d
 ];
 
 const THEME_GROUPS: { value: ThemeGroup; label: string; icon: React.ElementType; desc: string; plus?: boolean }[] = [
-  { value: 'lavalamp', label: 'Lava Lamp', icon: Sparkles, desc: 'Flowing gradient blobs' },
-  { value: 'space',    label: 'Space',     icon: Star,     desc: 'Stars, nebulae & galaxies' },
-  { value: 'seasons',  label: 'Seasons',   icon: Leaf,     desc: 'Seasonal atmospheres' },
-  { value: 'subjects', label: 'Subjects',  icon: BookOpen, desc: 'Based on what you study' },
-  { value: 'premium',  label: 'ASSI+',     icon: Crown,    desc: 'Exclusive premium themes', plus: true },
+  { value: 'lavalamp', label: 'Lava Lamp', icon: Sparkles,  desc: 'Flowing gradient blobs' },
+  { value: 'space',    label: 'Space',     icon: Star,      desc: 'Stars, nebulae & galaxies' },
+  { value: 'seasons',  label: 'Seasons',   icon: Leaf,      desc: 'Seasonal atmospheres' },
+  { value: 'events',   label: 'Events',    icon: Calendar,  desc: 'Holidays & Jamaica events' },
+  { value: 'subjects', label: 'Subjects',  icon: BookOpen,  desc: 'Based on what you study' },
+  { value: 'premium',  label: 'ASSI+',     icon: Crown,     desc: 'Exclusive premium themes', plus: true },
 ];
 
 const PREMIUM_VARIANTS: { value: PremiumVariant; label: string; colors: [string, string]; desc: string }[] = [
-  { value: 'cyberpunk', label: 'Cyberpunk',     colors: ['#00ffff', '#ff00ff'], desc: 'Neon grid + digital rain' },
-  { value: 'ocean',     label: 'Ocean Depths',  colors: ['#0077b6', '#48cae4'], desc: 'Bubbles + caustic light' },
-  { value: 'lofi',      label: 'Lo-fi Study',   colors: ['#ff9a3c', '#8B4513'], desc: 'Warm desk lamp glow' },
+  { value: 'cyberpunk', label: 'Cyberpunk',    colors: ['#00ffff', '#ff00ff'], desc: 'Neon grid + digital rain' },
+  { value: 'ocean',     label: 'Ocean Depths', colors: ['#0077b6', '#48cae4'], desc: 'Bubbles + caustic light' },
+  { value: 'lofi',      label: 'Lo-fi Study',  colors: ['#ff9a3c', '#8B4513'], desc: 'Warm desk lamp glow' },
 ];
 
-const EVENT_SEASON_VARIANTS = [
-  { value: 'christmas',    label: '🎄 Christmas',     colors: ['#c41e3a', '#0a7c3e'] as [string,string] },
-  { value: 'halloween',    label: '🎃 Halloween',     colors: ['#ff6b00', '#1a0030'] as [string,string] },
-  { value: 'new_year',     label: '🎆 New Year',      colors: ['#FFD700', '#4ECDC4'] as [string,string] },
-  { value: 'independence', label: '🇯🇲 Independence', colors: ['#FFD700', '#009B3A'] as [string,string] },
+const EVENT_VARIANTS: { value: EventVariant; label: string; colors: [string, string] }[] = [
+  { value: 'christmas',    label: '🎄 Christmas',     colors: ['#c41e3a', '#0a7c3e'] },
+  { value: 'halloween',    label: '🎃 Halloween',     colors: ['#ff6b00', '#1a0030'] },
+  { value: 'new_year',     label: '🎆 New Year',      colors: ['#FFD700', '#4ECDC4'] },
+  { value: 'independence', label: '🇯🇲 Independence', colors: ['#FFD700', '#009B3A'] },
 ];
 
 const SPACE_VARIANTS: { value: SpaceVariant; label: string; colors: [string, string] }[] = [
@@ -115,13 +117,19 @@ const TIER_INFO: Record<string, { label: string; color: string; bg: string; bord
   early_bird: { label: 'Early Bird', color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
   alpha:      { label: 'Alpha',      color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
   pro:        { label: 'ASSI+',      color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+  // Admin tiers — full access, no paywall
+  admin:      { label: 'Admin',      color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
+  sentinel:   { label: 'Sentinel',   color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
 };
+
+// Tiers that get full premium access (paid OR admin bypass)
+const PREMIUM_TIERS = new Set(['early_bird', 'alpha', 'pro', 'admin', 'sentinel']);
 
 export default function SettingsPage() {
   const { settings, update, isLoading } = useSettings();
   const { user } = useAuth();
   const {
-    themeGroup, themeVariant, colorMode,
+    themeGroup, themeVariant, colorMode, isSentinel,
     setThemeGroup, setThemeVariant, setColorMode, setCustomPreset,
   } = useTheme();
 
@@ -134,14 +142,28 @@ export default function SettingsPage() {
   const [profileError,  setProfileError]  = useState<string | null>(null);
   const [profileSaved,  setProfileSaved]  = useState(false);
 
-  const tier        = (user as any)?.tier ?? 'standard';
-  const tierInfo    = TIER_INFO[tier] ?? TIER_INFO.standard;
-  const hasAssisPlus = tier !== 'standard';
+  const tier = (user as any)?.tier ?? 'standard';
+  const tierInfo = TIER_INFO[tier] ?? TIER_INFO.standard;
+
+  // Admins (sentinel tier or admin tier) bypass the ASSI+ paywall entirely
+  const hasAssisPlus = PREMIUM_TIERS.has(tier) || isSentinel;
+  const isAdmin      = tier === 'admin' || tier === 'sentinel' || isSentinel;
 
   async function handleUpdate(patch: Partial<UserSettings>) {
     await update(patch);
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+  }
+
+  function handleGroupSelect(value: ThemeGroup) {
+    if (value === 'lavalamp') setThemeVariant('assi');
+    if (value === 'space')    setThemeVariant('stars');
+    if (value === 'seasons')  setThemeVariant('summer');
+    if (value === 'events')   setThemeVariant('christmas');
+    if (value === 'subjects') setThemeVariant('mathematics');
+    if (value === 'premium')  setThemeVariant('cyberpunk');
+    setThemeGroup(value);
+    setColorMode('custom');
   }
 
   async function handleProfileSave() {
@@ -200,7 +222,7 @@ export default function SettingsPage() {
         <AnimatedCheck visible={saved} />
       </motion.div>
 
-      {/* ASSI+ Tier */}
+      {/* Tier badge */}
       <motion.div custom={1} variants={fade} initial="initial" animate="animate"
         className={`panel rounded-3xl p-5 border ${tierInfo.border} ${tierInfo.bg}`}
       >
@@ -212,11 +234,13 @@ export default function SettingsPage() {
             <div>
               <p className="text-white font-medium text-sm">{tierInfo.label} Plan</p>
               <p className="text-white/40 text-xs mt-0.5">
-                {tier === 'standard'
-                  ? 'Upgrade to ASSI+ for unlimited AI, more subjects & priority tutors'
-                  : tier === 'early_bird'
-                    ? 'Early bird — grandfathered pricing forever 🎉'
-                    : 'Full platform access'}
+                {isAdmin
+                  ? 'Full platform access — all themes unlocked'
+                  : tier === 'standard'
+                    ? 'Upgrade to ASSI+ for unlimited AI, more subjects & priority tutors'
+                    : tier === 'early_bird'
+                      ? 'Early bird — grandfathered pricing forever 🎉'
+                      : 'Full platform access'}
               </p>
             </div>
           </div>
@@ -318,6 +342,7 @@ export default function SettingsPage() {
             })}
           </div>
         </div>
+
         <AnimatePresence>
           {colorMode === 'custom' && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
@@ -328,19 +353,12 @@ export default function SettingsPage() {
                 <p className="text-white/75 text-xs font-medium mb-3">Theme Style</p>
                 <div className="grid grid-cols-2 gap-2">
                   {THEME_GROUPS.map(({ value, label, icon: Icon, desc, plus }) => {
-                    const active  = themeGroup === value;
-                    const locked  = plus && !hasAssisPlus;
+                    const active = themeGroup === value;
+                    // Admins are never locked — only lock standard users from premium
+                    const locked = plus && !hasAssisPlus;
                     return (
                       <button key={value}
-                        onClick={() => {
-                          if (locked) return;
-                          setThemeGroup(value);
-                          if (value === 'lavalamp') setThemeVariant('assi');
-                          if (value === 'space')    setThemeVariant('stars');
-                          if (value === 'seasons')  setThemeVariant('summer');
-                          if (value === 'subjects') setThemeVariant('mathematics');
-                          if (value === 'premium')  setThemeVariant('cyberpunk');
-                        }}
+                        onClick={() => { if (!locked) handleGroupSelect(value); }}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
                           active  ? 'border-white/30 bg-white/12' :
                           locked  ? 'border-white/5 bg-white/2 opacity-60 cursor-not-allowed' :
@@ -350,43 +368,62 @@ export default function SettingsPage() {
                         <div className="text-left">
                           <div className="flex items-center gap-1.5">
                             <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/35' : 'text-white/60'}`}>{label}</p>
+                            {/* Admin sees "ADMIN" badge instead of lock */}
+                            {plus && isAdmin    && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">ADMIN</span>}
+                            {plus && !isAdmin && hasAssisPlus  && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
                             {plus && !hasAssisPlus && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
-                            {plus && hasAssisPlus && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
                           </div>
                           <p className="text-[10px] text-white/30">{desc}</p>
                         </div>
                         {active && !locked && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
-                        {locked && <Lock size={11} className="ml-auto text-white/20 flex-shrink-0" />}
+                        {locked            && <Lock  size={11} className="ml-auto text-white/20 flex-shrink-0" />}
                       </button>
                     );
                   })}
                 </div>
               </div>
+
               {themeGroup === 'lavalamp' && (
                 <VariantGrid label="Lava Lamp Style"
                   items={LAVA_PRESETS.map(p => ({ value: p, label: CUSTOM_PRESET_LABELS[p], colors: CUSTOM_PRESET_COLORS[p] }))}
                   active={themeVariant as string}
                   onSelect={(v) => { setCustomPreset(v as LavaLampVariant); setThemeVariant(v as LavaLampVariant); }} />
               )}
+
               {themeGroup === 'space' && (
                 <VariantGrid label="Space Style" items={SPACE_VARIANTS}
                   active={themeVariant as string} onSelect={(v) => setThemeVariant(v as SpaceVariant)} />
               )}
+
               {themeGroup === 'seasons' && (
                 <VariantGrid label="Season" items={SEASON_VARIANTS} cols={3}
                   active={themeVariant as string} onSelect={(v) => setThemeVariant(v as SeasonVariant)} />
               )}
+
+              {themeGroup === 'events' && (
+                <>
+                  <VariantGrid label="Jamaica & Holiday Events" items={EVENT_VARIANTS} cols={2}
+                    active={themeVariant as string} onSelect={(v) => setThemeVariant(v as EventVariant)} />
+                  <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
+                    <span className="text-orange-400 text-xs mt-0.5">✦</span>
+                    <p className="text-white/40 text-xs leading-relaxed">
+                      Events are also auto-detected by date — ASSI will switch to the right theme automatically around each holiday.
+                    </p>
+                  </div>
+                </>
+              )}
+
               {themeGroup === 'subjects' && (
                 <VariantGrid label="Subject Theme" items={SUBJECT_VARIANTS}
                   active={themeVariant as string} onSelect={(v) => setThemeVariant(v as SubjectVariant)} />
               )}
-              {themeGroup === 'seasons' && (
-                <VariantGrid label="Events (auto-detected by date)" items={EVENT_SEASON_VARIANTS}
-                  active={themeVariant as string} onSelect={(v) => setThemeVariant(v as any)} cols={2} />
-              )}
+
               {themeGroup === 'premium' && hasAssisPlus && (
                 <div>
-                  <p className="text-white/75 text-xs font-medium mb-3">Premium Style</p>
+                  <p className="text-white/75 text-xs font-medium mb-3">
+                    Premium Style
+                    {isAdmin && <span className="ml-2 text-[10px] text-red-400 font-normal">(admin access)</span>}
+                  </p>
                   <div className="space-y-2">
                     {PREMIUM_VARIANTS.map(({ value, label, colors, desc }) => {
                       const isActive = themeVariant === value;
@@ -408,6 +445,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+
               <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
                 <span className="text-orange-400 text-xs mt-0.5">✦</span>
                 <p className="text-white/40 text-xs leading-relaxed">
@@ -499,16 +537,16 @@ function VariantGrid({ label, items, active, onSelect, cols = 2 }: {
       <p className="text-white/75 text-xs font-medium mb-3">{label}</p>
       <div className={`grid gap-2 ${cols === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {items.map(({ value, label: l, colors }) => {
-          const active_ = active === value;
+          const isActive = active === value;
           return (
             <button key={value} onClick={() => onSelect(value)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${
-                active_ ? 'border-white/30 bg-white/12' : 'border-white/8 bg-white/4 hover:bg-white/8 hover:border-white/15'
+                isActive ? 'border-white/30 bg-white/12' : 'border-white/8 bg-white/4 hover:bg-white/8 hover:border-white/15'
               }`}>
               <span className="w-6 h-6 rounded-lg flex-shrink-0 ring-1 ring-white/10"
                 style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }} />
-              <span className={`text-sm font-medium truncate ${active_ ? 'text-white' : 'text-white/65'}`}>{l}</span>
-              {active_ && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
+              <span className={`text-sm font-medium truncate ${isActive ? 'text-white' : 'text-white/65'}`}>{l}</span>
+              {isActive && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
             </button>
           );
         })}

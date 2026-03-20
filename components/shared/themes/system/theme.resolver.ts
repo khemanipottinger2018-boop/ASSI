@@ -12,16 +12,21 @@ export function resolveTheme({
   userVariant: ThemeVariant;
   subjectOverride?: string | null;
 }) {
+  // 1. Subject override from live chat wins first
   if (subjectOverride) {
     const sv = SUBJECT_NAME_TO_VARIANT[subjectOverride];
-    if (sv) return { group: 'subjects', variant: sv };
+    if (sv) return { group: 'subjects' as ThemeGroup, variant: sv as ThemeVariant };
   }
 
-  const event = detectJamaicaEvent();
-  if (event) return { group: 'events', variant: event };
+  // 2. If user is on seasons group, auto-detect event → season
+  if (userGroup === 'seasons') {
+    const event = detectJamaicaEvent();
+    if (event) return { group: 'events' as ThemeGroup, variant: event as ThemeVariant };
+    const season = detectSeason();
+    return { group: 'seasons' as ThemeGroup, variant: season as ThemeVariant };
+  }
 
-  const season = detectSeason();
-  return { group: 'seasons', variant: season };
-
+  // 3. Everything else (lavalamp, space, events, subjects, premium, sentinel)
+  //    → respect exactly what the user picked
   return { group: userGroup, variant: userVariant };
 }
