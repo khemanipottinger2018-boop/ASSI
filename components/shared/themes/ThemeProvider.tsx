@@ -18,7 +18,13 @@ export type ThemeGroup =
   | 'space'      // Space / cosmic themes
   | 'seasons'    // Seasonal themes
   | 'subjects'   // Subject-based themes
+  | 'premium'    // 🔒 ASSI+ exclusive themes
   | 'sentinel';  // 🔒 Admin only
+
+export type PremiumVariant =
+  | 'cyberpunk'   // Neon grid + digital rain
+  | 'ocean'       // Bubbles + caustic light rays
+  | 'lofi';       // Warm desk lamp + dust motes
 
 // =============================================================================
 // THEME VARIANTS PER GROUP
@@ -45,7 +51,11 @@ export type SeasonVariant =
   | 'autumn'
   | 'winter'
   | 'dry'        // Caribbean dry season
-  | 'rainy';     // Caribbean rainy season
+  | 'rainy'      // Caribbean rainy season
+  | 'christmas'  // 🎄 Christmas
+  | 'halloween'  // 🎃 Halloween
+  | 'new_year'   // 🎆 New Year
+  | 'independence'; // 🇯🇲 Jamaica Independence
 
 export type SubjectVariant =
   | 'mathematics'  // All math subjects
@@ -61,7 +71,15 @@ export type ThemeVariant =
   | SpaceVariant
   | SeasonVariant
   | SubjectVariant
+  | PremiumVariant
   | 'sentinel';
+
+// ASSI+ required themes
+export const ASSI_PLUS_VARIANTS: ThemeVariant[] = ['cyberpunk', 'ocean', 'lofi', 'galaxy'];
+
+export function requiresAssisPlus(variant: ThemeVariant): boolean {
+  return ASSI_PLUS_VARIANTS.includes(variant);
+}
 
 // Legacy compat
 export type ThemeType = ThemeVariant;
@@ -201,6 +219,18 @@ export const CUSTOM_PRESET_COLORS: Record<LavaLampVariant, [string, string]> = {
   sunset:   ['#f7971e', '#e55d87'],
   aurora:   ['#a855f7', '#00ff88'],
   rose:     ['#c94b4b', '#e91e63'],
+};
+
+export const PREMIUM_GRADIENTS: Record<PremiumVariant, string> = {
+  cyberpunk: 'linear-gradient(135deg, #0a0a1a, #0d0d2b, #1a0030)',
+  ocean:     'linear-gradient(135deg, #001220, #003060, #005080)',
+  lofi:      'linear-gradient(135deg, #1a0f00, #2d1a00, #1a1000)',
+};
+
+export const PREMIUM_BLOB_COLORS: Record<PremiumVariant, string[]> = {
+  cyberpunk: ['#00ffff', '#ff00ff', '#7700ff'],
+  ocean:     ['#0077b6', '#00b4d8', '#48cae4'],
+  lofi:      ['#ff9a3c', '#ffb347', '#8B4513'],
 };
 
 // Legacy compat
