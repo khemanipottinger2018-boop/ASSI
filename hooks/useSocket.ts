@@ -69,10 +69,12 @@ export function useSocket() {
       console.error('[socket] connect_error:', msg);
     });
 
-    // Explicit connect once listeners are attached
-    socket.connect();
+    // Small delay to ensure the browser has stored the session cookie
+    // before the socket handshake fires — critical for cross-origin setups
+    const connectTimer = setTimeout(() => socket.connect(), 150);
 
     return () => {
+      clearTimeout(connectTimer);
       socket.off('connect',    handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('connect_error');

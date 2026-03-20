@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 const INTERVAL_MS = 45_000;
 
 export type PresenceStatus = 'online' | 'offline' | 'busy';
