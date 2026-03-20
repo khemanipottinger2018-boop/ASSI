@@ -399,3 +399,33 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
 }
+
+/* =====================================================
+   STACKING CONTEXT — theme vs UI separation
+   ===================================================== */
+
+/*
+  .theme-layer wraps AnimatedGradient + FloatingBlobs.
+  isolation: isolate creates a new stacking context so
+  every z-index inside (snow, blobs, nebula, bats…)
+  is completely contained — nothing can bleed through
+  into the UI layer above, no matter how high the
+  individual z-indexes go.
+*/
+.theme-layer {
+  isolation: isolate;   /* 👈 the key — new stacking context */
+  position:  fixed;
+  inset:     0;
+  z-index:   0;         /* sits BELOW the ui-layer */
+  pointer-events: none;
+}
+
+/*
+  .ui-layer wraps AppShell and all real UI.
+  Sits above the theme layer in natural document order
+  + explicit z-index to guarantee it wins.
+*/
+.ui-layer {
+  position: relative;
+  z-index:  1;          /* above theme-layer, below nothing */
+}

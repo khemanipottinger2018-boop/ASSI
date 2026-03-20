@@ -27,23 +27,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
-          <AnimatedGradient />
-          <FloatingBlobs />
 
-          {/* Provider order matters:
-              Auth first → Socket needs auth → Settings + Features need auth
-              FeaturesProvider fetches /api/user/features on mount            */}
+          {/*
+            ┌─────────────────────────────────────────┐
+            │  THEME LAYER                            │
+            │  isolation: isolate creates a brand-new │
+            │  stacking context — z-indexes inside    │
+            │  this div are completely separate from  │
+            │  the UI above. Snow, blobs, nebula etc  │
+            │  can never bleed through app UI.        │
+            └─────────────────────────────────────────┘
+          */}
+          <div className="theme-layer">
+            <AnimatedGradient />
+            <FloatingBlobs />
+          </div>
+
           <AuthProvider>
             <SocketProvider>
               <SettingsProvider>
                 <FeaturesProvider>
-                  <div className="h-screen w-screen overflow-hidden">
+                  {/*
+                    ui-layer sits above the theme-layer in the document.
+                    position: relative + z-index: 1 is enough since
+                    the theme-layer is isolated.
+                  */}
+                  <div className="ui-layer h-screen w-screen overflow-hidden">
                     <AppShell>{children}</AppShell>
                   </div>
                 </FeaturesProvider>
               </SettingsProvider>
             </SocketProvider>
           </AuthProvider>
+
         </ThemeProvider>
       </body>
     </html>
