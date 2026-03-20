@@ -1,19 +1,26 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
 
 interface TutorAvailabilityToggleProps {
-  available: boolean;
-  toggling: boolean;
-  onToggle: () => void;
+  available:   boolean;  // true only when Redis=online AND socket connected
+  toggling:    boolean;  // true while setStatus() is in flight OR !hydrated
+  busy:        boolean;  // true when status === 'busy' — disables toggle entirely
+  onToggle:    () => void;
 }
 
-export default function TutorAvailabilityToggle({ available, toggling, onToggle }: TutorAvailabilityToggleProps) {
+export default function TutorAvailabilityToggle({
+  available, toggling, busy, onToggle,
+}: TutorAvailabilityToggleProps) {
+  const disabled = toggling || busy;
+
   return (
     <button
       onClick={onToggle}
-      disabled={toggling}
-      className="relative flex items-center gap-3 disabled:opacity-60 transition group"
+      disabled={disabled}
+      className="relative flex items-center gap-3 transition group disabled:cursor-not-allowed"
+      style={{ opacity: busy ? 0.5 : 1 }}
     >
       {/* Track */}
       <div className={`
@@ -23,19 +30,28 @@ export default function TutorAvailabilityToggle({ available, toggling, onToggle 
           : 'bg-white/8 border border-white/12'
         }
       `}>
-        {/* Thumb */}
-        <motion.div
-          animate={{ x: available ? 24 : 2 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-          className={`
-            absolute top-1 w-4 h-4 rounded-full transition-colors duration-300
-            ${available ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 'bg-white/30'}
-          `}
-        />
+        {/* Thumb — spinner when toggling */}
+        {toggling ? (
+          <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
+            <Loader2 size={10} className="text-white/50 animate-spin" />
+          </div>
+        ) : (
+          <motion.div
+            animate={{ x: available ? 24 : 2 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className={`
+              absolute top-1 w-4 h-4 rounded-full transition-colors duration-300
+              ${available
+                ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                : 'bg-white/30'
+              }
+            `}
+          />
+        )}
 
         {/* Pulse ring when online */}
         <AnimatePresence>
-          {available && (
+          {available && !toggling && (
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: [0.4, 0], scale: [1, 1.8] }}
@@ -46,12 +62,22 @@ export default function TutorAvailabilityToggle({ available, toggling, onToggle 
         </AnimatePresence>
       </div>
 
+      {/* Label */}
       <div className="text-left">
-        <p className={`text-xs font-semibold transition-colors ${available ? 'text-emerald-400' : 'text-white/40'}`}>
-          {available ? 'Online' : 'Offline'}
+        <p className={`text-xs font-semibold transition-colors ${
+          busy      ? 'text-orange-400' :
+          available ? 'text-emerald-400' : 'text-white/40'
+        }`}>
+          {busy ? 'In Session' : available ? 'Online' : 'Offline'}
         </p>
         <p className="text-[10px] text-white/25 mt-0.5">
-          {available ? 'Students can find you' : 'Hidden from browse'}
+          {busy
+            ? 'Currently with a student'
+            : toggling
+              ? 'Updating…'
+              : available
+                ? 'Students can find you'
+                : 'Hidden from browse'}
         </p>
       </div>
     </button>
