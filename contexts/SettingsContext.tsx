@@ -7,26 +7,27 @@ import {
   useState,
   ReactNode,
 } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth }  from './AuthContext';
+import { useTheme } from '@/components/shared/themes/core/ThemeProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /* =====================================================
  * TYPES
- *
- * Mirrors GET /api/user/settings response exactly.
  * ===================================================== */
 
 export type UserSettings = {
   emailNotifications: boolean;
   pushNotifications:  boolean;
-  theme:              'light' | 'dark' | 'system';
   language:           string;
   timezone:           string;
   assiEnabled:        boolean;
   assiPosition:       { x: number; y: number } | null;
-  themePreference:    string;
   reduceMotion:       boolean;
+  // Theme — persisted to DB, owned by ThemeProvider
+  colorMode:    string;
+  themeGroup:   string;
+  themeVariant: string;
 };
 
 type SettingsContextType = {
@@ -48,10 +49,12 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading: authIsLoading } = useAuth();
+  const { hydrateFromServer } = useTheme();
+
   const [settings,  setSettings]  = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* ================= LOAD ================= */
+  /* ── LOAD ── */
 
   async function refresh() {
     if (!isAuthenticated) {
@@ -73,6 +76,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       if (data?.success && data?.settings) {
         setSettings(data.settings);
+
+        // Hand theme prefs to ThemeProvider — it overwrites localStorage
+        // with the DB truth and marks itself as hydrated so future changes
+        // start persisting back to the DB
+        hydrateFromServer({
+          colorMode:    data.settings.colorMode    ?? 'dark',
+          themeGroup:   data.settings.themeGroup   ?? 'lavalamp',
+          themeVariant: data.settings.themeVariant ?? 'assi',
+        });
       }
     } catch {
       setSettings(null);
@@ -81,7 +93,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  /* ================= UPDATE ================= */
+  /* ── UPDATE ── */
 
   async function update(patch: Partial<UserSettings>) {
     if (!isAuthenticated || !patch || !Object.keys(patch).length) return;
@@ -97,15 +109,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         body:        JSON.stringify(patch),
       });
 
-      if (!res.ok) {
-        await refresh();
-      }
+      if (!res.ok) await refresh();
     } catch {
       await refresh();
     }
   }
 
-  /* ================= HYDRATE ================= */
+  /* ── HYDRATE on auth ready ── */
 
   useEffect(() => {
     if (authIsLoading) return;
@@ -126,8 +136,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
 export function useSettings() {
   const ctx = useContext(SettingsContext);
-  if (!ctx) {
-    throw new Error('useSettings must be used within SettingsProvider');
-  }
+  if (!ctx) throw new Error('useSettings must be used within SettingsProvider');
   return ctx;
 }

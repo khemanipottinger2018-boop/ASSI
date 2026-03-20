@@ -6,68 +6,72 @@ import {
   useMemo,
   useState,
   useEffect,
+  useRef,
+  useCallback,
   ReactNode,
 } from 'react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 // =============================================================================
 // THEME GROUPS
 // =============================================================================
 
 export type ThemeGroup =
-  | 'lavalamp'   // Lava lamp blob themes
-  | 'space'      // Space / cosmic themes
-  | 'seasons'    // Seasonal themes
-  | 'events'     // Jamaica / holiday events
-  | 'subjects'   // Subject-based themes
-  | 'premium'    // 🔒 ASSI+ exclusive themes
-  | 'sentinel';  // 🔒 Admin only
+  | 'lavalamp'
+  | 'space'
+  | 'seasons'
+  | 'events'
+  | 'subjects'
+  | 'premium'
+  | 'sentinel';
 
 export type PremiumVariant =
-  | 'cyberpunk'   // Neon grid + digital rain
-  | 'ocean'       // Bubbles + caustic light rays
-  | 'lofi';       // Warm desk lamp + dust motes
+  | 'cyberpunk'
+  | 'ocean'
+  | 'lofi';
 
 // =============================================================================
 // THEME VARIANTS PER GROUP
 // =============================================================================
 
 export type LavaLampVariant =
-  | 'assi'       // Default — orange/red/gold
-  | 'midnight'   // Deep blue/purple
-  | 'forest'     // Green
-  | 'ocean'      // Blue
-  | 'sunset'     // Orange/pink
-  | 'aurora'     // Cyan/purple
-  | 'rose';      // Pink/red
+  | 'assi'
+  | 'midnight'
+  | 'forest'
+  | 'ocean'
+  | 'sunset'
+  | 'aurora'
+  | 'rose';
 
 export type SpaceVariant =
-  | 'stars'      // Peaceful drifting stars
-  | 'starfall'   // Shooting stars
-  | 'nebula'     // Deep space colors
-  | 'galaxy';    // Spiral galaxy effect
+  | 'stars'
+  | 'starfall'
+  | 'nebula'
+  | 'galaxy';
 
 export type SeasonVariant =
   | 'spring'
   | 'summer'
   | 'autumn'
   | 'winter'
-  | 'dry'        // Caribbean dry season
-  | 'rainy';     // Caribbean rainy season
+  | 'dry'
+  | 'rainy';
 
 export type EventVariant =
-  | 'christmas'    // 🎄 Christmas
-  | 'halloween'    // 🎃 Halloween
-  | 'new_year'     // 🎆 New Year
-  | 'independence'; // 🇯🇲 Jamaica Independence
+  | 'christmas'
+  | 'halloween'
+  | 'new_year'
+  | 'independence';
 
 export type SubjectVariant =
-  | 'mathematics'  // All math subjects
-  | 'sciences'     // Biology, Chemistry, Physics etc.
-  | 'languages'    // English, Spanish, French etc.
-  | 'business'     // Business, Accounts, Economics etc.
-  | 'technology'   // IT, Computer Science etc.
-  | 'arts'         // History, Geography, Visual Arts etc.
-  | 'health';      // PE, Food & Nutrition etc.
+  | 'mathematics'
+  | 'sciences'
+  | 'languages'
+  | 'business'
+  | 'technology'
+  | 'arts'
+  | 'health';
 
 export type ThemeVariant =
   | LavaLampVariant
@@ -78,18 +82,16 @@ export type ThemeVariant =
   | PremiumVariant
   | 'sentinel';
 
-// ASSI+ required themes
 export const ASSI_PLUS_VARIANTS: ThemeVariant[] = ['cyberpunk', 'ocean', 'lofi', 'galaxy'];
 
 export function requiresAssisPlus(variant: ThemeVariant): boolean {
   return ASSI_PLUS_VARIANTS.includes(variant);
 }
 
-// Legacy compat
-export type ThemeType = ThemeVariant;
+export type ThemeType    = ThemeVariant;
 export type CustomPreset = LavaLampVariant;
-export type ColorMode = 'dark' | 'light' | 'custom';
-export type TimeOfDay = 'dawn' | 'morning' | 'day' | 'afternoon' | 'dusk' | 'evening' | 'night' | 'midnight';
+export type ColorMode    = 'dark' | 'light' | 'custom';
+export type TimeOfDay    = 'dawn' | 'morning' | 'day' | 'afternoon' | 'dusk' | 'evening' | 'night' | 'midnight';
 
 // =============================================================================
 // COLOR DEFINITIONS
@@ -181,66 +183,20 @@ export const SUBJECT_BLOB_COLORS: Record<SubjectVariant, string[]> = {
   health:      ['#c2185b', '#f48fb1', '#fce4ec'],
 };
 
-export function detectJamaicaEvent(): EventVariant | null {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
-
-  if (month === 12 && day >= 20) return 'christmas';
-  if (month === 10 && day >= 25) return 'halloween';
-  if (month === 1  && day === 1) return 'new_year';
-  if (month === 8  && day <= 10) return 'independence';
-
-  return null;
-}
-
-export function detectSeason(): SeasonVariant {
-  const month = new Date().getMonth() + 1;
-
-  if (month >= 12 || month <= 2) return 'winter';
-  if (month >= 3 && month <= 5)  return 'spring';
-  if (month >= 6 && month <= 8)  return 'summer';
-  return 'autumn';
-}
-
-// Subject → variant mapping (for auto-switching)
-export const SUBJECT_NAME_TO_VARIANT: Record<string, SubjectVariant> = {
-  // Mathematics
-  'Mathematics': 'mathematics', 'Additional Mathematics': 'mathematics',
-  'Pure Mathematics': 'mathematics', 'Applied Mathematics': 'mathematics',
-  'Integrated Mathematics': 'mathematics',
-  // Sciences
-  'Biology': 'sciences', 'Chemistry': 'sciences', 'Physics': 'sciences',
-  'Human and Social Biology': 'sciences', 'Integrated Science': 'sciences',
-  'Agricultural Science': 'sciences', 'Environmental Science': 'sciences',
-  // Languages
-  'English A': 'languages', 'English B': 'languages', 'Spanish': 'languages',
-  'French': 'languages', 'Portuguese': 'languages',
-  'Communication Studies': 'languages', 'Literatures in English': 'languages',
-  // Business
-  'Principles of Business': 'business', 'Principles of Accounts': 'business',
-  'Economics': 'business', 'Accounting': 'business',
-  'Management of Business': 'business', 'Entrepreneurship': 'business',
-  'Financial Services Studies': 'business',
-  'Logistics and Supply Chain Operations': 'business',
-  // Technology
-  'Information Technology': 'technology', 'Computer Science': 'technology',
-  'Electronic Document Preparation and Management': 'technology',
-  'Digital Media': 'technology', 'Animation and Game Design': 'technology',
-  'Electrical and Electronic Engineering Technology': 'technology',
-  // Arts & Social
-  'Caribbean History': 'arts', 'History': 'arts', 'Geography': 'arts',
-  'Social Studies': 'arts', 'Caribbean Studies': 'arts', 'Sociology': 'arts',
-  'Religious Education': 'arts', 'Visual Arts': 'arts', 'Theatre Arts': 'arts',
-  'Music': 'arts', 'Performing Arts': 'arts', 'Office Administration': 'arts',
-  // Health & PE
-  'Physical Education and Sport': 'health', 'Physical Education and Sports': 'health',
-  'Food, Nutrition and Health': 'health', 'Food and Nutrition': 'health',
-  'Family and Resource Management': 'health',
-  'Textiles, Clothing and Fashion': 'health',
+export const PREMIUM_GRADIENTS: Record<PremiumVariant, string> = {
+  cyberpunk: 'linear-gradient(135deg, #0a0a1a, #0d0d2b, #1a0030)',
+  ocean:     'linear-gradient(135deg, #001220, #003060, #005080)',
+  lofi:      'linear-gradient(135deg, #1a0f00, #2d1a00, #1a1000)',
 };
 
-// Labels for settings UI
+export const PREMIUM_BLOB_COLORS: Record<PremiumVariant, string[]> = {
+  cyberpunk: ['#00ffff', '#ff00ff', '#7700ff'],
+  ocean:     ['#0077b6', '#00b4d8', '#48cae4'],
+  lofi:      ['#ff9a3c', '#ffb347', '#8B4513'],
+};
+
+export const CUSTOM_PRESET_GRADIENTS = LAVA_GRADIENTS;
+
 export const CUSTOM_PRESET_LABELS: Record<LavaLampVariant, string> = {
   assi:     'ASSI (Default)',
   midnight: 'Midnight',
@@ -261,20 +217,55 @@ export const CUSTOM_PRESET_COLORS: Record<LavaLampVariant, [string, string]> = {
   rose:     ['#c94b4b', '#e91e63'],
 };
 
-export const PREMIUM_GRADIENTS: Record<PremiumVariant, string> = {
-  cyberpunk: 'linear-gradient(135deg, #0a0a1a, #0d0d2b, #1a0030)',
-  ocean:     'linear-gradient(135deg, #001220, #003060, #005080)',
-  lofi:      'linear-gradient(135deg, #1a0f00, #2d1a00, #1a1000)',
-};
+export function detectJamaicaEvent(): EventVariant | null {
+  const now   = new Date();
+  const month = now.getMonth() + 1;
+  const day   = now.getDate();
 
-export const PREMIUM_BLOB_COLORS: Record<PremiumVariant, string[]> = {
-  cyberpunk: ['#00ffff', '#ff00ff', '#7700ff'],
-  ocean:     ['#0077b6', '#00b4d8', '#48cae4'],
-  lofi:      ['#ff9a3c', '#ffb347', '#8B4513'],
-};
+  if (month === 12 && day >= 20) return 'christmas';
+  if (month === 10 && day >= 25) return 'halloween';
+  if (month === 1  && day === 1) return 'new_year';
+  if (month === 8  && day <= 10) return 'independence';
 
-// Legacy compat
-export const CUSTOM_PRESET_GRADIENTS = LAVA_GRADIENTS;
+  return null;
+}
+
+export function detectSeason(): SeasonVariant {
+  const month = new Date().getMonth() + 1;
+  if (month >= 12 || month <= 2) return 'winter';
+  if (month >= 3  && month <= 5) return 'spring';
+  if (month >= 6  && month <= 8) return 'summer';
+  return 'autumn';
+}
+
+export const SUBJECT_NAME_TO_VARIANT: Record<string, SubjectVariant> = {
+  'Mathematics': 'mathematics', 'Additional Mathematics': 'mathematics',
+  'Pure Mathematics': 'mathematics', 'Applied Mathematics': 'mathematics',
+  'Integrated Mathematics': 'mathematics',
+  'Biology': 'sciences', 'Chemistry': 'sciences', 'Physics': 'sciences',
+  'Human and Social Biology': 'sciences', 'Integrated Science': 'sciences',
+  'Agricultural Science': 'sciences', 'Environmental Science': 'sciences',
+  'English A': 'languages', 'English B': 'languages', 'Spanish': 'languages',
+  'French': 'languages', 'Portuguese': 'languages',
+  'Communication Studies': 'languages', 'Literatures in English': 'languages',
+  'Principles of Business': 'business', 'Principles of Accounts': 'business',
+  'Economics': 'business', 'Accounting': 'business',
+  'Management of Business': 'business', 'Entrepreneurship': 'business',
+  'Financial Services Studies': 'business',
+  'Logistics and Supply Chain Operations': 'business',
+  'Information Technology': 'technology', 'Computer Science': 'technology',
+  'Electronic Document Preparation and Management': 'technology',
+  'Digital Media': 'technology', 'Animation and Game Design': 'technology',
+  'Electrical and Electronic Engineering Technology': 'technology',
+  'Caribbean History': 'arts', 'History': 'arts', 'Geography': 'arts',
+  'Social Studies': 'arts', 'Caribbean Studies': 'arts', 'Sociology': 'arts',
+  'Religious Education': 'arts', 'Visual Arts': 'arts', 'Theatre Arts': 'arts',
+  'Music': 'arts', 'Performing Arts': 'arts', 'Office Administration': 'arts',
+  'Physical Education and Sport': 'health', 'Physical Education and Sports': 'health',
+  'Food, Nutrition and Health': 'health', 'Food and Nutrition': 'health',
+  'Family and Resource Management': 'health',
+  'Textiles, Clothing and Fashion': 'health',
+};
 
 // =============================================================================
 // TIME OF DAY
@@ -292,7 +283,6 @@ export function resolveTimeOfDay(): TimeOfDay {
   return 'midnight';
 }
 
-/** Returns an RGBA overlay color based on time of day */
 export function getTimeOverlay(tod: TimeOfDay): string {
   switch (tod) {
     case 'dawn':      return 'rgba(255, 160, 80, 0.18)';
@@ -306,7 +296,6 @@ export function getTimeOverlay(tod: TimeOfDay): string {
   }
 }
 
-/** Returns blob opacity based on time */
 export function getBlobOpacity(tod: TimeOfDay): number {
   switch (tod) {
     case 'dawn':      return 0.50;
@@ -325,24 +314,23 @@ export function getBlobOpacity(tod: TimeOfDay): number {
 // =============================================================================
 
 interface ThemeContextProps {
-  // Current active group + variant
   themeGroup:    ThemeGroup;
   themeVariant:  ThemeVariant;
   colorMode:     ColorMode;
   customPreset:  LavaLampVariant;
   timeOfDay:     TimeOfDay;
   isSentinel:    boolean;
+  isSyncing:     boolean; // true while a DB save is in flight
 
-  // Setters
-  setThemeGroup:   (group: ThemeGroup) => void;
-  setThemeVariant: (variant: ThemeVariant) => void;
-  setColorMode:    (mode: ColorMode) => void;
-  setCustomPreset: (preset: LavaLampVariant) => void;
-
-  // Subject override (from live chat)
+  setThemeGroup:      (group: ThemeGroup)     => void;
+  setThemeVariant:    (variant: ThemeVariant) => void;
+  setColorMode:       (mode: ColorMode)       => void;
+  setCustomPreset:    (preset: LavaLampVariant) => void;
   setSubjectOverride: (subjectName: string | null) => void;
 
-  // Legacy compat
+  // Called by SettingsContext after GET /api/user/settings resolves
+  hydrateFromServer: (prefs: { colorMode: string; themeGroup: string; themeVariant: string }) => void;
+
   theme:    ThemeType;
   setTheme: (t: ThemeType) => void;
 }
@@ -354,15 +342,24 @@ const LS_VARIANT = 'assi:theme-variant';
 const LS_MODE    = 'assi:color-mode';
 const LS_PRESET  = 'assi:custom-preset';
 
+// How long to wait after the last change before persisting to DB (ms)
+const DB_DEBOUNCE_MS = 800;
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeGroup,   setGroupState]   = useState<ThemeGroup>('lavalamp');
   const [themeVariant, setVariantState] = useState<ThemeVariant>('assi');
   const [colorMode,    setModeState]    = useState<ColorMode>('dark');
   const [customPreset, setPresetState]  = useState<LavaLampVariant>('assi');
   const [subjectOverride, setSubjectOverrideState] = useState<string | null>(null);
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('day');
+  const [timeOfDay,    setTimeOfDay]    = useState<TimeOfDay>('day');
+  const [isSyncing,    setIsSyncing]    = useState(false);
 
-  // Hydrate from localStorage
+  // Track whether we've hydrated from the server yet — prevents the
+  // debounced save from firing on the initial hydration write
+  const hydratedRef  = useRef(false);
+  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Hydrate from localStorage on first mount (fast — before server responds) ──
   useEffect(() => {
     const g = localStorage.getItem(LS_GROUP)   as ThemeGroup | null;
     const v = localStorage.getItem(LS_VARIANT) as ThemeVariant | null;
@@ -374,19 +371,74 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (p) setPresetState(p);
   }, []);
 
-  // Tick time of day — update every minute
+  // ── Time of day ticker ──
   useEffect(() => {
     setTimeOfDay(resolveTimeOfDay());
     const interval = setInterval(() => setTimeOfDay(resolveTimeOfDay()), 60_000);
     return () => clearInterval(interval);
   }, []);
 
-  // Apply data attributes on <html> for CSS targeting
+  // ── Sync data-attributes to <html> ──
   useEffect(() => {
     document.documentElement.setAttribute('data-color-mode', colorMode);
   }, [colorMode]);
 
-  // Resolve active variant — subject override wins if set
+  // ── Debounced DB persist ──
+  // Fires whenever the three persisted values change, but only after hydration
+  const persistToDb = useCallback((
+    mode: ColorMode,
+    group: ThemeGroup,
+    variant: ThemeVariant,
+  ) => {
+    if (!hydratedRef.current) return; // don't save during hydration
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(async () => {
+      setIsSyncing(true);
+      try {
+        await fetch(`${API_URL}/api/user/settings`, {
+          method:      'PATCH',
+          credentials: 'include',
+          headers:     { 'Content-Type': 'application/json' },
+          body:        JSON.stringify({
+            colorMode: mode,
+            themeGroup: group,
+            themeVariant: variant,
+          }),
+        });
+      } catch (err) {
+        console.warn('[ThemeProvider] failed to persist theme to DB:', err);
+      } finally {
+        setIsSyncing(false);
+      }
+    }, DB_DEBOUNCE_MS);
+  }, []);
+
+  // ── Called by SettingsContext once GET /api/user/settings resolves ──
+  // Overwrites localStorage + state with the server truth, then marks hydrated
+  const hydrateFromServer = useCallback((prefs: {
+    colorMode: string;
+    themeGroup: string;
+    themeVariant: string;
+  }) => {
+    const mode    = (prefs.colorMode    as ColorMode)    || 'dark';
+    const group   = (prefs.themeGroup   as ThemeGroup)   || 'lavalamp';
+    const variant = (prefs.themeVariant as ThemeVariant) || 'assi';
+
+    setModeState(mode);
+    setGroupState(group);
+    setVariantState(variant);
+
+    localStorage.setItem(LS_MODE,    mode);
+    localStorage.setItem(LS_GROUP,   group);
+    localStorage.setItem(LS_VARIANT, variant);
+
+    // Mark hydrated — future changes will trigger DB saves
+    hydratedRef.current = true;
+  }, []);
+
+  // ── Resolve active variant (subject override wins) ──
   const activeVariant: ThemeVariant = useMemo(() => {
     if (subjectOverride) {
       const sv = SUBJECT_NAME_TO_VARIANT[subjectOverride];
@@ -400,45 +452,46 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return themeGroup;
   }, [subjectOverride, themeGroup]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme-group',   activeGroup);
+    document.documentElement.setAttribute('data-theme-variant', activeVariant as string);
+  }, [activeGroup, activeVariant]);
+
+  // ── Setters — update state, localStorage, and trigger DB debounce ──
   function setThemeGroup(next: ThemeGroup) {
     setGroupState(next);
     localStorage.setItem(LS_GROUP, next);
+    persistToDb(colorMode, next, themeVariant);
   }
 
   function setThemeVariant(next: ThemeVariant) {
     setVariantState(next);
     localStorage.setItem(LS_VARIANT, next);
+    persistToDb(colorMode, themeGroup, next);
   }
 
   function setColorMode(next: ColorMode) {
     setModeState(next);
     localStorage.setItem(LS_MODE, next);
+    persistToDb(next, themeGroup, themeVariant);
   }
 
   function setCustomPreset(next: LavaLampVariant) {
     setPresetState(next);
     setVariantState(next);
-    localStorage.setItem(LS_PRESET, next);
+    localStorage.setItem(LS_PRESET,  next);
     localStorage.setItem(LS_VARIANT, next);
+    persistToDb(colorMode, themeGroup, next);
   }
 
   function setSubjectOverride(subjectName: string | null) {
     setSubjectOverrideState(subjectName);
-  }
-
-  // Legacy compat
-  const theme = activeVariant as ThemeType;
-  function setTheme(t: ThemeType) {
-    setThemeVariant(t);
+    // Subject override is ephemeral (page-scoped) — never persisted to DB
   }
 
   const isSentinel = activeVariant === 'sentinel';
-
-  // Sync theme data attributes to <html> for CSS targeting
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme-group', activeGroup);
-    document.documentElement.setAttribute('data-theme-variant', activeVariant as string);
-  }, [activeGroup, activeVariant]);
+  const theme      = activeVariant as ThemeType;
+  function setTheme(t: ThemeType) { setThemeVariant(t); }
 
   const value = useMemo(() => ({
     themeGroup: activeGroup,
@@ -447,14 +500,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     customPreset,
     timeOfDay,
     isSentinel,
+    isSyncing,
     setThemeGroup,
     setThemeVariant,
     setColorMode,
     setCustomPreset,
     setSubjectOverride,
+    hydrateFromServer,
     theme,
     setTheme,
-  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, isSentinel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, isSentinel, isSyncing]);
 
   return (
     <ThemeContext.Provider value={value}>

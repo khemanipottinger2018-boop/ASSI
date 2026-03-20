@@ -8,13 +8,13 @@ import {
   Wifi, WifiOff, Clock, ChevronRight,
 } from 'lucide-react';
 import { useAuth }           from '@/contexts/AuthContext';
+import { useTheme }          from '@/components/shared/themes/core/ThemeProvider';
 import SubjectDropdown, { Subject } from '@/components/shared/service-selector/SubjectDropdown';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 /* ── Types ── */
 
-// Matches shape from GET /api/tutors/available — backend source of truth
 interface AvailableTutor {
   tutorId:         string;
   userId:          string;
@@ -29,7 +29,6 @@ interface AvailableTutor {
 
 type Step = 'subject' | 'tutors' | 'requesting' | 'error';
 
-// All tutors from /api/tutors/available are online by definition
 const AVAILABLE_DOT = { bg: '#34d399', glow: '0 0 6px rgba(52,211,153,0.7)', label: 'Available' };
 
 /* ══════════════════════════════════════════════════
@@ -41,17 +40,19 @@ export default function LiveChatPage() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  // Seed from ServiceSelector query params (subject + subjectId)
-  const paramSubjectId   = searchParams.get('subjectId')?.trim()   || null;
-  const paramSubjectName = searchParams.get('subject')?.trim()     || null;
+  // Theme override — switches to subject theme while on this page
+  const { setSubjectOverride } = useTheme();
 
-  const [step,           setStep]           = useState<Step>(paramSubjectId ? 'tutors' : 'subject');
-  const [subjectId,      setSubjectId]      = useState<string | null>(paramSubjectId);
-  const [subjectName,    setSubjectName]    = useState<string | null>(paramSubjectName);
-  const [tutors,         setTutors]         = useState<AvailableTutor[]>([]);
-  const [loadingTutors,  setLoadingTutors]  = useState(false);
-  const [requestingId,   setRequestingId]   = useState<string | null>(null);
-  const [error,          setError]          = useState<string | null>(null);
+  const paramSubjectId   = searchParams.get('subjectId')?.trim() || null;
+  const paramSubjectName = searchParams.get('subject')?.trim()   || null;
+
+  const [step,          setStep]          = useState<Step>(paramSubjectId ? 'tutors' : 'subject');
+  const [subjectId,     setSubjectId]     = useState<string | null>(paramSubjectId);
+  const [subjectName,   setSubjectName]   = useState<string | null>(paramSubjectName);
+  const [tutors,        setTutors]        = useState<AvailableTutor[]>([]);
+  const [loadingTutors, setLoadingTutors] = useState(false);
+  const [requestingId,  setRequestingId]  = useState<string | null>(null);
+  const [error,         setError]         = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -59,6 +60,14 @@ export default function LiveChatPage() {
   useEffect(() => {
     if (!authLoading && !user) router.replace('/signin');
   }, [authLoading, user, router]);
+
+  /* ── Subject theme override ──
+     Whenever a subject is selected, switch the background theme to match.
+     Cleans up back to the user's normal theme when leaving the page.        */
+  useEffect(() => {
+    setSubjectOverride(subjectName);
+    return () => setSubjectOverride(null);
+  }, [subjectName, setSubjectOverride]);
 
   /* ── Fetch tutors whenever subjectId is known ── */
   const fetchTutors = useCallback(async (sid: string) => {
@@ -200,9 +209,12 @@ export default function LiveChatPage() {
                     Select a tutor to request a session.
                   </p>
                 </div>
-                {/* Change subject */}
                 <button
-                  onClick={() => { setStep('subject'); setSubjectId(null); setSubjectName(null); }}
+                  onClick={() => {
+                    setStep('subject');
+                    setSubjectId(null);
+                    setSubjectName(null); // also clears the theme override via the useEffect
+                  }}
                   className="text-xs text-white/35 hover:text-white/60 transition underline underline-offset-2"
                 >
                   Change subject
@@ -235,7 +247,11 @@ export default function LiveChatPage() {
                     Check back soon, or try a different subject.
                   </p>
                   <button
-                    onClick={() => { setStep('subject'); setSubjectId(null); setSubjectName(null); }}
+                    onClick={() => {
+                      setStep('subject');
+                      setSubjectId(null);
+                      setSubjectName(null);
+                    }}
                     className="mt-5 text-xs text-white/40 hover:text-white/70 underline underline-offset-2 transition"
                   >
                     Try another subject
@@ -270,7 +286,6 @@ export default function LiveChatPage() {
                             >
                               {tutor.username[0]?.toUpperCase()}
                             </div>
-                            {/* Availability dot */}
                             <span style={{
                               position: 'absolute', bottom: -1, right: -1,
                               width: 10, height: 10, borderRadius: '50%',
@@ -296,7 +311,6 @@ export default function LiveChatPage() {
                               </span>
                             </div>
 
-                            {/* Subjects taught */}
                             {tutor.subjects.length > 0 && (
                               <div className="flex items-center gap-1 mt-1 flex-wrap">
                                 {tutor.subjects.slice(0, 3).map((s, i) => (
@@ -310,9 +324,7 @@ export default function LiveChatPage() {
                               </div>
                             )}
 
-                            {/* Rating + session count */}
-                            <div className="flex items-center gap-3 mt-1">
-                            </div>
+                            <div className="flex items-center gap-3 mt-1" />
                           </div>
 
                           {/* Request button */}
@@ -345,7 +357,6 @@ export default function LiveChatPage() {
                           </button>
                         </div>
 
-                        {/* Bio */}
                         {tutor.bio && (
                           <p className="mt-3 text-xs text-white/35 leading-relaxed pl-[52px]">
                             {tutor.bio}
