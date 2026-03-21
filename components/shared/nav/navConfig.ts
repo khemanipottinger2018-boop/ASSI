@@ -37,7 +37,7 @@ export const navByRole: Record<string, NavSection> = {
       { label: 'Sessions',       href: '/sessions',      icon: Calendar },
       { label: 'Inbox',          href: '/inbox',         icon: Inbox,         badge: 'messages' },
       // ── Learning
-      { label: 'AI Tutor',       href: '/ai',            icon: Sparkles },
+      { label: 'ASSI',           href: '/assi',          icon: Sparkles },
       { label: 'Assignments',    href: '/assignments',   icon: PenTool },
       { label: 'Progress',       href: '/progress',      icon: TrendingUp,    soon: true },
       { label: 'Study Resources',href: '/resources',     icon: BookMarked,    soon: true },
@@ -55,7 +55,7 @@ export const navByRole: Record<string, NavSection> = {
     mobileItems: [
       { label: 'Home',     href: '/',              icon: Home,          exact: true },
       { label: 'Browse',   href: '/browse',        icon: Search },
-      { label: 'AI',       href: '/assi',          icon: Sparkles },
+      { label: 'ASSI',     href: '/assi',          icon: Sparkles },
       { label: 'Inbox',    href: '/inbox',         icon: Inbox,         badge: 'messages' },
       { label: 'Profile',  href: '/profile',       icon: User },
     ],
