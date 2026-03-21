@@ -7,6 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Copy, Check, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Key stored in localStorage so the rest of the app can read it
+export const REMEMBER_ME_KEY = 'assi:remember_me';
+
 type DemoCredentials = {
   username: string;
   email: string;
@@ -15,7 +18,7 @@ type DemoCredentials = {
 };
 
 export default function SignIn() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
   const { user, login, isLoading } = useAuth();
 
@@ -27,8 +30,6 @@ export default function SignIn() {
   const [copied,          setCopied]          = useState<string | null>(null);
   const [demoCredentials, setDemoCredentials] = useState<DemoCredentials | null>(null);
 
-  // Only redirect once auth context has finished loading — prevents
-  // auto-redirect on page load when browser autofills credentials
   useEffect(() => {
     if (!isLoading && user) router.replace('/');
   }, [user, isLoading, router]);
@@ -44,6 +45,12 @@ export default function SignIn() {
         setPassword(parsed.password);
       }
     } catch { /* silent */ }
+  }, []);
+
+  // Restore remembered preference on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(REMEMBER_ME_KEY);
+    if (stored === 'true') setRememberMe(true);
   }, []);
 
   async function copyText(value: string, key: string) {
@@ -62,7 +69,11 @@ export default function SignIn() {
     setLoading(true);
 
     try {
-      await login(email.trim().toLowerCase(), password);
+      // Pass rememberMe to login — backend sets cookie expiry accordingly.
+      // Also store the flag in localStorage so useStreak and other hooks
+      // know whether this session counts toward the streak.
+      await login(email.trim().toLowerCase(), password, rememberMe);
+      localStorage.setItem(REMEMBER_ME_KEY, String(rememberMe));
       sessionStorage.removeItem('assi_demo_credentials');
       router.replace('/');
     } catch (err: any) {
@@ -90,55 +101,30 @@ export default function SignIn() {
             <BookOpen size={20} className="text-white/80" />
           </div>
           <div className="text-center">
-            <h1 className="text-white font-semibold text-xl tracking-tight">
-              Welcome back
-            </h1>
-            <p className="text-white/50 text-sm mt-1">
-              Sign in to continue with ASSI
-            </p>
+            <h1 className="text-white font-semibold text-xl tracking-tight">Welcome back</h1>
+            <p className="text-white/50 text-sm mt-1">Sign in to continue with ASSI</p>
           </div>
         </div>
 
         <AnimatePresence mode="popLayout">
-          {showDemoBanner && (
+          {showDemoBanner && demoCredentials && (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
               className="mb-5 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 space-y-3"
             >
               <div className="flex items-start gap-2">
                 <Sparkles size={16} className="text-blue-300 mt-0.5 shrink-0" />
                 <div>
-                  <h2 className="text-sm font-semibold text-white">
-                    Demo account ready
-                  </h2>
+                  <h2 className="text-sm font-semibold text-white">Demo account ready</h2>
                   <p className="text-xs text-white/50 mt-1">
-                    Your demo credentials have been autofilled below. Save them before continuing.
+                    Your demo credentials have been autofilled. Save them before continuing.
                   </p>
                 </div>
               </div>
-
-              <CredentialRow
-                label="Username"
-                value={demoCredentials.username}
-                copied={copied === 'username'}
-                onCopy={() => copyText(demoCredentials.username, 'username')}
-              />
-              <CredentialRow
-                label="Email"
-                value={demoCredentials.email}
-                copied={copied === 'email'}
-                onCopy={() => copyText(demoCredentials.email, 'email')}
-              />
-              <CredentialRow
-                label="Password"
-                value={demoCredentials.password}
-                copied={copied === 'password'}
-                onCopy={() => copyText(demoCredentials.password, 'password')}
-              />
-
+              <CredentialRow label="Username" value={demoCredentials.username} copied={copied === 'username'} onCopy={() => copyText(demoCredentials.username, 'username')} />
+              <CredentialRow label="Email"    value={demoCredentials.email}    copied={copied === 'email'}    onCopy={() => copyText(demoCredentials.email, 'email')} />
+              <CredentialRow label="Password" value={demoCredentials.password} copied={copied === 'password'} onCopy={() => copyText(demoCredentials.password, 'password')} />
               {demoCredentials.expiresAt && (
                 <div className="text-[11px] text-white/45 pt-1">
                   Expires: {new Date(demoCredentials.expiresAt).toLocaleString()}
@@ -149,10 +135,8 @@ export default function SignIn() {
 
           {error && (
             <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2 }}
               className="mb-5 px-3 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs"
             >
               {error}
@@ -162,50 +146,51 @@ export default function SignIn() {
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
-            type="email"
-            required
-            disabled={loading}
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="email" required disabled={loading}
+            placeholder="Email" value={email}
+            onChange={e => setEmail(e.target.value)}
             autoComplete="email"
             className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
           />
-
           <input
-            type="password"
-            required
-            disabled={loading}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            type="password" required disabled={loading}
+            placeholder="Password" value={password}
+            onChange={e => setPassword(e.target.value)}
             autoComplete="current-password"
             className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
           />
 
           <div className="flex items-center justify-between pt-1 pb-2">
-            <label className="flex items-center gap-2 cursor-pointer text-xs text-white/40 hover:text-white/60 transition">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={loading}
-                className="accent-white/80"
-              />
-              Remember me
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <div
+                onClick={() => setRememberMe(r => !r)}
+                className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${
+                  rememberMe ? 'bg-orange-400' : 'bg-white/10'
+                }`}
+              >
+                <motion.div
+                  animate={{ x: rememberMe ? 16 : 2 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow"
+                />
+              </div>
+              <div>
+                <span className="text-xs text-white/50 group-hover:text-white/70 transition block leading-tight">
+                  Remember me
+                </span>
+                <span className="text-[10px] text-white/25 leading-tight block">
+                  {rememberMe ? 'Streak counts · stays logged in' : 'Session only · streak won\'t count'}
+                </span>
+              </div>
             </label>
 
-            <Link
-              href="/forgot-password"
-              className="text-xs text-white/40 hover:text-white/70 transition"
-            >
+            <Link href="/forgot-password" className="text-xs text-white/40 hover:text-white/70 transition">
               Forgot password?
             </Link>
           </div>
 
           <motion.button
-            type="submit"
-            disabled={loading}
+            type="submit" disabled={loading}
             whileTap={{ scale: 0.98 }}
             className="w-full py-3 rounded-xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 disabled:opacity-50 transition flex items-center justify-center gap-2"
           >
@@ -214,18 +199,21 @@ export default function SignIn() {
                 <span className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
                 Signing in…
               </>
-            ) : (
-              'Sign in'
-            )}
+            ) : 'Sign in'}
           </motion.button>
         </form>
 
-        <p className="mt-6 text-center text-xs text-white/30">
+        {/* Streak reminder */}
+        <div className="mt-5 px-3 py-2.5 rounded-xl bg-orange-400/6 border border-orange-400/12 flex items-start gap-2.5">
+          <span className="text-base leading-none mt-0.5">🔥</span>
+          <p className="text-white/35 text-[11px] leading-relaxed">
+            Turn on <span className="text-orange-400/80 font-medium">Remember me</span> to build your login streak and earn credits. 365 consistent days unlocks ASSI+ for a year.
+          </p>
+        </div>
+
+        <p className="mt-5 text-center text-xs text-white/30">
           Don&apos;t have an account?{' '}
-          <Link
-            href="/signup"
-            className="text-white/60 hover:text-white font-medium transition"
-          >
+          <Link href="/signup" className="text-white/60 hover:text-white font-medium transition">
             Create one
           </Link>
         </p>
@@ -234,31 +222,18 @@ export default function SignIn() {
   );
 }
 
-function CredentialRow({
-  label,
-  value,
-  copied,
-  onCopy,
-}: {
-  label: string;
-  value: string;
-  copied: boolean;
-  onCopy: () => void;
+function CredentialRow({ label, value, copied, onCopy }: {
+  label: string; value: string; copied: boolean; onCopy: () => void;
 }) {
   return (
     <div className="rounded-xl bg-white/5 border border-white/10 px-3 py-2.5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/35 mb-1">
-            {label}
-          </div>
-          <div className="text-sm text-white font-mono break-all">
-            {value}
-          </div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35 mb-1">{label}</div>
+          <div className="text-sm text-white font-mono break-all">{value}</div>
         </div>
         <button
-          type="button"
-          onClick={onCopy}
+          type="button" onClick={onCopy}
           className="shrink-0 rounded-lg px-2.5 py-2 text-white/60 hover:text-white hover:bg-white/5 transition"
           title={`Copy ${label}`}
         >

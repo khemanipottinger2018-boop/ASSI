@@ -8,18 +8,6 @@ import {
   ReactNode,
 } from 'react';
 
-/* =====================================================
- * TYPES
- *
- * Mirrors /api/auth/me response exactly.
- * Note: /api/auth/me and /api/user/me are different endpoints.
- *   /api/auth/me  → lightweight, used for auth checks
- *   /api/user/me  → full profile including tier, tutor.bio, tutor.timezone
- *
- * AuthUser reflects /api/auth/me only.
- * For full profile data use userApi.getMe() directly.
- * ===================================================== */
-
 export type AuthUser = {
   id:                 string;
   email:              string | null;
@@ -35,29 +23,21 @@ type AuthContextType = {
   isLoading:        boolean;
   isAuthenticated:  boolean;
 
-  // Convenience role booleans
   isStudent:        boolean;
   isTutor:          boolean;
   isTutorApplicant: boolean;
   isAdmin:          boolean;
 
-  login:   (email: string, password: string) => Promise<void>;
+  login:   (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout:  () => Promise<void>;
   refresh: () => Promise<AuthUser | null>;
 };
-
-/* ===================================================== */
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 
-/* =====================================================
- * HELPERS
- *
- * /api/auth/me returns camelCase — map directly.
- * Fields: id, email, username, role, disclaimerAccepted, isDemo, demoExpiresAt
- * ===================================================== */
+export const REMEMBER_ME_KEY = 'assi:remember_me';
 
 function mapUser(raw: any): AuthUser {
   return {
@@ -71,10 +51,6 @@ function mapUser(raw: any): AuthUser {
   };
 }
 
-/* =====================================================
- * PROVIDER
- * ===================================================== */
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user,      setUser]      = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,20 +61,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isTutorApplicant = user?.role === 'tutor_applicant';
   const isAdmin          = user?.role === 'admin';
 
-  /* ── Rehydrate session ── */
-
   async function refresh(): Promise<AuthUser | null> {
     try {
-      const res = await fetch(`${API_URL}/api/auth/me`, {
-        credentials: 'include',
-      });
-
+      const res = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
       if (!res.ok) { setUser(null); return null; }
-
       const data = await res.json();
-
       if (!data?.success || !data?.user) { setUser(null); return null; }
-
       const mapped = mapUser(data.user);
       setUser(mapped);
       return mapped;
@@ -113,56 +81,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await refresh();
       setIsLoading(false);
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Login ── */
-
-  async function login(email: string, password: string) {
+  // ── Login ──
+  // rememberMe controls:
+  //   1. Cookie TTL (passed to backend — backend sets session vs persistent cookie)
+  //   2. localStorage flag read by useStreak to decide if this session counts
+  async function login(email: string, password: string, rememberMe = false) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
       method:      'POST',
       headers:     { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body:        JSON.stringify({ email, password }),
+      body:        JSON.stringify({ email, password, rememberMe }),
     });
 
     const data = await res.json();
-
     if (!res.ok || !data?.success || !data?.user) {
       throw new Error(data?.error || 'Login failed');
     }
 
+    // Persist the rememberMe flag — useStreak reads this to gate streak counting
+    localStorage.setItem(REMEMBER_ME_KEY, String(rememberMe));
+
     setUser(mapUser(data.user));
   }
 
-  /* ── Logout ── */
-
+  // ── Logout ──
   async function logout() {
     try {
       await fetch(`${API_URL}/api/auth/logout`, {
-        method:      'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
       });
     } finally {
+      localStorage.removeItem(REMEMBER_ME_KEY);
       setUser(null);
     }
   }
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated,
-        isStudent,
-        isTutor,
-        isTutorApplicant,
-        isAdmin,
-        login,
-        logout,
-        refresh,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, isLoading, isAuthenticated,
+      isStudent, isTutor, isTutorApplicant, isAdmin,
+      login, logout, refresh,
+    }}>
       {children}
     </AuthContext.Provider>
   );

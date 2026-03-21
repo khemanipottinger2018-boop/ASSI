@@ -17,22 +17,22 @@ interface Props {
 }
 
 export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
-  const router                   = useRouter();
-  const { user }                 = useAuth();
-  const { setSubjectOverride }   = useTheme();
+  const router                 = useRouter();
+  const { user }               = useAuth();
+  const { setSubjectOverride } = useTheme();
 
-  const [selectedSubject,  setSelectedSubject]  = useState<Subject | null>(null);
-  const [dropdownOpen,     setDropdownOpen]      = useState(false);
-  const [loadingSubjects,  setLoadingSubjects]   = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [dropdownOpen,    setDropdownOpen]     = useState(false);
+  const [loadingSubjects, setLoadingSubjects]  = useState(true);
 
   const handleSubjectSelect = useCallback((subject: Subject) => {
     setSelectedSubject(subject);
-    setSubjectOverride(subject.name); // ephemeral — never saved to DB
+    setSubjectOverride(subject.name);
   }, [setSubjectOverride]);
 
   const handleSubjectClear = useCallback(() => {
     setSelectedSubject(null);
-    setSubjectOverride(null); // snaps back to user's saved theme
+    setSubjectOverride(null);
   }, [setSubjectOverride]);
 
   const noTutors = selectedSubject !== null && selectedSubject.tutorCount === 0;
@@ -43,32 +43,38 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
       : window.dispatchEvent(new Event('assi:open-login'));
   }, [onOpenLogin]);
 
+  // AI → /assi with subject pre-selected
   const handleAI = useCallback(() => {
     if (!user) return requireAuth();
-    router.push('/ai');
-  }, [user, router, requireAuth]);
+    const params = selectedSubject
+      ? `?subject=${encodeURIComponent(selectedSubject.name)}&subjectId=${selectedSubject.id}`
+      : '';
+    router.push(`/assi${params}`);
+  }, [user, router, selectedSubject, requireAuth]);
 
+  // Live tutor — unchanged
   const handleLiveTutor = useCallback(() => {
     if (!user) return requireAuth();
     if (!selectedSubject) return;
     router.push(`/live-chat?subject=${selectedSubject.name}&subjectId=${selectedSubject.id}`);
   }, [user, router, selectedSubject, requireAuth]);
 
+  // Assignment → /assignments with subject param
   const handleAssignment = useCallback(() => {
     if (!user) return requireAuth();
-    router.push('/assignment-help');
-  }, [user, router, requireAuth]);
+    const params = selectedSubject
+      ? `?subject=${encodeURIComponent(selectedSubject.name)}`
+      : '';
+    router.push(`/assignments${params}`);
+  }, [user, router, selectedSubject, requireAuth]);
 
   return (
     <>
-      {/* ── Page blur when dropdown is open ── */}
       <AnimatePresence>
         {dropdownOpen && (
           <motion.div
             key="blur-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-20 pointer-events-none"
             style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
@@ -76,7 +82,6 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── Card ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -92,25 +97,22 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
           padding:              28,
         }}
       >
-        {/* Subtle top-edge shimmer */}
         <div className="absolute inset-x-8 top-0 h-px"
           style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent)' }}
         />
 
-        {/* ── Header ── */}
         <div className="mb-6">
           <p className="text-white/40 text-xs font-semibold tracking-[0.18em] uppercase mb-1">
             {user ? 'Ready to study?' : 'Get help now'}
           </p>
           <h2 className="text-white font-bold text-[22px] tracking-tight leading-tight">
-            {user ? `Hey ${user.username} 👋` : 'What do you need help with?'}
+            {user ? `Hey ${user.username}` : 'What do you need help with?'}
           </h2>
           <p className="text-white/55 text-sm mt-1">
             Choose a subject, then pick how you want help.
           </p>
         </div>
 
-        {/* ── Subject dropdown ── */}
         <SubjectDropdown
           selected={selectedSubject}
           onSelect={handleSubjectSelect}
@@ -119,7 +121,6 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
           onLoadingChange={setLoadingSubjects}
         />
 
-        {/* ── Status indicator ── */}
         <StatusIndicator
           hasSelection={!!selectedSubject}
           loading={loadingSubjects}
@@ -127,10 +128,8 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
           totalTutors={selectedSubject?.tutorCount ?? 0}
         />
 
-        {/* ── Divider ── */}
         <div className="my-4 border-t border-white/10" />
 
-        {/* ── Service buttons ── */}
         <div className={!selectedSubject ? 'opacity-40 pointer-events-none select-none' : ''}>
           <ServiceButtons
             disabled={!selectedSubject}
@@ -148,7 +147,6 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
           </p>
         )}
 
-        {/* ── Guest nudge ── */}
         {!user && (
           <p className="mt-5 text-center text-xs text-white/35">
             <button onClick={requireAuth}
