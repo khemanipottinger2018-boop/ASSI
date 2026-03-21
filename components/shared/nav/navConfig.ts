@@ -55,7 +55,7 @@ export const navByRole: Record<string, NavSection> = {
     mobileItems: [
       { label: 'Home',     href: '/',              icon: Home,          exact: true },
       { label: 'Browse',   href: '/browse',        icon: Search },
-      { label: 'AI',       href: '/ai',            icon: Sparkles },
+      { label: 'AI',       href: '/assi',          icon: Sparkles },
       { label: 'Inbox',    href: '/inbox',         icon: Inbox,         badge: 'messages' },
       { label: 'Profile',  href: '/profile',       icon: User },
     ],
