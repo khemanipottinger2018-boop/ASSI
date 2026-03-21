@@ -4,9 +4,9 @@
    ROOT DESIGN TOKENS  (dark mode — default)
    ===================================================== */
 :root {
-  --foreground:       #f8f8f8;   /* near-white — slightly warmer than pure white */
-  --foreground-muted: #e8e8e8;   /* visible secondary text — not gray */
-  --foreground-dim:   #c0c0c0;   /* tertiary — still readable, not washed out */
+  --foreground:       #f8f8f8;
+  --foreground-muted: #e8e8e8;
+  --foreground-dim:   #c0c0c0;
 
   --assi-bg:
     radial-gradient(
@@ -34,7 +34,6 @@
 
   --accent:          #f97316;
 
-  /* Light mode surface tokens (unused in dark, ready for light) */
   --light-surface:   #ffffff;
   --light-tint:      rgba(249, 115, 22, 0.0);
   --light-shadow:    rgba(0, 0, 0, 0.08);
@@ -42,7 +41,6 @@
 
 /* =====================================================
    LIGHT MODE — BASE
-   Applied when data-color-mode="light"
    ===================================================== */
 [data-color-mode="light"] {
   --foreground:       #0f0f0f;
@@ -63,7 +61,6 @@
   --light-shadow:    rgba(0, 0, 0, 0.10);
 }
 
-/* ── Lava Lamp light: frosted warm glass ── */
 [data-color-mode="light"][data-theme-group="lavalamp"],
 [data-color-mode="light"]:not([data-theme-group]) {
   --light-tint:   rgba(249, 115, 22, 0.04);
@@ -73,7 +70,6 @@
   --light-shadow: rgba(200, 80, 20, 0.10);
 }
 
-/* ── Space light: stark navy/white star chart feel ── */
 [data-color-mode="light"][data-theme-group="space"] {
   --panel-bg:        rgba(248, 249, 255, 0.90);
   --panel-border:    rgba(30, 55, 153, 0.12);
@@ -84,11 +80,9 @@
   --light-tint:      rgba(30, 55, 153, 0.03);
 }
 
-/* ── Seasons light: varies per season via body classes ── */
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="spring"],
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="summer"],
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="dry"] {
-  /* Sunrise — warm cream to peach */
   --panel-bg:     rgba(255, 252, 245, 0.84);
   --glass-bg:     rgba(255, 247, 235, 0.78);
   --glass-border: rgba(230, 140, 60, 0.12);
@@ -99,7 +93,6 @@
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="autumn"],
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="winter"],
 [data-color-mode="light"][data-theme-group="seasons"][data-theme-variant="rainy"] {
-  /* Paper & ink — cool cream */
   --panel-bg:     rgba(252, 251, 248, 0.88);
   --glass-bg:     rgba(247, 245, 240, 0.80);
   --glass-border: rgba(100, 90, 80, 0.10);
@@ -107,7 +100,6 @@
   --light-tint:   rgba(120, 100, 80, 0.03);
 }
 
-/* ── Subjects light: tinted per subject ── */
 [data-color-mode="light"][data-theme-group="subjects"][data-theme-variant="mathematics"] {
   --glass-border: rgba(25, 118, 210, 0.14);
   --light-shadow: rgba(25, 118, 210, 0.09);
@@ -146,11 +138,7 @@
 
 /* =====================================================
    LIGHT MODE — COMPONENT OVERRIDES
-   Premium quality — real shadows, sharp borders,
-   nothing muddy or washed out
    ===================================================== */
-
-/* Panel: frosted card with real shadow */
 [data-color-mode="light"] .panel {
   background:    var(--panel-bg);
   border-color:  var(--panel-border);
@@ -169,7 +157,6 @@
     0 0 0 0.5px rgba(0, 0, 0, 0.05);
 }
 
-/* Glass: tinted frosted surface */
 [data-color-mode="light"] .glass {
   background:    var(--glass-bg);
   border-color:  var(--glass-border);
@@ -181,7 +168,6 @@
   -webkit-backdrop-filter: blur(20px);
 }
 
-/* Glass-soft: subtle inset surfaces */
 [data-color-mode="light"] .glass-soft {
   background:   rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.07);
@@ -189,14 +175,12 @@
   -webkit-backdrop-filter: none;
 }
 
-/* Sidebar */
 [data-color-mode="light"] .sidebar-bg {
   background:   var(--sidebar-bg);
   border-color: var(--sidebar-border);
   box-shadow:   2px 0 20px rgba(0, 0, 0, 0.06);
 }
 
-/* Text on light backgrounds — crisp black hierarchy */
 [data-color-mode="light"] .text-white       { color: #0f0f0f !important; }
 [data-color-mode="light"] .text-white\/80   { color: #1a1a1a !important; }
 [data-color-mode="light"] .text-white\/70   { color: #2a2a2a !important; }
@@ -209,28 +193,25 @@
 [data-color-mode="light"] .text-white\/25   { color: #999999 !important; }
 [data-color-mode="light"] .text-white\/20   { color: #aaaaaa !important; }
 
-/* Borders on light backgrounds */
 [data-color-mode="light"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
 [data-color-mode="light"] .border-white\/8  { border-color: rgba(0, 0, 0, 0.06) !important; }
 [data-color-mode="light"] .border-white\/15 { border-color: rgba(0, 0, 0, 0.09) !important; }
 [data-color-mode="light"] .border-white\/20 { border-color: rgba(0, 0, 0, 0.11) !important; }
 [data-color-mode="light"] .border-white\/30 { border-color: rgba(0, 0, 0, 0.14) !important; }
 
-/* Background tints on light */
 [data-color-mode="light"] .bg-white\/4   { background: rgba(0, 0, 0, 0.025) !important; }
-[data-color-mode="light"] .bg-white\/5   { background: rgba(0, 0, 0, 0.03) !important; }
+[data-color-mode="light"] .bg-white\/5   { background: rgba(0, 0, 0, 0.03)  !important; }
 [data-color-mode="light"] .bg-white\/6   { background: rgba(0, 0, 0, 0.035) !important; }
 [data-color-mode="light"] .bg-white\/8   { background: rgba(0, 0, 0, 0.045) !important; }
 [data-color-mode="light"] .bg-white\/10  { background: rgba(0, 0, 0, 0.055) !important; }
 [data-color-mode="light"] .bg-white\/12  { background: rgba(0, 0, 0, 0.065) !important; }
-[data-color-mode="light"] .bg-white\/15  { background: rgba(0, 0, 0, 0.08) !important; }
+[data-color-mode="light"] .bg-white\/15  { background: rgba(0, 0, 0, 0.08)  !important; }
 
-/* Inputs on light */
 [data-color-mode="light"] input,
 [data-color-mode="light"] textarea,
 [data-color-mode="light"] select {
-  color: var(--foreground);
-  background: rgba(0, 0, 0, 0.03);
+  color:        var(--foreground);
+  background:   rgba(0, 0, 0, 0.03);
   border-color: rgba(0, 0, 0, 0.10);
 }
 
@@ -243,10 +224,9 @@
 [data-color-mode="light"] textarea:focus,
 [data-color-mode="light"] select:focus {
   border-color: rgba(249, 115, 22, 0.40);
-  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.08);
+  box-shadow:   0 0 0 3px rgba(249, 115, 22, 0.08);
 }
 
-/* Scrollbar on light */
 [data-color-mode="light"] ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
 }
@@ -254,18 +234,14 @@
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* Selection on light */
 [data-color-mode="light"] ::selection {
   background: rgba(249, 115, 22, 0.20);
-  color: #0f0f0f;
+  color:      #0f0f0f;
 }
-
 
 /* =====================================================
    PREMIUM THEMES (ASSI+)
    ===================================================== */
-
-/* Cyberpunk */
 [data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="cyberpunk"] {
   --panel-bg:     rgba(5, 5, 20, 0.75);
   --panel-border: rgba(0, 255, 255, 0.12);
@@ -273,7 +249,6 @@
   --glass-border: rgba(0, 255, 255, 0.18);
 }
 
-/* Ocean Depths */
 [data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="ocean"] {
   --panel-bg:     rgba(0, 15, 40, 0.72);
   --panel-border: rgba(0, 150, 255, 0.14);
@@ -281,13 +256,13 @@
   --glass-border: rgba(0, 180, 255, 0.18);
 }
 
-/* Lo-fi Study */
 [data-color-mode="custom"][data-theme-group="premium"][data-theme-variant="lofi"] {
   --panel-bg:     rgba(20, 12, 0, 0.75);
   --panel-border: rgba(255, 180, 60, 0.12);
   --glass-bg:     rgba(30, 18, 0, 0.65);
   --glass-border: rgba(255, 160, 40, 0.18);
 }
+
 /* =====================================================
    BASE DOCUMENT
    ===================================================== */
@@ -296,11 +271,11 @@ html, body {
 }
 
 body {
-  background: transparent;
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  background:              transparent;
+  color:                   var(--foreground);
+  font-family:             system-ui, -apple-system, BlinkMacSystemFont,
+                           "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing:  antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
@@ -323,28 +298,28 @@ body {
    GLASS UTILITIES
    ===================================================== */
 .glass {
-  background:    var(--glass-bg);
+  background:      var(--glass-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--glass-border);
+  border:          1px solid var(--glass-border);
   box-shadow:
     0 25px 80px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 var(--glass-highlight);
 }
 
 .glass-soft {
-  background:    rgba(255, 255, 255, 0.06);
+  background:      rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border:          1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* =====================================================
    PANEL
    ===================================================== */
 .panel {
-  background:    var(--panel-bg);
-  border:        1px solid var(--panel-border);
+  background:      var(--panel-bg);
+  border:          1px solid var(--panel-border);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -357,8 +332,8 @@ body {
    SIDEBAR
    ===================================================== */
 .sidebar-bg {
-  background:    var(--sidebar-bg);
-  border-color:  var(--sidebar-border);
+  background:      var(--sidebar-bg);
+  border-color:    var(--sidebar-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -387,45 +362,366 @@ body {
    ===================================================== */
 ::selection {
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color:      #fff;
 }
 
-::-webkit-scrollbar       { width: 10px; }
+::-webkit-scrollbar       { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background:    rgba(255, 255, 255, 0.25);
+  background:    rgba(255, 255, 255, 0.18);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.32);
 }
 
 /* =====================================================
-   STACKING CONTEXT — theme vs UI separation
+   STACKING CONTEXT
+   
+   The key insight: position:fixed elements always
+   participate in the VIEWPORT stacking context (the
+   initial containing block), not their DOM parent's
+   context. This means isolation:isolate on .theme-layer
+   does NOT contain Vignette (z:9) or GrainOverlay (z:10)
+   — they escape and render above everything.
+
+   Fix:
+     - Remove isolation:isolate from .theme-layer
+     - Raise .ui-layer to z-index:11 so it beats
+       GrainOverlay(10) and Vignette(9)
+
+   Full z-index budget:
+     AnimatedGradient / blobs:  0  (theme background)
+     Vignette:                  9  (theme — stays behind UI)
+     GrainOverlay:             10  (theme — stays behind UI)
+     .ui-layer:                11  (ALL app content)
+     ASSI DOF backdrop:      9997  (inside ui-layer context)
+     ASSI orb:               9999  (inside ui-layer context)
+     ASSI panel:            10000  (inside ui-layer context)
    ===================================================== */
 
-/*
-  .theme-layer wraps AnimatedGradient + FloatingBlobs.
-  isolation: isolate creates a new stacking context so
-  every z-index inside (snow, blobs, nebula, bats…)
-  is completely contained — nothing can bleed through
-  into the UI layer above, no matter how high the
-  individual z-indexes go.
-*/
 .theme-layer {
-  isolation: isolate;   /* 👈 the key — new stacking context */
-  position:  fixed;
-  inset:     0;
-  z-index:   0;         /* sits BELOW the ui-layer */
+  /* Fixed background container — NO isolation:isolate.
+     isolation only contains absolutely/relatively positioned
+     children. Fixed children escape it and participate in
+     the viewport stacking context regardless. */
+  position:       fixed;
+  inset:          0;
+  z-index:        0;
   pointer-events: none;
 }
 
-/*
-  .ui-layer wraps AppShell and all real UI.
-  Sits above the theme layer in natural document order
-  + explicit z-index to guarantee it wins.
-*/
 .ui-layer {
+  /* z-index: 11 beats Vignette(9) + GrainOverlay(10).
+     position:relative is required for z-index to apply. */
   position: relative;
-  z-index:  1;          /* above theme-layer, below nothing */
+  z-index:  11;
+}
+
+/* =====================================================
+   DARK MODE — COLORED THEME GLASS OVERRIDES
+
+   Dark tinted glass (rgba white 0.08) looks like a
+   murky smear on vibrant colored backgrounds.
+   Per-theme overrides shift glass to frosted white
+   with a color-matched accent — keeps the 3D pop
+   without fighting the background palette.
+   ===================================================== */
+
+/* ── Lava Lamp variants ───────────────────────────── */
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="midnight"] {
+  --glass-bg:        rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(124, 58, 237, 0.25);
+  --glass-highlight: rgba(124, 58, 237, 0.12);
+  --panel-bg:        rgba(0, 0, 0, 0.45);
+  --panel-border:    rgba(124, 58, 237, 0.15);
+}
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="forest"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(113, 178, 128, 0.22);
+  --glass-highlight: rgba(113, 178, 128, 0.10);
+  --panel-bg:        rgba(0, 10, 5, 0.40);
+  --panel-border:    rgba(113, 178, 128, 0.14);
+}
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="ocean"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(0, 180, 219, 0.22);
+  --glass-highlight: rgba(0, 180, 219, 0.10);
+  --panel-bg:        rgba(0, 5, 20, 0.42);
+  --panel-border:    rgba(0, 180, 219, 0.14);
+}
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="sunset"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(255, 210, 80, 0.20);
+  --glass-highlight: rgba(255, 210, 80, 0.10);
+  --panel-bg:        rgba(20, 5, 0, 0.40);
+  --panel-border:    rgba(247, 151, 30, 0.16);
+}
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="aurora"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(0, 195, 255, 0.22);
+  --glass-highlight: rgba(168, 85, 247, 0.12);
+  --panel-bg:        rgba(0, 8, 16, 0.42);
+  --panel-border:    rgba(0, 195, 255, 0.14);
+}
+
+[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="rose"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(233, 30, 99, 0.22);
+  --glass-highlight: rgba(233, 30, 99, 0.10);
+  --panel-bg:        rgba(20, 0, 10, 0.42);
+  --panel-border:    rgba(201, 75, 75, 0.16);
+}
+
+/* ── Space variants ──────────────────────────────── */
+
+[data-color-mode="dark"][data-theme-group="space"] {
+  --glass-bg:        rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(79, 195, 247, 0.18);
+  --glass-highlight: rgba(79, 195, 247, 0.08);
+  --panel-bg:        rgba(0, 0, 10, 0.50);
+  --panel-border:    rgba(79, 195, 247, 0.12);
+}
+
+[data-color-mode="dark"][data-theme-group="space"][data-theme-variant="nebula"] {
+  --glass-bg:        rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(124, 58, 237, 0.22);
+  --glass-highlight: rgba(168, 85, 247, 0.10);
+  --panel-bg:        rgba(5, 0, 20, 0.52);
+  --panel-border:    rgba(124, 58, 237, 0.16);
+}
+
+[data-color-mode="dark"][data-theme-group="space"][data-theme-variant="galaxy"] {
+  --glass-bg:        rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(157, 78, 221, 0.22);
+  --glass-highlight: rgba(157, 78, 221, 0.10);
+  --panel-bg:        rgba(0, 0, 20, 0.52);
+  --panel-border:    rgba(66, 103, 212, 0.18);
+}
+
+/* ── Season variants ─────────────────────────────── */
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="spring"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="spring"] {
+  --glass-bg:        rgba(255, 255, 255, 0.13);
+  --glass-border:    rgba(86, 171, 47, 0.28);
+  --glass-highlight: rgba(168, 224, 99, 0.14);
+  --panel-bg:        rgba(10, 25, 0, 0.38);
+  --panel-border:    rgba(86, 171, 47, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="summer"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="summer"] {
+  --glass-bg:        rgba(255, 255, 255, 0.13);
+  --glass-border:    rgba(255, 210, 0, 0.28);
+  --glass-highlight: rgba(255, 210, 0, 0.12);
+  --panel-bg:        rgba(20, 12, 0, 0.38);
+  --panel-border:    rgba(247, 151, 30, 0.20);
+}
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="autumn"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="autumn"] {
+  --glass-bg:        rgba(255, 255, 255, 0.11);
+  --glass-border:    rgba(233, 100, 67, 0.26);
+  --glass-highlight: rgba(233, 100, 67, 0.10);
+  --panel-bg:        rgba(18, 6, 0, 0.40);
+  --panel-border:    rgba(144, 78, 149, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="winter"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="winter"] {
+  --glass-bg:        rgba(255, 255, 255, 0.12);
+  --glass-border:    rgba(130, 164, 212, 0.28);
+  --glass-highlight: rgba(182, 251, 255, 0.14);
+  --panel-bg:        rgba(5, 12, 25, 0.40);
+  --panel-border:    rgba(130, 164, 212, 0.20);
+}
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="dry"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="dry"] {
+  --glass-bg:        rgba(255, 255, 255, 0.11);
+  --glass-border:    rgba(231, 111, 81, 0.26);
+  --glass-highlight: rgba(244, 162, 97, 0.12);
+  --panel-bg:        rgba(20, 8, 0, 0.38);
+  --panel-border:    rgba(231, 111, 81, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="rainy"],
+[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="rainy"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(100, 140, 200, 0.22);
+  --glass-highlight: rgba(100, 140, 200, 0.10);
+  --panel-bg:        rgba(5, 10, 20, 0.44);
+  --panel-border:    rgba(100, 140, 200, 0.15);
+}
+
+/* ── Event variants ──────────────────────────────── */
+
+[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="christmas"],
+[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="christmas"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(220, 53, 69, 0.24);
+  --glass-highlight: rgba(25, 135, 84, 0.12);
+  --panel-bg:        rgba(5, 18, 8, 0.42);
+  --panel-border:    rgba(25, 135, 84, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="halloween"],
+[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="halloween"] {
+  --glass-bg:        rgba(255, 255, 255, 0.07);
+  --glass-border:    rgba(255, 117, 24, 0.28);
+  --glass-highlight: rgba(255, 117, 24, 0.10);
+  --panel-bg:        rgba(15, 5, 0, 0.48);
+  --panel-border:    rgba(255, 117, 24, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="new_year"],
+[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="new_year"] {
+  --glass-bg:        rgba(255, 255, 255, 0.08);
+  --glass-border:    rgba(79, 195, 247, 0.22);
+  --glass-highlight: rgba(255, 215, 0, 0.14);
+  --panel-bg:        rgba(0, 0, 8, 0.50);
+  --panel-border:    rgba(255, 215, 0, 0.16);
+}
+
+[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="independence"],
+[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="independence"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(0, 155, 58, 0.26);
+  --glass-highlight: rgba(254, 209, 0, 0.12);
+  --panel-bg:        rgba(0, 12, 4, 0.42);
+  --panel-border:    rgba(0, 155, 58, 0.18);
+}
+
+/* ── Subject variants ────────────────────────────── */
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="mathematics"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="mathematics"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(25, 118, 210, 0.28);
+  --glass-highlight: rgba(66, 165, 245, 0.12);
+  --panel-bg:        rgba(0, 5, 20, 0.42);
+  --panel-border:    rgba(25, 118, 210, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="sciences"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="sciences"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(46, 125, 50, 0.28);
+  --glass-highlight: rgba(102, 187, 106, 0.12);
+  --panel-bg:        rgba(0, 10, 2, 0.42);
+  --panel-border:    rgba(46, 125, 50, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="languages"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="languages"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(142, 36, 170, 0.28);
+  --glass-highlight: rgba(206, 147, 216, 0.12);
+  --panel-bg:        rgba(10, 0, 15, 0.42);
+  --panel-border:    rgba(142, 36, 170, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="business"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="business"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(0, 105, 92, 0.28);
+  --glass-highlight: rgba(77, 182, 172, 0.12);
+  --panel-bg:        rgba(0, 10, 8, 0.42);
+  --panel-border:    rgba(0, 105, 92, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="technology"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="technology"] {
+  --glass-bg:        rgba(255, 255, 255, 0.09);
+  --glass-border:    rgba(40, 53, 147, 0.30);
+  --glass-highlight: rgba(121, 134, 203, 0.12);
+  --panel-bg:        rgba(0, 0, 18, 0.44);
+  --panel-border:    rgba(40, 53, 147, 0.20);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="arts"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="arts"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(230, 74, 25, 0.26);
+  --glass-highlight: rgba(255, 138, 101, 0.12);
+  --panel-bg:        rgba(18, 4, 0, 0.40);
+  --panel-border:    rgba(230, 74, 25, 0.18);
+}
+
+[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="health"],
+[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="health"] {
+  --glass-bg:        rgba(255, 255, 255, 0.10);
+  --glass-border:    rgba(194, 24, 91, 0.26);
+  --glass-highlight: rgba(240, 98, 146, 0.12);
+  --panel-bg:        rgba(18, 0, 8, 0.42);
+  --panel-border:    rgba(194, 24, 91, 0.18);
+}
+
+/* ── Apply tokens to components on colored themes ── */
+/* Without this block, tokens are updated but classes
+   still render with hardcoded rgba() values. */
+
+[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .glass,
+[data-theme-group="space"] .glass,
+[data-theme-group="seasons"] .glass,
+[data-theme-group="events"] .glass,
+[data-theme-group="subjects"] .glass {
+  background:   var(--glass-bg);
+  border-color: var(--glass-border);
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .glass-soft,
+[data-theme-group="space"] .glass-soft,
+[data-theme-group="seasons"] .glass-soft,
+[data-theme-group="events"] .glass-soft,
+[data-theme-group="subjects"] .glass-soft {
+  background:   var(--glass-bg);
+  border-color: var(--glass-border);
+}
+
+[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .panel,
+[data-theme-group="space"] .panel,
+[data-theme-group="seasons"] .panel,
+[data-theme-group="events"] .panel,
+[data-theme-group="subjects"] .panel {
+  background:   var(--panel-bg);
+  border-color: var(--panel-border);
+}
+
+/* Text legibility on brightly colored themes */
+[data-theme-group="seasons"] .text-white,
+[data-theme-group="events"] .text-white,
+[data-theme-group="subjects"] .text-white {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* =====================================================
+   ASSI DOF OVERLAY
+   Rendered as position:fixed inside .ui-layer's
+   stacking context (z:11 in body). Internal z-indexes
+   are relative to that context so 9997 stays well
+   above page content but below the ASSI orb/panel.
+   ===================================================== */
+.assi-dof-overlay {
+  position:                fixed;
+  inset:                   0;
+  pointer-events:          none;
+  z-index:                 9997;
+  backdrop-filter:         blur(14px) brightness(0.5);
+  -webkit-backdrop-filter: blur(14px) brightness(0.5);
+  background:              rgba(4, 4, 10, 0.45);
+  transition:              opacity 0.3s ease;
+}
+
+.assi-dof-overlay.hidden {
+  opacity: 0;
 }

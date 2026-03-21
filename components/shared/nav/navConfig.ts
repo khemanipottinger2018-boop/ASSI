@@ -5,8 +5,9 @@ import {
   Activity, BookOpen, LayoutDashboard, GraduationCap,
   Cpu, Inbox, FileText, Trophy, BookMarked,
   Wallet, Star, HelpCircle, PenTool, Sparkles,
-  TrendingUp, UserCheck, DollarSign,
+  TrendingUp, UserCheck, DollarSign, MessageSquare,
 } from 'lucide-react';
+import type { UserFeatures } from '@/lib/api/user';
 
 export type NavItem = {
   label:    string;
@@ -14,7 +15,8 @@ export type NavItem = {
   icon:     React.ElementType;
   badge?:   'notifications' | 'messages';
   exact?:   boolean;
-  soon?:    boolean; // grayed out, coming soon
+  soon?:    boolean;
+  feature?: keyof UserFeatures; // gates this item behind a feature flag
 };
 
 export type NavSection = {
@@ -31,33 +33,35 @@ export const navByRole: Record<string, NavSection> = {
   student: {
     items: [
       // ── Core
-      { label: 'Home',           href: '/',              icon: Home,          exact: true },
-      { label: 'Browse Tutors',  href: '/browse',        icon: Search },
-      { label: 'Live Chat',      href: '/live-chat',     icon: MessageCircle },
-      { label: 'Sessions',       href: '/sessions',      icon: Calendar },
-      { label: 'Inbox',          href: '/inbox',         icon: Inbox,         badge: 'messages' },
-      // ── Learning
-      { label: 'ASSI',           href: '/assi',          icon: Sparkles },
-      { label: 'Assignments',    href: '/assignments',   icon: PenTool },
-      { label: 'Progress',       href: '/progress',      icon: TrendingUp,    soon: true },
-      { label: 'Study Resources',href: '/resources',     icon: BookMarked,    soon: true },
+      { label: 'Home',          href: '/',              icon: Home,          exact: true },
+      { label: 'Browse Tutors', href: '/browse',        icon: Search },
+      { label: 'Live Chat',     href: '/live-chat',     icon: MessageCircle },
+      { label: 'Sessions',      href: '/sessions',      icon: Calendar },
+      { label: 'Inbox',         href: '/inbox',         icon: Inbox,         badge: 'messages' },
+      // ── Learning (feature-gated)
+      { label: 'ASSI',          href: '/assi',          icon: Sparkles,      feature: 'ai_bundles' },
+      { label: 'Assignments',   href: '/assignments',   icon: PenTool,       feature: 'assignments' },
+      { label: 'Resources',     href: '/resources',     icon: BookMarked,    feature: 'past_papers', soon: true },
+      { label: 'Forums',        href: '/forums',        icon: MessageSquare, feature: 'forums', soon: true },
+      // ── Progress
+      { label: 'Progress',      href: '/progress',      icon: TrendingUp,    soon: true },
       // ── Community
-      { label: 'Leaderboard',    href: '/leaderboard',   icon: Trophy,        soon: true },
-      { label: 'Notifications',  href: '/notifications', icon: Bell,          badge: 'notifications' },
+      { label: 'Leaderboard',   href: '/leaderboard',   icon: Trophy,        soon: true },
+      { label: 'Notifications', href: '/notifications', icon: Bell,          badge: 'notifications' },
       // ── Growth
-      { label: 'Become a Tutor', href: '/apply',         icon: GraduationCap },
+      { label: 'Become a Tutor', href: '/apply',        icon: GraduationCap },
     ],
     bottomItems: [
-      { label: 'Profile',        href: '/profile',       icon: User },
-      { label: 'Settings',       href: '/settings',      icon: Settings },
-      { label: 'Help',           href: '/support',       icon: HelpCircle },
+      { label: 'Profile',  href: '/profile',  icon: User },
+      { label: 'Settings', href: '/settings', icon: Settings },
+      { label: 'Help',     href: '/support',  icon: HelpCircle },
     ],
     mobileItems: [
-      { label: 'Home',     href: '/',              icon: Home,          exact: true },
-      { label: 'Browse',   href: '/browse',        icon: Search },
-      { label: 'ASSI',     href: '/assi',          icon: Sparkles },
-      { label: 'Inbox',    href: '/inbox',         icon: Inbox,         badge: 'messages' },
-      { label: 'Profile',  href: '/profile',       icon: User },
+      { label: 'Home',    href: '/',          icon: Home,     exact: true },
+      { label: 'Browse',  href: '/browse',    icon: Search },
+      { label: 'ASSI',    href: '/assi',      icon: Sparkles, feature: 'ai_bundles' },
+      { label: 'Inbox',   href: '/inbox',     icon: Inbox,    badge: 'messages' },
+      { label: 'Profile', href: '/profile',   icon: User },
     ],
   },
 
@@ -67,24 +71,25 @@ export const navByRole: Record<string, NavSection> = {
   tutor: {
     items: [
       // ── Core
-      { label: 'Home',           href: '/',                icon: Home,            exact: true },
-      { label: 'Dashboard',      href: '/dashboard/tutor', icon: LayoutDashboard },
-      { label: 'Sessions',       href: '/sessions',        icon: Calendar },
-      { label: 'Inbox',          href: '/inbox',           icon: Inbox,           badge: 'messages' },
-      { label: 'Notifications',  href: '/notifications',   icon: Bell,            badge: 'notifications' },
-      // ── Teaching
-      { label: 'Assignments',    href: '/assignments',     icon: PenTool },
-      { label: 'My Students',    href: '/students',        icon: Users,           soon: true },
-      { label: 'Resources',      href: '/resources',       icon: BookMarked,      soon: true },
+      { label: 'Home',          href: '/',                icon: Home,            exact: true },
+      { label: 'Dashboard',     href: '/dashboard/tutor', icon: LayoutDashboard },
+      { label: 'Sessions',      href: '/sessions',        icon: Calendar },
+      { label: 'Inbox',         href: '/inbox',           icon: Inbox,           badge: 'messages' },
+      { label: 'Notifications', href: '/notifications',   icon: Bell,            badge: 'notifications' },
+      // ── Teaching (feature-gated)
+      { label: 'Assignments',   href: '/assignments',     icon: PenTool,         feature: 'assignments' },
+      { label: 'Forums',        href: '/forums',          icon: MessageSquare,   feature: 'forums', soon: true },
+      { label: 'My Students',   href: '/students',        icon: Users,           soon: true },
+      { label: 'Resources',     href: '/resources',       icon: BookMarked,      feature: 'past_papers', soon: true },
       // ── Growth
-      { label: 'Earnings',       href: '/earnings',        icon: DollarSign,      soon: true },
-      { label: 'Reviews',        href: '/reviews',         icon: Star,            soon: true },
-      { label: 'Analytics',      href: '/analytics',       icon: TrendingUp,      soon: true },
+      { label: 'Earnings',      href: '/earnings',        icon: DollarSign,      soon: true },
+      { label: 'Reviews',       href: '/reviews',         icon: Star,            soon: true },
+      { label: 'Analytics',     href: '/analytics',       icon: TrendingUp,      soon: true },
     ],
     bottomItems: [
-      { label: 'Profile',        href: '/profile',         icon: User },
-      { label: 'Settings',       href: '/settings',        icon: Settings },
-      { label: 'Help',           href: '/support',         icon: HelpCircle },
+      { label: 'Profile',  href: '/profile',  icon: User },
+      { label: 'Settings', href: '/settings', icon: Settings },
+      { label: 'Help',     href: '/support',  icon: HelpCircle },
     ],
     mobileItems: [
       { label: 'Home',      href: '/',                icon: Home,            exact: true },
@@ -155,4 +160,22 @@ export function getNav(role?: string): NavSection {
     bottomItems: [],
     mobileItems: [],
   };
+}
+
+/**
+ * Filter nav items by feature flags.
+ * Items without a feature key always show.
+ * Items with a feature key only show if that feature is enabled.
+ * Items with soon:true always show (as coming soon) regardless of feature flag —
+ * this lets users see what's coming without being able to use it yet.
+ */
+export function filterNavByFeatures(
+  items: NavItem[],
+  features: UserFeatures,
+): NavItem[] {
+  return items.filter(item => {
+    if (!item.feature) return true;          // no gate — always show
+    if (item.soon) return true;              // coming soon — always show grayed out
+    return features[item.feature] === true;  // gate active — only show if enabled
+  });
 }

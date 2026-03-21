@@ -4,19 +4,29 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth }          from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useGlobalNotifications';
-import { getNav, type NavItem } from './navConfig';
+import { getNav, filterNavByFeatures, type NavItem } from './navConfig';
+import type { UserFeatures } from '@/lib/api/user';
 
-export default function MobileNav() {
+interface MobileNavProps {
+  features?: UserFeatures;
+}
+
+// Routes where mobile nav is hidden
+const HIDE_ON = ['/signin', '/signup', '/live-chat', '/assi'];
+
+export default function MobileNav({ features }: MobileNavProps) {
   const { user }        = useAuth();
   const pathname        = usePathname();
   const router          = useRouter();
   const { unreadCount } = useNotifications();
 
-  const hideOn = ['/signin', '/signup', '/live-chat'];
-  if (hideOn.some((p) => pathname.startsWith(p))) return null;
+  if (HIDE_ON.some(p => pathname.startsWith(p))) return null;
   if (!user) return null;
 
-  const { mobileItems } = getNav(user.role);
+  const rawNav      = getNav(user.role);
+  const mobileItems = features
+    ? filterNavByFeatures(rawNav.mobileItems, features)
+    : rawNav.mobileItems;
 
   function isActive(item: NavItem) {
     if (item.exact) return pathname === item.href;
@@ -53,7 +63,6 @@ export default function MobileNav() {
                 borderRight: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              {/* Active background pill */}
               {active && (
                 <motion.div
                   layoutId="mobile-nav-active"
@@ -62,7 +71,6 @@ export default function MobileNav() {
                 />
               )}
 
-              {/* Icon + badge */}
               <div className="relative z-10">
                 <item.icon
                   size={19}
@@ -72,9 +80,7 @@ export default function MobileNav() {
                 <AnimatePresence>
                   {count > 0 && (
                     <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
+                      initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}
                       className="absolute -top-1.5 -right-2 min-w-[14px] h-[14px] rounded-full bg-orange-500 text-white text-[9px] font-bold flex items-center justify-center px-0.5"
                     >
                       {count > 9 ? '9+' : count}
@@ -83,14 +89,12 @@ export default function MobileNav() {
                 </AnimatePresence>
               </div>
 
-              {/* Label */}
               <span className={`relative z-10 text-[10px] font-medium transition-all duration-150 leading-none ${
                 active ? 'text-white' : 'text-white/30'
               }`}>
                 {item.label}
               </span>
 
-              {/* Active dot */}
               {active && (
                 <motion.div
                   layoutId="mobile-nav-dot"

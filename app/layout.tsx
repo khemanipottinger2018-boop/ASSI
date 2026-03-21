@@ -29,14 +29,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
 
           {/*
-            ┌─────────────────────────────────────────┐
-            │  THEME LAYER                            │
-            │  isolation: isolate creates a brand-new │
-            │  stacking context — z-indexes inside    │
-            │  this div are completely separate from  │
-            │  the UI above. Snow, blobs, nebula etc  │
-            │  can never bleed through app UI.        │
-            └─────────────────────────────────────────┘
+            ── THEME LAYER ───────────────────────────────────────────
+            All theme visuals live here — gradient, blobs, vignette,
+            grain overlay, seasonal effects.
+
+            Key insight: position:fixed elements inside this div
+            participate in the BODY stacking context directly, not
+            this div's context. So their z-indexes (0–10) are global.
+
+            FloatingBlobs internal z-indexes:
+              blobs/effects:   0–1
+              Vignette:        9
+              GrainOverlay:   10   ← highest theme element
+
+            .ui-layer must beat ALL of these → z-index: 11.
           */}
           <div className="theme-layer">
             <AnimatedGradient />
@@ -48,11 +54,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <SettingsProvider>
                 <FeaturesProvider>
                   {/*
-                    ui-layer sits above the theme-layer in the document.
-                    position: relative + z-index: 1 is enough since
-                    the theme-layer is isolated.
+                    ── UI LAYER ──────────────────────────────────────
+                    z-index: 11 beats GrainOverlay (10) and Vignette (9).
+                    position: relative is required for z-index to apply.
+                    100dvh uses dynamic viewport height (accounts for
+                    mobile browser chrome correctly).
+
+                    overflow: hidden prevents children from causing
+                    body scroll — the ASSI chat and other pages manage
+                    their own internal scroll.
                   */}
-                  <div className="ui-layer h-screen w-screen overflow-hidden">
+                  <div
+                    className="ui-layer"
+                    style={{
+                      position: 'relative',
+                      zIndex:   11,
+                      height:   '100dvh',
+                      width:    '100vw',
+                      overflow: 'hidden',
+                    }}
+                  >
                     <AppShell>{children}</AppShell>
                   </div>
                 </FeaturesProvider>

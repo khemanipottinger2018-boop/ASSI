@@ -2,26 +2,41 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { ChevronLeft, ChevronRight, Sparkles, Zap } from 'lucide-react';
+import { useAuth }          from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useGlobalNotifications';
-import { getNav, type NavItem } from './navConfig';
+import { getNav, filterNavByFeatures, type NavItem } from './navConfig';
+import type { UserFeatures } from '@/lib/api/user';
 
 interface SidebarProps {
   collapsed:       boolean;
   onToggle:        () => void;
   undercoverRole?: 'student' | 'tutor' | null;
+  features?:       UserFeatures;
+  tier?:           string;
 }
 
-export default function Sidebar({ collapsed, onToggle, undercoverRole }: SidebarProps) {
+export default function Sidebar({
+  collapsed, onToggle, undercoverRole,
+  features, tier,
+}: SidebarProps) {
   const { user }        = useAuth();
   const pathname        = usePathname();
   const router          = useRouter();
   const { unreadCount } = useNotifications();
 
   const effectiveRole = undercoverRole ?? user?.role;
-  const nav = getNav(effectiveRole);
-  const w   = collapsed ? 64 : 220;
+  const rawNav        = getNav(effectiveRole);
+  const isPlus        = tier === 'plus' || tier === 'assi_plus';
+
+  // Filter nav items by feature flags when features are available
+  const nav = features ? {
+    items:       filterNavByFeatures(rawNav.items,       features),
+    bottomItems: filterNavByFeatures(rawNav.bottomItems, features),
+    mobileItems: filterNavByFeatures(rawNav.mobileItems, features),
+  } : rawNav;
+
+  const w = collapsed ? 64 : 220;
 
   function isActive(item: NavItem) {
     if (item.exact) return pathname === item.href;
@@ -30,7 +45,6 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
 
   function getBadgeCount(item: NavItem) {
     if (item.badge === 'notifications') return unreadCount;
-    // messages badge — hook into later
     return 0;
   }
 
@@ -117,10 +131,17 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
               transition={{ duration: 0.15 }}
               className="flex items-center gap-2"
             >
-              <div className="glass-soft w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0">
-                <BookOpen size={13} className="text-orange-400" />
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: 'radial-gradient(circle at 30% 30%, #ff9aa2, #b84cff)' }}>
+                <Sparkles size={12} className="text-white" />
               </div>
               <span className="text-white font-semibold text-sm tracking-tight">ASSI</span>
+              {/* ASSI+ tier badge */}
+              {isPlus && (
+                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-orange-400/15 text-orange-400 border border-orange-400/25 uppercase tracking-wide">
+                  <Zap size={8} />+
+                </span>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -144,19 +165,18 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
       )}
 
       {/* ── Main nav ── */}
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${collapsed ? 'px-2' : 'px-3'} space-y-0.5`}>
-        {nav.items.map((item) => (
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden py-3 ${collapsed ? 'px-2' : 'px-3'} space-y-0.5`}
+        style={{ scrollbarWidth: 'none' }}>
+        {nav.items.map(item => (
           <NavLink key={item.href} item={item} />
         ))}
       </div>
 
-      {/* ── Bottom: profile + settings ── */}
-      <div className={`
-        border-t py-3 space-y-0.5
-        ${collapsed ? 'px-2' : 'px-3'}
-      `}
-        style={{ borderColor: 'var(--sidebar-border)' }}
-      >
+      {/* ── Bottom section ── */}
+      <div className={`border-t py-3 space-y-0.5 ${collapsed ? 'px-2' : 'px-3'}`}
+        style={{ borderColor: 'var(--sidebar-border)' }}>
+
+        {/* User identity row */}
         <AnimatePresence initial={false}>
           {!collapsed && user && (
             <motion.div
@@ -171,9 +191,14 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
                   {user.username[0]?.toUpperCase()}
                 </span>
               </div>
-              <div className="min-w-0">
-                <p className="text-white text-xs font-semibold truncate">{user.username}</p>
-                <p className="text-white/50 text-[10px] capitalize">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-white text-xs font-semibold truncate">{user.username}</p>
+                  {isPlus && (
+                    <Zap size={9} className="text-orange-400 flex-shrink-0" />
+                  )}
+                </div>
+                <p className="text-white/45 text-[10px] capitalize">
                   {undercoverRole
                     ? `${user.role} · viewing as ${undercoverRole}`
                     : user.role.replace('_', ' ')}
@@ -183,9 +208,27 @@ export default function Sidebar({ collapsed, onToggle, undercoverRole }: Sidebar
           )}
         </AnimatePresence>
 
-        {nav.bottomItems.map((item) => (
+        {nav.bottomItems.map(item => (
           <NavLink key={item.href} item={item} />
         ))}
+
+        {/* ASSI+ upsell — show for free tier users on non-collapsed sidebar */}
+        {!collapsed && !isPlus && features && (
+          <AnimatePresence>
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => router.push('/settings?tab=upgrade')}
+              className="w-full mt-2 flex items-center gap-2 px-3 py-2 rounded-xl border border-orange-400/15 bg-orange-400/6 hover:bg-orange-400/12 hover:border-orange-400/25 transition group"
+            >
+              <Zap size={13} className="text-orange-400 flex-shrink-0" />
+              <div className="text-left min-w-0">
+                <p className="text-orange-400 text-[11px] font-semibold">Get ASSI+</p>
+                <p className="text-white/28 text-[10px]">Unlock all features</p>
+              </div>
+            </motion.button>
+          </AnimatePresence>
+        )}
       </div>
     </motion.aside>
   );
