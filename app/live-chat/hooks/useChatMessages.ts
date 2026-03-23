@@ -6,11 +6,12 @@ import { useChatSocket } from './useChatSocket';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 export interface ChatMessage {
-  messageId: string;
-  sessionId: string;
-  senderId:  string;
-  content:   string;
-  timestamp: number;
+  messageId:   string;
+  sessionId:   string;
+  senderId:    string;
+  senderName?: string;   // populated in group/conference views
+  content:     string;
+  timestamp:   number;
 }
 
 export function useChatMessages(sessionId: string) {
@@ -38,11 +39,12 @@ export function useChatMessages(sessionId: string) {
         if (cancelled) return;
 
         const history: ChatMessage[] = (data.messages ?? []).map((m: any) => ({
-          messageId: String(m.messageId),
-          sessionId: String(m.sessionId ?? sessionId),
-          senderId:  String(m.senderId),
-          content:   String(m.content),
-          timestamp: Number(m.timestamp),
+          messageId:  String(m.messageId),
+          sessionId:  String(m.sessionId ?? sessionId),
+          senderId:   String(m.senderId),
+          senderName: m.senderName ?? undefined,
+          content:    String(m.content),
+          timestamp:  Number(m.timestamp),
         }));
 
         setMessages(history);

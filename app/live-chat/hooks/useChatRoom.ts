@@ -13,12 +13,28 @@ export function useChatRoom(sessionId: string) {
   const joinedRef = useRef(false);
   const [presence, setPresence] = useState<Presence>({ participants: [], count: 0 });
 
+  /* ── Join / leave ────────────────────────────────────────────
+     Kept separate from the listener so sessionId changes don't
+     cause a missed join due to React 18 strict mode cleanup order.
+  ────────────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!isConnected || !sessionId) return;
     if (joinedRef.current) return;
 
     joinedRef.current = true;
     emit('chat:join', sessionId);
+
+    return () => {
+      joinedRef.current = false;
+      emit('chat:leave', sessionId);
+    };
+  }, [isConnected, sessionId, emit]);
+
+  /* ── Presence listener ───────────────────────────────────────
+     No joinedRef dependency — always active when connected.
+  ────────────────────────────────────────────────────────────── */
+  useEffect(() => {
+    if (!isConnected || !sessionId) return;
 
     const handlePresence = ({ sessionId: sid, participants, count }: {
       sessionId:    string;
@@ -30,15 +46,8 @@ export function useChatRoom(sessionId: string) {
     };
 
     on('chat:presence', handlePresence);
-
-    return () => {
-      // Reset joinedRef so re-join fires if sessionId changes
-      // or socket reconnects (isConnected flips false → true)
-      joinedRef.current = false;
-      emit('chat:leave', sessionId);
-      off('chat:presence', handlePresence);
-    };
-  }, [isConnected, sessionId, emit, on, off]);
+    return () => off('chat:presence', handlePresence);
+  }, [isConnected, sessionId, on, off]);
 
   return presence;
 }

@@ -1,57 +1,68 @@
 'use client';
 
-import { PresenceStatus } from '@/contexts/PresenceProvider';
+import type { PresenceDisplayOutput } from '@/lib/presence/usePresenceDisplay';
 
 type PresenceBadgeProps = {
-  status: PresenceStatus;
-  label?: string;
-  loading?: boolean;
-  pulse?: boolean;
+  display: PresenceDisplayOutput;
+  size?: 'sm' | 'md';
   className?: string;
 };
 
-const STATUS_STYLES: Record<
-  PresenceStatus,
+const VARIANT_STYLES: Record<
+  PresenceDisplayOutput['variant'],
   {
     wrap: string;
     dot: string;
     defaultLabel: string;
   }
 > = {
-  online: {
+  available: {
     wrap: 'bg-green-500/15 text-green-300 border border-green-400/20',
     dot: 'bg-green-400',
-    defaultLabel: 'Online',
+    defaultLabel: 'Available',
   },
   busy: {
     wrap: 'bg-yellow-500/15 text-yellow-300 border border-yellow-400/20',
     dot: 'bg-yellow-400',
-    defaultLabel: 'Busy',
+    defaultLabel: 'In Session',
+  },
+  unavailable: {
+    wrap: 'bg-white/10 text-white/50 border border-white/10',
+    dot: 'bg-white/30',
+    defaultLabel: 'Unavailable',
   },
   offline: {
     wrap: 'bg-white/10 text-white/50 border border-white/10',
     dot: 'bg-white/30',
     defaultLabel: 'Offline',
   },
+  reconnecting: {
+    wrap: 'bg-blue-500/10 text-blue-300 border border-blue-400/20',
+    dot: 'bg-blue-400',
+    defaultLabel: 'Reconnecting',
+  },
 };
 
 export default function PresenceBadge({
-  status,
-  label,
-  loading = false,
-  pulse = false,
+  display,
+  size = 'md',
   className = '',
 }: PresenceBadgeProps) {
-  const cfg = STATUS_STYLES[status];
+  const { variant, label, pulse } = display;
+  const cfg = VARIANT_STYLES[variant];
+
+  const dotSize = size === 'md' ? 'w-2.5 h-2.5' : 'w-2 h-2';
 
   return (
     <span
       className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs ${cfg.wrap} ${className}`}
     >
       <span
-        className={`w-2 h-2 rounded-full ${cfg.dot} ${pulse ? 'animate-pulse' : ''}`}
+        className={`${dotSize} rounded-full ${cfg.dot} ${
+          pulse ? 'animate-pulse' : ''
+        }`}
       />
-      {loading ? 'Checking...' : label ?? cfg.defaultLabel}
+      {label ?? cfg.defaultLabel}
     </span>
   );
 }

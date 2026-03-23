@@ -1,249 +1,150 @@
 'use client';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL!;
-const INTERVAL_MS = 45_000;
+/* ───────── TYPES ───────── */
 
 export type PresenceStatus = 'online' | 'offline' | 'busy';
-export type StatusIntent =
-  | 'available'
-  | 'do_not_disturb'
-  | 'busy_session'
-  | 'busy_other';
 
-export type PresenceContextValue = {
-  status: PresenceStatus;
-  intent: StatusIntent | null;
-  isOnline: boolean;
-  isBusy: boolean;
-  hydrated: boolean;
+export interface FullPresence {
+  online: boolean;
   socketConnected: boolean;
+  intent: 'available' | 'do_not_disturb' | 'busy_session' | 'busy_other';
   discoverable: boolean;
-  setStatus: (next: PresenceStatus) => Promise<void>;
-  setIntent: (next: StatusIntent) => Promise<void>;
-  refreshPresence: () => Promise<void>;
+  lastActivity: number | null;
+  socketCount: number;
+}
+
+export type PresenceData = {
+  hydrated: boolean;
+  status: PresenceStatus;
+  discoverable: boolean;
+  isOnline: boolean;
+  socketConnected: boolean;
+
+  // tutor-specific
+  tutorAvailable?: boolean;
+  tutorBusy?: boolean;
 };
 
-const PresenceContext = createContext<PresenceContextValue | null>(null);
+type PresenceContextValue = PresenceData & {
+  refreshPresence: () => Promise<void>;
+  setTutorAvailable?: (value: boolean) => void; // tutor toggle method
+};
 
-function deriveStatus(
-  online: boolean,
-  intent: StatusIntent | null
-): PresenceStatus {
-  if (!online || !intent || intent === 'do_not_disturb') return 'offline';
-  if (intent === 'busy_session' || intent === 'busy_other') return 'busy';
-  return 'online';
-}
+/* ───────── CONTEXT ───────── */
 
-function statusToIntent(status: PresenceStatus): StatusIntent {
-  if (status === 'online') return 'available';
-  if (status === 'busy') return 'busy_other';
-  return 'do_not_disturb';
-}
+const PresenceContext = createContext<PresenceContextValue | undefined>(undefined);
+
+/* ───────── SINGLETON SOCKET ───────── */
+
+let socket: Socket | null = null;
+
+/* ───────── PROVIDER ───────── */
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-
-  const [intent, setIntentState] = useState<StatusIntent | null>(null);
-  const [isOnline, setIsOnline] = useState(false);
   const [hydrated, setHydrated] = useState(false);
-  const [socketConnected, setSocketConnected] = useState(false);
+  const [status, setStatus] = useState<PresenceStatus>('offline');
   const [discoverable, setDiscoverable] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [socketConnected, setSocketConnected] = useState(false);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const aliveRef = useRef(true);
-  const intentRef = useRef<StatusIntent | null>(null);
+  // tutor-specific
+  const [tutorAvailable, setTutorAvailableState] = useState<boolean>(false);
+  const tutorBusy = status === 'busy';
 
-  useEffect(() => {
-    intentRef.current = intent;
-  }, [intent]);
+  /* ───────── MAP BACKEND INTENT ───────── */
+  function mapIntentToStatus(intent: FullPresence['intent']): PresenceStatus {
+    if (intent === 'busy_session' || intent === 'busy_other') return 'busy';
+    if (intent === 'available') return 'online';
+    return 'offline';
+  }
 
-  useEffect(() => {
-    aliveRef.current = true;
-    return () => {
-      aliveRef.current = false;
-    };
-  }, []);
-
-  const resetPresence = useCallback(() => {
-    setIntentState(null);
-    setIsOnline(false);
-    setHydrated(false);
-    setSocketConnected(false);
-    setDiscoverable(false);
-  }, []);
-
-  const applyPresencePayload = useCallback((data: any) => {
-    setIsOnline(Boolean(data?.online));
-    setIntentState(data?.intent ?? null);
-    setSocketConnected(Boolean(data?.socketConnected));
-    setDiscoverable(Boolean(data?.discoverable));
-    setHydrated(true);
-  }, []);
-
-  const refreshPresence = useCallback(async () => {
-    if (!user) return;
-
+  /* ───────── FETCH PRESENCE ───────── */
+  async function fetchPresence() {
     try {
-      const res = await fetch(`${API_URL}/api/presence/me`, {
-        credentials: 'include',
-      });
+      const res = await fetch('/api/presence/me');
+      if (!res.ok) throw new Error('Failed to fetch presence');
+      const data: FullPresence = await res.json();
 
-      if (!res.ok) {
-        if (!aliveRef.current) return;
-        setIntentState(null);
-        setIsOnline(false);
-        setSocketConnected(false);
-        setDiscoverable(false);
-        setHydrated(true);
-        return;
-      }
-
-      const data = await res.json();
-
-      if (!aliveRef.current) return;
-
-      if (!data?.success) {
-        setIntentState(null);
-        setIsOnline(false);
-        setSocketConnected(false);
-        setDiscoverable(false);
-        setHydrated(true);
-        return;
-      }
-
-      applyPresencePayload(data);
-    } catch {
-      if (!aliveRef.current) return;
-      setIntentState(null);
-      setIsOnline(false);
-      setSocketConnected(false);
-      setDiscoverable(false);
+      setStatus(mapIntentToStatus(data.intent));
+      setDiscoverable(data.discoverable);
+      setIsOnline(data.online);
+      setSocketConnected(data.socketConnected);
       setHydrated(true);
+    } catch (err) {
+      console.error('[PresenceProvider] fetchPresence error', err);
     }
-  }, [user, applyPresencePayload]);
+  }
 
-  const heartbeat = useCallback(async () => {
-    if (!user || !hydrated || !intentRef.current) return;
+  /* ───────── SOCKET CONNECTION ───────── */
+  function connectSocket() {
+    if (socket) return;
 
-    try {
-      await fetch(`${API_URL}/api/presence/heartbeat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ intent: intentRef.current }),
-      });
-    } catch {
-      // silent
-    }
-  }, [user, hydrated]);
+    socket = io('/', {
+      autoConnect: true,
+      reconnection: true,
+      transports: ['websocket'],
+    });
 
+    socket.on('connect', () => setSocketConnected(true));
+    socket.on('disconnect', () => setSocketConnected(false));
+
+    // Listen for live presence updates
+    socket.on('presenceUpdate', (data: FullPresence) => {
+      setStatus(mapIntentToStatus(data.intent));
+      setDiscoverable(data.discoverable);
+      setIsOnline(data.online);
+      setSocketConnected(data.socketConnected);
+    });
+  }
+
+  /* ───────── EFFECT ───────── */
   useEffect(() => {
-    if (!user) {
-      resetPresence();
-      return;
-    }
+    fetchPresence();
+    connectSocket();
 
-    refreshPresence();
-  }, [user, refreshPresence, resetPresence]);
-
-  useEffect(() => {
-    if (!user || !hydrated) return;
-
-    intervalRef.current = setInterval(() => {
-      heartbeat();
-    }, INTERVAL_MS);
+    const heartbeatInterval = setInterval(() => {
+      fetch('/api/presence/heartbeat', { method: 'POST' }).catch((err) =>
+        console.warn('[PresenceProvider] heartbeat error', err)
+      );
+    }, 45_000);
 
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      clearInterval(heartbeatInterval);
+      socket?.disconnect();
     };
-  }, [user, hydrated, heartbeat]);
-
-  const setIntent = useCallback(async (next: StatusIntent) => {
-    try {
-      const res = await fetch(`${API_URL}/api/presence/intent`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ intent: next }),
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-      if (!aliveRef.current || !data?.success) return;
-
-      setIntentState(data.intent ?? next);
-      setIsOnline(Boolean(data.online));
-
-      if (typeof data.socketConnected === 'boolean') {
-        setSocketConnected(data.socketConnected);
-      }
-
-      if (typeof data.discoverable === 'boolean') {
-        setDiscoverable(data.discoverable);
-      }
-    } catch {
-      // silent
-    }
   }, []);
 
-  const setStatus = useCallback(
-    async (next: PresenceStatus) => {
-      await setIntent(statusToIntent(next));
-    },
-    [setIntent]
-  );
-
-  const value = useMemo<PresenceContextValue>(
-    () => ({
-      status: deriveStatus(isOnline, intent),
-      intent,
-      isOnline,
-      isBusy: deriveStatus(isOnline, intent) === 'busy',
-      hydrated,
-      socketConnected,
-      discoverable,
-      setStatus,
-      setIntent,
-      refreshPresence,
-    }),
-    [
-      intent,
-      isOnline,
-      hydrated,
-      socketConnected,
-      discoverable,
-      setStatus,
-      setIntent,
-      refreshPresence,
-    ]
-  );
+  const setTutorAvailable = (value: boolean) => {
+    // only allow if online and socket connected
+    if (!isOnline || !socketConnected || tutorBusy) return;
+    setTutorAvailableState(value);
+  };
 
   return (
-    <PresenceContext.Provider value={value}>
+    <PresenceContext.Provider
+      value={{
+        hydrated,
+        status,
+        discoverable,
+        isOnline,
+        socketConnected,
+        tutorAvailable,
+        tutorBusy,
+        setTutorAvailable,
+        refreshPresence: fetchPresence,
+      }}
+    >
       {children}
     </PresenceContext.Provider>
   );
 }
 
-export function usePresenceContext() {
-  const ctx = useContext(PresenceContext);
-  if (!ctx) {
-    throw new Error('usePresenceContext must be used within PresenceProvider');
-  }
-  return ctx;
+/* ───────── HOOK ───────── */
+export function usePresence() {
+  const context = useContext(PresenceContext);
+  if (!context) throw new Error('usePresence must be used within PresenceProvider');
+  return context;
 }

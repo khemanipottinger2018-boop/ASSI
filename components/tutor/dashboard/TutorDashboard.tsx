@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useAuth }    from '@/contexts/AuthContext';
 import { usePresence, type PresenceStatus } from '@/hooks/usePresence';
-import { getPresenceDisplay } from '@/lib/presence/getPresenceDisplay';
+import { getPresenceDisplay } from '@/lib/presence/usePresenceDisplay';
 import PresenceBadge  from '@/components/shared/presence/PresenceBadge';
 import { sessionsApi, tutorsApi } from '@/lib/api';
 import type { BookedSession } from '@/lib/api';

@@ -1,13 +1,14 @@
 import { api } from './client';
+import type { SessionStatus } from './browse';
 
 /* =====================================================
- * Booked session — GET /api/browse/my-sessions
+ * Booked Session (lean version for chat context)
  * ===================================================== */
 
 export type BookedSession = {
   sessionId:       string;
-  status:          'pending' | 'confirmed' | 'in_progress' | 'active' | 'completed' | 'cancelled';
-  scheduledAt:     string;   // ISO date
+  status:          SessionStatus;
+  scheduledAt:     string; // ISO
   durationMinutes: number;
   rate:            number | null;
   notes:           string | null;
@@ -16,22 +17,20 @@ export type BookedSession = {
 };
 
 /* =====================================================
- * Chat session — GET /api/chat/sessions
- * Includes both live (Redis) and historical (DB) sessions
+ * Chat Session (1:1 with booking session)
  * ===================================================== */
 
 export type ChatSession = {
-  id:          string;
+  sessionId:   string; // SAME as booking sessionId (enforced)
   partnerId:   string | null;
   partnerName: string;
   subjectName: string;
-  status:      string;
-  live:        boolean;
-  startedAt:   string;  // ISO date
+  status:      SessionStatus;
+  startedAt:   string | null; // ISO (null until active)
 };
 
 /* =====================================================
- * Message — GET /api/chat/sessions/:sessionId/messages
+ * Message
  * ===================================================== */
 
 export type SessionMessage = {
@@ -41,62 +40,36 @@ export type SessionMessage = {
   senderName: string;
   content:    string;
   isRead:     boolean;
-  timestamp:  number;  // ms epoch
+  timestamp:  string; // ISO (standardized)
   isMine:     boolean;
-};
-
-/* =====================================================
- * Book session body — POST /api/browse/book
- * Note: backend field is scheduled_time (snake_case)
- * ===================================================== */
-
-export type BookSessionBody = {
-  tutor_id:         string;
-  subject_id:       string;
-  scheduled_time:   string;   // ISO date string
-  duration_minutes?: number;  // default 60
-  notes?:           string;
 };
 
 /* ===================================================== */
 
 export const sessionsApi = {
-  /* GET /api/browse/my-sessions
-   * Booked/scheduled sessions for the current user (student or tutor).
-   */
-  getMySessions: () =>
-    api.get<{ success: boolean; sessions: BookedSession[] }>('/api/browse/my-sessions'),
-
-  /* GET /api/chat/sessions
-   * All sessions — live (Redis) + historical (DB).
-   */
+  /* GET all sessions (active + historical) */
   getChatSessions: () =>
-    api.get<{ success: boolean; sessions: ChatSession[] }>('/api/chat/sessions'),
-
-  /* GET /api/chat/sessions/:sessionId/messages */
-  getSessionMessages: (sessionId: string) =>
-    api.get<{ success: boolean; messages: SessionMessage[]; live: boolean }>(
-      `/api/chat/sessions/${sessionId}/messages`
+    api.get<{ success: boolean; sessions: ChatSession[] }>(
+      '/api/chat/sessions'
     ),
 
-  /* POST /api/browse/book
-   * Student only. Returns sessionId on success.
-   */
-  bookSession: (body: BookSessionBody) =>
-    api.post<{ success: boolean; sessionId: string }>('/api/browse/book', body),
+  /* GET messages */
+  getSessionMessages: (sessionId: string) =>
+    api.get<{
+      success: boolean;
+      messages: SessionMessage[];
+    }>(`/api/chat/sessions/${sessionId}/messages`),
 
-  /* GET /api/live-chat/active
-   * Student only — own active live session from Redis.
-   */
+  /* GET currently active session (if any) */
   getActiveSession: () =>
     api.get<{
       success: boolean;
       session: {
         sessionId:   string;
-        status:      string;
+        status:      SessionStatus;
         tutorName:   string;
         subjectName: string;
-        startedAt:   number;
+        startedAt:   string; // ISO
       } | null;
     }>('/api/live-chat/active'),
 };

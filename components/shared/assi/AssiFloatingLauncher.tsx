@@ -23,6 +23,7 @@ type Pos = { x: number; y: number };
 interface Props {
   enabled?: boolean;
   isGuest?: boolean;
+  isPlus?: boolean;
 }
 
 // Work out which corner the panel should anchor to based on orb position
@@ -124,17 +125,28 @@ export default function AssiFloatingLauncher({ enabled = true, isGuest = false }
   return (
     <>
       {/* ── Depth-of-field backdrop ── */}
+      {/* z-index: 9996 — below orb (9999) so orb stays draggable/clickable.
+          The backdrop closes the panel on click, but the orb above it
+          intercepts its own click events first. */}
       <AnimatePresence>
         {open && (
           <motion.div
             key="dof-backdrop"
-            className="assi-dof-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25 }}
             onClick={() => setOpen(false)}
-            style={{ pointerEvents: 'auto', cursor: 'default' }}
+            style={{
+              position:             'fixed',
+              inset:                0,
+              zIndex:               9996,
+              backdropFilter:       'blur(12px) brightness(0.52)',
+              WebkitBackdropFilter: 'blur(12px) brightness(0.52)',
+              background:           'rgba(4,4,10,0.40)',
+              cursor:               'default',
+              pointerEvents:        'auto',
+            }}
           />
         )}
       </AnimatePresence>

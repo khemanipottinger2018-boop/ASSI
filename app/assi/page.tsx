@@ -10,6 +10,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAuth }     from '@/contexts/AuthContext';
+import { useFeatures } from '@/contexts/FeaturesContext';
 import { useSubjects } from '@/hooks/useSubjects';
 import { subjectToModel, subjectHint } from '@/lib/subjectToModel';
 import AssiMessage    from '@/components/shared/assi/AssiMessage';
@@ -336,21 +337,20 @@ function SubjectSwitcher({
 
 // ── Chat view ──────────────────────────────────────────────────────
 function ChatView({
-  subject, subjects, csec, cape, username, onReset, onSwitchSubject,
+  subject, subjects, csec, cape, username, isPlus, onReset, onSwitchSubject,
 }: {
   subject:         Subject;
   subjects:        Subject[];
   csec:            Subject[];
   cape:            Subject[];
   username?:       string;
+  isPlus:          boolean;
   onReset:         () => void;
   onSwitchSubject: (s: Subject) => void;
 }) {
   const config  = useMemo(() => subjectToModel(subject.name, subject.category), [subject]);
   const SubIcon = subject.id === 'casual' ? MessageSquare : config.icon;
 
-  // TODO: wire isPlus from user context / feature flags
-  const isPlus = false;
   const limits = isPlus ? LIMITS.plus : LIMITS.free;
 
   const [messages,  setMessages]  = useState<Message[]>([
@@ -517,7 +517,7 @@ function ChatView({
   return (
     // overflow-hidden is critical — prevents the AppShell scroll from
     // pushing the input up. The inner message div handles its own scroll.
-    <div className="flex flex-col w-full overflow-hidden" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex flex-col w-full" style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-6 py-3 border-b border-white/6 flex-shrink-0 bg-black/10 backdrop-blur-sm">
@@ -569,7 +569,7 @@ function ChatView({
 
       {/* ── Messages ── */}
       <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-        <div className="max-w-3xl mx-auto px-6 py-6 space-y-5 pb-4">
+        <div className="px-6 py-5 space-y-5">
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => (
               <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -653,7 +653,7 @@ function ChatView({
         </AnimatePresence>
 
         {/* Main input bar */}
-        <div className="max-w-5xl mx-auto">
+        <div>
           <div className={`flex items-end gap-2 glass rounded-2xl px-3 py-2.5 border transition ${
             locked ? 'border-white/5 opacity-60' : 'border-white/8 focus-within:border-white/18'
           }`}>
@@ -732,7 +732,9 @@ function ChatView({
 function AssiInner() {
   const searchParams             = useSearchParams();
   const { user }                 = useAuth();
+  const { tier, features }       = useFeatures();
   const { subjects, csec, cape, isLoading } = useSubjects();
+  const isPlus = tier === 'early_bird' || tier === 'alpha' || features?.ai_bundles;
 
   // Resolve initial subject from URL param — waits until subjects are loaded
   const initialSubject = useMemo(() => {
@@ -771,23 +773,6 @@ function AssiInner() {
 
   return (
     <>
-      {/* Depth-of-field overlay — uses .assi-dof-overlay CSS class
-          which sets z-index: 9997, below the launcher (9998+) but
-          above all page content. Renders via fixed positioning
-          outside the relative stacking context. */}
-      <AnimatePresence>
-        {chatActive && subject && (
-          <motion.div
-            key="assi-dof"
-            className="assi-dof-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          />
-        )}
-      </AnimatePresence>
-
       <AnimatePresence mode="wait">
         {!chatActive || !subject ? (
           <motion.div key="picker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -804,6 +789,7 @@ function AssiInner() {
               subject={subject}
               subjects={subjects} csec={csec} cape={cape}
               username={user?.username}
+              isPlus={!!isPlus}
               onReset={handleReset}
               onSwitchSubject={handleSwitchSubject}
             />

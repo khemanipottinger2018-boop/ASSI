@@ -29,20 +29,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
 
           {/*
-            ── THEME LAYER ───────────────────────────────────────────
-            All theme visuals live here — gradient, blobs, vignette,
-            grain overlay, seasonal effects.
-
-            Key insight: position:fixed elements inside this div
-            participate in the BODY stacking context directly, not
-            this div's context. So their z-indexes (0–10) are global.
-
-            FloatingBlobs internal z-indexes:
-              blobs/effects:   0–1
-              Vignette:        9
-              GrainOverlay:   10   ← highest theme element
-
-            .ui-layer must beat ALL of these → z-index: 11.
+            THEME LAYER — fixed background, z-index 0.
+            NO isolation:isolate — position:fixed children
+            (Vignette z:9, GrainOverlay z:10) escape any
+            isolation boundary and live in body stacking context.
+            ui-layer must use z-index:11 to beat them both.
           */}
           <div className="theme-layer">
             <AnimatedGradient />
@@ -54,26 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <SettingsProvider>
                 <FeaturesProvider>
                   {/*
-                    ── UI LAYER ──────────────────────────────────────
-                    z-index: 11 beats GrainOverlay (10) and Vignette (9).
-                    position: relative is required for z-index to apply.
-                    100dvh uses dynamic viewport height (accounts for
-                    mobile browser chrome correctly).
-
-                    overflow: hidden prevents children from causing
-                    body scroll — the ASSI chat and other pages manage
-                    their own internal scroll.
+                    UI LAYER — z-index:11 beats Vignette(9) + Grain(10).
+                    100dvh uses dynamic viewport height (mobile safe).
                   */}
-                  <div
-                    className="ui-layer"
-                    style={{
-                      position: 'relative',
-                      zIndex:   11,
-                      height:   '100dvh',
-                      width:    '100vw',
-                      overflow: 'hidden',
-                    }}
-                  >
+                  <div className="ui-layer" style={{ height: '100dvh', width: '100vw', overflow: 'hidden' }}>
                     <AppShell>{children}</AppShell>
                   </div>
                 </FeaturesProvider>

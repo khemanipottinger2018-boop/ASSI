@@ -1,35 +1,34 @@
-export { api }              from './client';
+export { api } from './client';
 
-export { userApi }          from './user';
+export { userApi } from './user';
 export type {
   UserMe,
   UserStreak,
   UserBadge,
   UserFeatures,
   UserFeaturesResponse,
-}                           from './user';
+} from './user';
 
-export { sessionsApi }      from './sessions';
+export { sessionsApi } from './sessions';
 export type {
   BookedSession,
   ChatSession,
   SessionMessage,
-  BookSessionBody,
-}                           from './sessions';
+} from './sessions';
 
-export { tutorsApi }        from './tutors';
+export { tutorsApi } from './tutors';
 export type {
   TutorSummary,
   SubjectSummary,
   PublicProfile,
   BrowseFilters,
   BrowsePagination,
-}                           from './tutors';
+} from './tutors';
 
 export { notificationsApi } from './notifications';
 export type { Notification } from './notifications';
 
-export { adminApi }         from './admin';
+export { adminApi } from './admin';
 export type {
   AdminUser,
   AdminApplication,
@@ -38,10 +37,17 @@ export type {
   DashboardStats,
   LiveSession,
   ApplicationStatus,
-}                           from './admin';
+} from './admin';
 
 export { messagesApi, adminMessagesApi } from './messages';
 export type {
   InboxMessage,
   MessageThread,
 } from './messages';
+
+export { browseApi } from './browse';
+export type {
+  BookSessionBody,
+  InstantChatBody,
+  SessionSummary,
+} from './browse';

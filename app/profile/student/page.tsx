@@ -10,9 +10,9 @@ import {
   Star, Zap, Trophy, Clock, ChevronRight, Sparkles,
   TrendingUp, Award,
 } from 'lucide-react';
-import { userApi, sessionsApi } from '@/lib/api';
+import { userApi, browseApi } from '@/lib/api';
 import type { UserMe } from '@/lib/api/user';
-import type { BookedSession } from '@/lib/api';
+import type { SessionSummary } from '@/lib/api/browse';
 import ProfileEditModal from '@/components/shared/ui/ProfileEditModal';
 
 const fade = (delay = 0) => ({
@@ -22,23 +22,22 @@ const fade = (delay = 0) => ({
 });
 
 const MILESTONES = [
-  { days: 7,   label: '1 Week',   icon: Zap,       reward: '+10 credits'      },
-  { days: 30,  label: '1 Month',  icon: TrendingUp, reward: '+50 credits'     },
-  { days: 100, label: '100 Days', icon: Award,      reward: '+150 credits'    },
-  { days: 365, label: '365 Days', icon: Star,       reward: 'ASSI+ for a year'},
+  { days: 7,   label: '1 Week',   icon: Zap,        reward: '+10 credits'       },
+  { days: 30,  label: '1 Month',  icon: TrendingUp,  reward: '+50 credits'      },
+  { days: 100, label: '100 Days', icon: Award,       reward: '+150 credits'     },
+  { days: 365, label: '365 Days', icon: Star,        reward: 'ASSI+ for a year' },
 ];
 
 const statusStyle: Record<string, { label: string; color: string }> = {
-  active:      { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-  in_progress: { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-  pending:     { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
-  confirmed:   { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
-  completed:   { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10'                },
-  cancelled:   { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
+  active:          { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  in_progress:     { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  pending:         { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
+  instant_pending: { label: 'Waiting',   color: 'text-blue-400 bg-blue-500/15 border-blue-500/20'         },
+  confirmed:       { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
+  completed:       { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10'                },
+  cancelled:       { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
 };
 
-// Derive weekly pips from currentStreak alone
-// (UserStreak only has currentStreak / longestStreak / lastActiveAt)
 function weekPips(streak: number): number {
   if (streak === 0) return 0;
   const mod = streak % 7;
@@ -50,9 +49,7 @@ function WeekPips({ streak }: { streak: number }) {
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: 7 }).map((_, i) => (
-        <div key={i} className={`h-1.5 rounded-full transition-all ${
-          i < filled ? 'w-5 bg-orange-400' : 'w-2 bg-white/10'
-        }`} />
+        <div key={i} className={`h-1.5 rounded-full transition-all ${i < filled ? 'w-5 bg-orange-400' : 'w-2 bg-white/10'}`} />
       ))}
     </div>
   );
@@ -61,20 +58,18 @@ function WeekPips({ streak }: { streak: number }) {
 export default function StudentProfilePage() {
   const { logout } = useAuth();
   const router     = useRouter();
+  const { streak } = useStreak();
 
   const [profile,  setProfile]  = useState<UserMe | null>(null);
-  const [sessions, setSessions] = useState<BookedSession[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);   // ← updated type
   const [loading,  setLoading]  = useState(true);
   const [showEdit, setShowEdit] = useState(false);
-
-  // UserStreak = { currentStreak: number, longestStreak: number, lastActiveAt: string | null }
-  const { streak } = useStreak();
 
   async function fetchAll() {
     try {
       const [me, sess] = await Promise.all([
         userApi.getMe(),
-        sessionsApi.getMySessions(),
+        browseApi.mySessions(),                                       // ← updated
       ]);
       if (me.success)   setProfile(me.user);
       if (sess.success) setSessions(sess.sessions ?? []);
@@ -88,7 +83,7 @@ export default function StudentProfilePage() {
   const p         = profile;
   const completed = sessions.filter(s => s.status === 'completed');
   const upcoming  = sessions.filter(s =>
-    ['pending', 'confirmed', 'in_progress', 'active'].includes(s.status)
+    ['pending', 'instant_pending', 'confirmed', 'in_progress', 'active'].includes(s.status)
   );
   const recent = sessions.slice(0, 4);
 
@@ -138,8 +133,7 @@ export default function StudentProfilePage() {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setShowEdit(true)}
-                className="glass-soft rounded-xl p-2.5 text-white/32 hover:text-white/65 transition flex-shrink-0">
+              <button onClick={() => setShowEdit(true)} className="glass-soft rounded-xl p-2.5 text-white/32 hover:text-white/65 transition flex-shrink-0">
                 <Edit3 size={14} />
               </button>
             </div>
@@ -155,7 +149,7 @@ export default function StudentProfilePage() {
         {/* ── Stats ── */}
         <motion.div {...fade(0.06)} className="grid grid-cols-3 gap-3">
           <MiniStat icon={BookOpen} label="Completed" value={completed.length} accent="emerald" />
-          <MiniStat icon={Calendar} label="Upcoming"  value={upcoming.length}  accent="purple" />
+          <MiniStat icon={Calendar} label="Upcoming"  value={upcoming.length}  accent="purple"  />
           <MiniStat icon={Trophy}   label="Streak"    value={currentStreak}    accent="orange"
             suffix={currentStreak === 1 ? 'day' : 'days'} />
         </motion.div>
@@ -176,9 +170,9 @@ export default function StudentProfilePage() {
                 <span className="text-white/42 text-xs font-medium uppercase tracking-widest">Login streak</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className={`text-2xl font-bold ${
-                  is365 ? 'text-yellow-400' : currentStreak > 0 ? 'text-orange-400' : 'text-white/28'
-                }`}>{currentStreak}</span>
+                <span className={`text-2xl font-bold ${is365 ? 'text-yellow-400' : currentStreak > 0 ? 'text-orange-400' : 'text-white/28'}`}>
+                  {currentStreak}
+                </span>
                 <span className="text-white/22 text-xs">days</span>
                 {longestStreak > currentStreak && longestStreak > 0 && (
                   <span className="text-white/15 text-[10px] ml-1">best {longestStreak}</span>
@@ -192,17 +186,13 @@ export default function StudentProfilePage() {
             </div>
 
             <div className="space-y-1.5">
-              {MILESTONES.map((m) => {
+              {MILESTONES.map(m => {
                 const reached  = currentStreak >= m.days;
                 const progress = Math.min(currentStreak / m.days, 1);
                 const MIcon    = m.icon;
                 return (
-                  <div key={m.days} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${
-                    reached ? 'bg-orange-400/6 border border-orange-400/12' : 'bg-white/2'
-                  }`}>
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                      reached ? 'bg-orange-400/15' : 'bg-white/5'
-                    }`}>
+                  <div key={m.days} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${reached ? 'bg-orange-400/6 border border-orange-400/12' : 'bg-white/2'}`}>
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${reached ? 'bg-orange-400/15' : 'bg-white/5'}`}>
                       <MIcon size={12} className={reached ? (m.days === 365 ? 'text-yellow-400' : 'text-orange-400') : 'text-white/20'} />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -213,9 +203,8 @@ export default function StudentProfilePage() {
                         </span>
                       </div>
                       <div className="h-1 rounded-full bg-white/6 overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-700 ${
-                          reached ? (m.days === 365 ? 'bg-gradient-to-r from-orange-400 to-yellow-400' : 'bg-orange-400') : 'bg-orange-400/35'
-                        }`} style={{ width: `${progress * 100}%` }} />
+                        <div className={`h-full rounded-full transition-all duration-700 ${reached ? (m.days === 365 ? 'bg-gradient-to-r from-orange-400 to-yellow-400' : 'bg-orange-400') : 'bg-orange-400/35'}`}
+                          style={{ width: `${progress * 100}%` }} />
                       </div>
                     </div>
                     {reached && (
@@ -237,8 +226,7 @@ export default function StudentProfilePage() {
               <Clock size={12} className="text-white/28" />
               <span className="text-white/38 text-[10px] font-medium uppercase tracking-widest">Recent sessions</span>
             </div>
-            <button onClick={() => router.push('/sessions')}
-              className="flex items-center gap-0.5 text-white/28 hover:text-white/55 text-xs transition">
+            <button onClick={() => router.push('/sessions')} className="flex items-center gap-0.5 text-white/28 hover:text-white/55 text-xs transition">
               See all <ChevronRight size={11} />
             </button>
           </div>
@@ -246,18 +234,20 @@ export default function StudentProfilePage() {
             {recent.length === 0 ? (
               <div className="glass-soft rounded-2xl px-4 py-6 text-center">
                 <p className="text-white/22 text-sm">No sessions yet</p>
-                <button onClick={() => router.push('/browse')}
-                  className="mt-2 text-xs text-white/32 hover:text-white/55 underline underline-offset-2 transition">
+                <button onClick={() => router.push('/browse')} className="mt-2 text-xs text-white/32 hover:text-white/55 underline underline-offset-2 transition">
                   Find a tutor
                 </button>
               </div>
             ) : (
-              recent.map((s) => {
+              recent.map(s => {
                 const style = statusStyle[s.status] ?? statusStyle.completed;
                 return (
                   <div key={s.sessionId} className="glass-soft rounded-2xl px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
-                      <BookOpen size={13} className="text-white/35" />
+                    <div className="w-8 h-8 rounded-xl glass-soft flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {s.partnerAvatarUrl
+                        ? <img src={s.partnerAvatarUrl} alt={s.partnerUsername} className="w-full h-full object-cover" />
+                        : <BookOpen size={13} className="text-white/35" />
+                      }
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-white/70 text-sm font-medium truncate">{s.subjectName ?? 'Session'}</p>
@@ -317,10 +307,7 @@ function ActionRow({ label, onClick, destructive, icon: Icon }: {
   label: string; onClick: () => void; destructive?: boolean; icon?: React.ElementType;
 }) {
   return (
-    <button onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm transition hover:bg-white/5 ${
-        destructive ? 'text-red-400/65 hover:text-red-400' : 'text-white/48 hover:text-white/75'
-      }`}>
+    <button onClick={onClick} className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm transition hover:bg-white/5 ${destructive ? 'text-red-400/65 hover:text-red-400' : 'text-white/48 hover:text-white/75'}`}>
       {Icon && <Icon size={13} className="text-white/22" />}
       <span className="flex-1 text-left">{label}</span>
       <span className="text-white/18">›</span>
@@ -332,9 +319,7 @@ function ProfileSkeleton() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
       <div className="glass rounded-3xl h-36" />
-      <div className="grid grid-cols-3 gap-3">
-        {[0,1,2].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}
-      </div>
+      <div className="grid grid-cols-3 gap-3">{[0,1,2].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}</div>
       <div className="glass rounded-3xl h-64" />
       <div className="glass rounded-3xl h-36" />
     </div>

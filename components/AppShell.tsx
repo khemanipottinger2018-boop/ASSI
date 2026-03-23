@@ -2,40 +2,41 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth }     from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useSettings } from '@/contexts/SettingsContext';
 import { useFeatures } from '@/contexts/FeaturesContext';
 import { PresenceProvider } from '@/contexts/PresenceProvider';
 
-import Sidebar              from './shared/nav/Sidebar';
-import MobileNav            from './shared/nav/MobileNav';
+import Sidebar from './shared/nav/Sidebar';
+import MobileNav from './shared/nav/MobileNav';
 import AssiFloatingLauncher from './shared/assi/AssiFloatingLauncher';
-import SentinelLauncher     from './shared/../admin/sentinel/SentinelLauncher';
-import AuthModals           from './shared/auth/AuthModals';
+import SentinelLauncher from './admin/sentinel/SentinelLauncher';
+import AuthModals from './shared/auth/AuthModals';
 
-const STORAGE_KEY    = 'assi:sidebar-collapsed';
+// ✅ NEW
+import AvailabilityModal from './shared/ui/AvailabilityModal';
+
+const STORAGE_KEY = 'assi:sidebar-collapsed';
 const UNDERCOVER_KEY = 'sentinel:undercover';
 
-// Routes that render with no chrome at all
-const BARE_ROUTES  = ['/signin', '/signup'];
-// Routes that use the admin shell (no sidebar, no ASSI)
+const BARE_ROUTES = ['/signin', '/signup'];
 const ADMIN_ROUTES = ['/admin', '/sentinel'];
-
-// Routes where <main> must NOT scroll — the page manages its own scroll
-// (e.g. ASSI chat has a docked input that needs overflow:hidden on the parent)
 const NO_SCROLL_ROUTES = ['/assi', '/live-chat'];
 
 type UndercoverRole = 'student' | 'tutor' | null;
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { user }                          = useAuth();
-  const { settings }                      = useSettings();
+  const { user } = useAuth();
+  const { settings } = useSettings();
   const { features, tier, isLoading: featuresLoading } = useFeatures();
-  const pathname                          = usePathname();
+  const pathname = usePathname();
 
-  const [collapsed,      setCollapsed]      = useState(false);
-  const [mounted,        setMounted]        = useState(false);
-  const [undercoverRole, setUndercover]     = useState<UndercoverRole>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [undercoverRole, setUndercover] = useState<UndercoverRole>(null);
+
+  // ✅ NEW: availability modal state
+  const [showAvailability, setShowAvailability] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -46,20 +47,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleToggle = useCallback(() => {
-    setCollapsed(prev => {
+    setCollapsed((prev) => {
       const next = !prev;
       localStorage.setItem(STORAGE_KEY, String(next));
       return next;
     });
   }, []);
 
-  // ── Bare routes (auth pages) ─────────────────────────────────────
-  if (BARE_ROUTES.some(r => pathname.startsWith(r))) {
+  // ── Bare routes ─────────────────────────────
+  if (BARE_ROUTES.some((r) => pathname.startsWith(r))) {
     return <>{children}</>;
   }
 
-  // ── Admin routes ─────────────────────────────────────────────────
-  const isAdminRoute = ADMIN_ROUTES.some(r => pathname.startsWith(r));
+  // ── Admin routes ────────────────────────────
+  const isAdminRoute = ADMIN_ROUTES.some((r) => pathname.startsWith(r));
   if (isAdminRoute) {
     return (
       <>
@@ -72,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ── Guest / unauthenticated ──────────────────────────────────────
+  // ── Guest ───────────────────────────────────
   if (!user && mounted) {
     return (
       <>
@@ -83,37 +84,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ── Derived role/feature state ───────────────────────────────────
-  const isAdmin   = user?.role === 'admin';
+  // ── Derived state ───────────────────────────
+  const isAdmin = user?.role === 'admin';
   const isStudent = user?.role === 'student';
-  const isTutor   = user?.role === 'tutor' || user?.role === 'tutor_applicant';
-  const isPlus    = tier === 'plus' || tier === 'assi_plus';
+  const isTutor = user?.role === 'tutor' || user?.role === 'tutor_applicant';
+  const isPlus = tier === 'early_bird' || tier === 'alpha';
 
-  // ASSI floating launcher:
-  // — Shown for students/tutors if settings allow
-  // — ai_bundles feature flag gates it (when features are loaded)
-  // — Always shown for admins undercover
   const assiAllowed = settings?.assiEnabled !== false;
-  const assiEnabled = featuresLoading
-    ? false  // don't flash it on before features load
-    : features.ai_bundles || isPlus;
-
+  const assiEnabled = featuresLoading ? false : features.ai_bundles || isPlus;
   const showAssi =
     assiAllowed &&
-    (
-      (isStudent && assiEnabled) ||
-      (isTutor   && assiEnabled) ||
-      (isAdmin   && undercoverRole !== null)
-    );
+    ((isStudent && assiEnabled) ||
+      (isTutor && assiEnabled) ||
+      (isAdmin && undercoverRole !== null));
 
-  // Whether this route manages its own scroll (ASSI chat, live chat)
-  const noScroll = NO_SCROLL_ROUTES.some(r => pathname.startsWith(r));
+  const noScroll = NO_SCROLL_ROUTES.some((r) => pathname.startsWith(r));
 
-  // ── Authenticated app shell ──────────────────────────────────────
+  // ── Authenticated App Shell ─────────────────
   return (
     <PresenceProvider>
       <div className="flex h-full w-full overflow-hidden">
-
         {/* Sidebar */}
         <Sidebar
           collapsed={collapsed}
@@ -121,35 +111,37 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           undercoverRole={isAdmin ? undercoverRole : undefined}
           features={features}
           tier={tier}
+
+          // ✅ NEW: allow sidebar to open availability modal
+          onOpenAvailability={isTutor ? () => setShowAvailability(true) : undefined}
         />
 
-        {/* Main content area */}
+        {/* Main */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <main className={`flex-1 overflow-x-hidden ${
-            noScroll
-              ? 'overflow-y-hidden'   // page handles its own scroll (ASSI chat etc.)
-              : 'overflow-y-auto pb-16 md:pb-0'
-          }`}>
+          <main
+            className={`flex-1 overflow-x-hidden ${
+              noScroll ? 'overflow-y-hidden' : 'overflow-y-auto pb-16 md:pb-0'
+            }`}
+          >
             {children}
           </main>
 
-          {/* Mobile nav hidden on no-scroll routes (live chat, ASSI) */}
           {!noScroll && <MobileNav features={features} />}
         </div>
 
-        {/* ASSI floating orb — authenticated only */}
-        {mounted && showAssi && (
-          <AssiFloatingLauncher
-            enabled
-            isPlus={isPlus}
-          />
-        )}
+        {/* ASSI */}
+        {mounted && showAssi && <AssiFloatingLauncher enabled isPlus={isPlus} />}
 
-        {/* Sentinel (admin only) */}
+        {/* Sentinel */}
         {mounted && isAdmin && (
           <SentinelLauncher onUndercoverChange={setUndercover} />
         )}
       </div>
+
+      {/* ✅ GLOBAL AVAILABILITY MODAL (TUTORS ONLY) */}
+      {mounted && isTutor && showAvailability && (
+        <AvailabilityModal onClose={() => setShowAvailability(false)} />
+      )}
 
       <AuthModals />
     </PresenceProvider>

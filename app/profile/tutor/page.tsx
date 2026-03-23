@@ -8,10 +8,11 @@ import {
   Star, BookOpen, DollarSign, Edit3, Clock,
   Users, TrendingUp, ChevronRight, ExternalLink, Sparkles,
 } from 'lucide-react';
-import { userApi, tutorsApi, sessionsApi } from '@/lib/api';
+import { userApi, tutorsApi, browseApi } from '@/lib/api';
+import { useCurrency } from '@/hooks/useCurrency';
 import type { UserMe } from '@/lib/api/user';
 import type { SubjectSummary } from '@/lib/api/tutors';
-import type { BookedSession } from '@/lib/api';
+import type { SessionSummary } from '@/lib/api/browse';
 import ProfileEditModal    from '@/components/shared/ui/ProfileEditModal';
 import ManageSubjectsModal from '@/components/shared/ui/ManageSubjectsModal';
 import AvailabilityModal   from '@/components/shared/ui/AvailabilityModal';
@@ -25,21 +26,23 @@ const fade = (delay = 0) => ({
 });
 
 const statusStyle: Record<string, { label: string; color: string }> = {
-  active:      { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-  in_progress: { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
-  pending:     { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
-  confirmed:   { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
-  completed:   { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10'                },
-  cancelled:   { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
+  active:          { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  in_progress:     { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
+  pending:         { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
+  instant_pending: { label: 'Waiting',  color: 'text-blue-400 bg-blue-500/15 border-blue-500/20'          },
+  confirmed:       { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
+  completed:       { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10'                },
+  cancelled:       { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
 };
 
 export default function TutorProfilePage() {
   const { user, logout } = useAuth();
-  const router = useRouter();
+  const router           = useRouter();
+  const { format }       = useCurrency();
 
   const [profile,  setProfile]  = useState<UserMe | null>(null);
   const [subjects, setSubjects] = useState<SubjectSummary[]>([]);
-  const [sessions, setSessions] = useState<BookedSession[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [modal,    setModal]    = useState<Modal>(null);
 
@@ -49,7 +52,7 @@ export default function TutorProfilePage() {
       const [meData, publicData, sessData] = await Promise.all([
         userApi.getMe(),
         tutorsApi.getPublicProfile(user.username),
-        sessionsApi.getMySessions(),
+        browseApi.mySessions(),                           // ← updated
       ]);
       if (meData.success)     setProfile(meData.user);
       if (publicData.success) setSubjects(publicData.user.subjects ?? []);
@@ -64,16 +67,17 @@ export default function TutorProfilePage() {
   if (loading) return <ProfileSkeleton />;
 
   const p         = profile;
-  const bio       = p?.tutor?.bio       ?? null;
-  const timezone  = p?.tutor?.timezone  ?? null;
+  const bio       = p?.tutor?.bio        ?? null;
+  const timezone  = p?.tutor?.timezone   ?? null;
   const rate      = p?.tutor?.hourlyRate ?? null;
+
   const completed = sessions.filter(s => s.status === 'completed');
   const upcoming  = sessions.filter(s =>
-    ['pending', 'confirmed', 'in_progress', 'active'].includes(s.status)
+    ['pending', 'instant_pending', 'confirmed', 'in_progress', 'active'].includes(s.status)
   );
-  const recent    = sessions.slice(0, 4);
+  const recent = sessions.slice(0, 4);
 
-  // Estimated earnings — completed sessions × rate × avg duration fallback
+  // Estimated earnings — completed × rate × duration (80% platform cut assumed)
   const estimatedEarnings = rate && completed.length
     ? completed.reduce((acc, s) => acc + ((s.durationMinutes ?? 60) / 60) * rate * 0.8, 0)
     : null;
@@ -88,17 +92,14 @@ export default function TutorProfilePage() {
           <div className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
-                {/* Avatar */}
                 <div className="relative flex-shrink-0">
                   <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center text-white/70 font-semibold text-2xl">
                     {p?.username?.[0]?.toUpperCase()}
                   </div>
-                  {/* Live presence dot */}
                   <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-black/30 flex items-center justify-center">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                   </span>
                 </div>
-
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-white font-semibold text-xl tracking-tight leading-none">
@@ -114,7 +115,6 @@ export default function TutorProfilePage() {
                       <Clock size={10} /> {timezone}
                     </p>
                   )}
-                  {/* View public profile link */}
                   <button
                     onClick={() => router.push(`/u/${p?.username}`)}
                     className="flex items-center gap-1 mt-2 text-white/25 hover:text-white/55 text-[11px] transition"
@@ -123,7 +123,6 @@ export default function TutorProfilePage() {
                   </button>
                 </div>
               </div>
-
               <button
                 onClick={() => setModal('edit')}
                 className="glass-soft rounded-xl p-2.5 text-white/35 hover:text-white/70 transition flex-shrink-0"
@@ -151,22 +150,14 @@ export default function TutorProfilePage() {
         <motion.div {...fade(0.06)} className="grid grid-cols-4 gap-2">
           <MiniStat
             icon={DollarSign} label="Rate"
-            value={rate != null ? `$${rate}` : '—'}
+            value={rate != null ? format(rate, { short: true }) : '—'}
             accent="emerald"
           />
-          <MiniStat
-            icon={BookOpen} label="Sessions"
-            value={String(completed.length)}
-            accent="white"
-          />
-          <MiniStat
-            icon={Users} label="Upcoming"
-            value={String(upcoming.length)}
-            accent="purple"
-          />
+          <MiniStat icon={BookOpen}    label="Sessions" value={String(completed.length)} accent="white"  />
+          <MiniStat icon={Users}       label="Upcoming" value={String(upcoming.length)}  accent="purple" />
           <MiniStat
             icon={TrendingUp} label="Earned"
-            value={estimatedEarnings != null ? `$${Math.round(estimatedEarnings)}` : '—'}
+            value={estimatedEarnings != null ? format(estimatedEarnings, { short: true }) : '—'}
             accent="orange"
           />
         </motion.div>
@@ -176,21 +167,15 @@ export default function TutorProfilePage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BookOpen size={13} className="text-white/30" />
-              <span className="text-white/40 text-xs font-medium uppercase tracking-widest">
-                Subjects
-              </span>
+              <span className="text-white/40 text-xs font-medium uppercase tracking-widest">Subjects</span>
             </div>
-            <button
-              onClick={() => setModal('subjects')}
-              className="text-white/30 hover:text-white/60 text-xs transition"
-            >
+            <button onClick={() => setModal('subjects')} className="text-white/30 hover:text-white/60 text-xs transition">
               {subjects.length > 0 ? 'Edit' : '+ Add subjects'}
             </button>
           </div>
-
           {subjects.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              {subjects.map((s) => (
+              {subjects.map(s => (
                 <span key={s.id} className={`
                   px-2.5 py-1 rounded-full text-xs font-medium border
                   ${s.category === 'CAPE'
@@ -206,10 +191,7 @@ export default function TutorProfilePage() {
           ) : (
             <div className="text-center py-4">
               <p className="text-white/20 text-xs">No subjects added yet</p>
-              <button
-                onClick={() => setModal('subjects')}
-                className="mt-2 text-orange-400/60 hover:text-orange-400 text-xs underline underline-offset-2 transition"
-              >
+              <button onClick={() => setModal('subjects')} className="mt-2 text-orange-400/60 hover:text-orange-400 text-xs underline underline-offset-2 transition">
                 Add subjects to appear in search
               </button>
             </div>
@@ -221,45 +203,34 @@ export default function TutorProfilePage() {
           <div className="flex items-center justify-between px-1 mb-2">
             <div className="flex items-center gap-2">
               <Clock size={13} className="text-white/30" />
-              <span className="text-white/40 text-xs font-medium uppercase tracking-widest">
-                Recent sessions
-              </span>
+              <span className="text-white/40 text-xs font-medium uppercase tracking-widest">Recent sessions</span>
             </div>
-            <button
-              onClick={() => router.push('/sessions')}
-              className="flex items-center gap-0.5 text-white/30 hover:text-white/60 text-xs transition"
-            >
+            <button onClick={() => router.push('/sessions')} className="flex items-center gap-0.5 text-white/30 hover:text-white/60 text-xs transition">
               See all <ChevronRight size={11} />
             </button>
           </div>
-
           <div className="space-y-2">
             {recent.length === 0 ? (
               <div className="glass-soft rounded-2xl px-4 py-6 text-center">
                 <p className="text-white/25 text-sm">No sessions yet</p>
               </div>
             ) : (
-              recent.map((s) => {
+              recent.map(s => {
                 const style = statusStyle[s.status] ?? statusStyle.completed;
                 return (
-                  <div key={s.sessionId}
-                    className="glass-soft rounded-2xl px-4 py-3 flex items-center gap-3"
-                  >
+                  <div key={s.sessionId} className="glass-soft rounded-2xl px-4 py-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
-                      <BookOpen size={13} className="text-white/40" />
+                      {s.partnerAvatarUrl
+                        ? <img src={s.partnerAvatarUrl} alt={s.partnerUsername} className="w-full h-full object-cover rounded-xl" />
+                        : <BookOpen size={13} className="text-white/40" />
+                      }
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-white/75 text-sm font-medium truncate">
-                        {s.subjectName ?? 'Session'}
-                      </p>
+                      <p className="text-white/75 text-sm font-medium truncate">{s.subjectName ?? 'Session'}</p>
                       <p className="text-white/30 text-xs mt-0.5">
                         with {s.partnerUsername}
-                        {s.scheduledAt && (
-                          <span> · {new Date(s.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                        )}
-                        {s.durationMinutes && (
-                          <span> · {s.durationMinutes}m</span>
-                        )}
+                        {s.scheduledAt && <span> · {new Date(s.scheduledAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                        {s.durationMinutes && <span> · {s.durationMinutes}m</span>}
                       </p>
                     </div>
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border flex-shrink-0 ${style.color}`}>
@@ -274,9 +245,7 @@ export default function TutorProfilePage() {
 
         {/* ── Account actions ── */}
         <motion.div {...fade(0.18)} className="glass rounded-3xl p-4 space-y-1">
-          <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">
-            Account
-          </p>
+          <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
           <ActionRow label="Edit profile"    icon={Edit3}    onClick={() => setModal('edit')} />
           <ActionRow label="Manage subjects" icon={BookOpen}  onClick={() => setModal('subjects')} />
           <ActionRow label="Availability"    icon={Clock}     onClick={() => setModal('availability')} />
@@ -286,26 +255,19 @@ export default function TutorProfilePage() {
 
       </div>
 
-      {/* ── Modals ── */}
       {modal === 'edit' && profile && (
         <ProfileEditModal
           profile={{
-            id:         profile.id,
-            username:   profile.username,
-            role:       profile.role,
-            tutorBio:   profile.tutor?.bio       ?? null,
-            hourlyRate: profile.tutor?.hourlyRate ?? null,
-            tutor:      profile.tutor ?? null,
+            id: profile.id, username: profile.username, role: profile.role,
+            tutorBio: profile.tutor?.bio ?? null, hourlyRate: profile.tutor?.hourlyRate ?? null,
+            tutor: profile.tutor ?? null,
           }}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); fetchAll(); }}
         />
       )}
       {modal === 'subjects' && (
-        <ManageSubjectsModal
-          onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); fetchAll(); }}
-        />
+        <ManageSubjectsModal onClose={() => setModal(null)} onSaved={() => { setModal(null); fetchAll(); }} />
       )}
       {modal === 'availability' && (
         <AvailabilityModal onClose={() => setModal(null)} />
@@ -314,16 +276,10 @@ export default function TutorProfilePage() {
   );
 }
 
-// ── Shared sub-components ──────────────────────────────────────────
-
 function MiniStat({ icon: Icon, label, value, accent = 'white' }: {
-  icon: React.ElementType; label: string; value: string;
-  accent?: 'white' | 'emerald' | 'orange' | 'purple';
+  icon: React.ElementType; label: string; value: string; accent?: 'white' | 'emerald' | 'orange' | 'purple';
 }) {
-  const colors = {
-    white: 'text-white/60', emerald: 'text-emerald-400',
-    orange: 'text-orange-400', purple: 'text-purple-400',
-  };
+  const colors = { white: 'text-white/60', emerald: 'text-emerald-400', orange: 'text-orange-400', purple: 'text-purple-400' };
   return (
     <div className="glass-soft rounded-2xl px-3 py-3 flex flex-col gap-1.5">
       <Icon size={13} className="text-white/25" />
@@ -334,16 +290,10 @@ function MiniStat({ icon: Icon, label, value, accent = 'white' }: {
 }
 
 function ActionRow({ label, onClick, destructive, icon: Icon }: {
-  label: string; onClick: () => void;
-  destructive?: boolean; icon?: React.ElementType;
+  label: string; onClick: () => void; destructive?: boolean; icon?: React.ElementType;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm transition hover:bg-white/6 ${
-        destructive ? 'text-red-400/70 hover:text-red-400' : 'text-white/50 hover:text-white/80'
-      }`}
-    >
+    <button onClick={onClick} className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl text-sm transition hover:bg-white/6 ${destructive ? 'text-red-400/70 hover:text-red-400' : 'text-white/50 hover:text-white/80'}`}>
       {Icon && <Icon size={14} className="text-white/25" />}
       <span className="flex-1 text-left">{label}</span>
       <span className="text-white/20">›</span>
@@ -355,9 +305,7 @@ function ProfileSkeleton() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
       <div className="glass rounded-3xl h-40" />
-      <div className="grid grid-cols-4 gap-2">
-        {[0, 1, 2, 3].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}
-      </div>
+      <div className="grid grid-cols-4 gap-2">{[0,1,2,3].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}</div>
       <div className="glass rounded-3xl h-32" />
       <div className="glass rounded-3xl h-40" />
       <div className="glass rounded-3xl h-40" />

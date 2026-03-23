@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth }               from '@/contexts/AuthContext';
 import { useTutorAvailability }  from '@/hooks/useTutorAvailability';
-import { getPresenceDisplay }    from '@/lib/presence/getPresenceDisplay';
+import { getPresenceDisplay }    from '@/lib/presence/usePresenceDisplay';
 import { sessionsApi, tutorsApi } from '@/lib/api';
 import type { BookedSession }    from '@/lib/api';
 

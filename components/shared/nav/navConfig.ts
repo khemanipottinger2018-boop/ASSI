@@ -6,6 +6,7 @@ import {
   Cpu, Inbox, FileText, Trophy, BookMarked,
   Wallet, Star, HelpCircle, PenTool, Sparkles,
   TrendingUp, UserCheck, DollarSign, MessageSquare,
+  Radio,
 } from 'lucide-react';
 import type { UserFeatures } from '@/lib/api/user';
 
@@ -16,7 +17,7 @@ export type NavItem = {
   badge?:   'notifications' | 'messages';
   exact?:   boolean;
   soon?:    boolean;
-  feature?: keyof UserFeatures; // gates this item behind a feature flag
+  feature?: keyof UserFeatures;
 };
 
 export type NavSection = {
@@ -74,6 +75,7 @@ export const navByRole: Record<string, NavSection> = {
       { label: 'Home',          href: '/',                icon: Home,            exact: true },
       { label: 'Dashboard',     href: '/dashboard/tutor', icon: LayoutDashboard },
       { label: 'Sessions',      href: '/sessions',        icon: Calendar },
+      { label: 'Live Sessions', href: '/live-chat',       icon: Radio },         // ← lobby: group study + conference
       { label: 'Inbox',         href: '/inbox',           icon: Inbox,           badge: 'messages' },
       { label: 'Notifications', href: '/notifications',   icon: Bell,            badge: 'notifications' },
       // ── Teaching (feature-gated)
@@ -95,7 +97,7 @@ export const navByRole: Record<string, NavSection> = {
       { label: 'Home',      href: '/',                icon: Home,            exact: true },
       { label: 'Dashboard', href: '/dashboard/tutor', icon: LayoutDashboard },
       { label: 'Sessions',  href: '/sessions',        icon: Calendar },
-      { label: 'Inbox',     href: '/inbox',           icon: Inbox,           badge: 'messages' },
+      { label: 'Live',      href: '/live-chat',       icon: Radio },
       { label: 'Profile',   href: '/profile',         icon: User },
     ],
   },
@@ -162,20 +164,13 @@ export function getNav(role?: string): NavSection {
   };
 }
 
-/**
- * Filter nav items by feature flags.
- * Items without a feature key always show.
- * Items with a feature key only show if that feature is enabled.
- * Items with soon:true always show (as coming soon) regardless of feature flag —
- * this lets users see what's coming without being able to use it yet.
- */
 export function filterNavByFeatures(
   items: NavItem[],
   features: UserFeatures,
 ): NavItem[] {
   return items.filter(item => {
-    if (!item.feature) return true;          // no gate — always show
-    if (item.soon) return true;              // coming soon — always show grayed out
-    return features[item.feature] === true;  // gate active — only show if enabled
+    if (!item.feature) return true;
+    if (item.soon) return true;
+    return features[item.feature] === true;
   });
 }

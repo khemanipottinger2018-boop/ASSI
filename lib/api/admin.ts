@@ -178,6 +178,8 @@ export const adminApi = {
 
   /* ── Errors (stubbed — always returns []) ── */
 
-  getErrors: () =>
-    api.get<{ success: boolean; count: number; errors: any[] }>('/api/admin/errors'),
+  getErrors: (range?: '24h' | '7d' | '30d') =>
+    api.get<{ success: boolean; count: number; errors: any[] }>(
+      `/api/admin/errors${range ? `?range=${range}` : ''}`
+    ),
 };
