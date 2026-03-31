@@ -9,6 +9,13 @@ export type {
   UserFeaturesResponse,
 } from './user';
 
+export { presenceApi } from './presence';
+export type { 
+  PresenceMeResponse, 
+  PublicPresenceResponse, 
+  Eligibility 
+} from './presence';
+
 export { sessionsApi } from './sessions';
 export type {
   BookedSession,

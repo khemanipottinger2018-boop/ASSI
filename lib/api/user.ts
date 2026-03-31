@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { UserSettings } from '@/contexts/SettingsContext';
+import type { UserSettings } from '@/features/settings';
 
 /* ── GET /api/user/me ─────────────────────────────────────────────
  * Full response shape from user.routes.ts.

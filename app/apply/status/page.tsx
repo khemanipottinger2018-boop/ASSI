@@ -7,7 +7,7 @@ import {
   Loader2, Clock, CheckCircle, XCircle,
   Eye, RefreshCw, BookOpen, Edit3,
 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/features/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 

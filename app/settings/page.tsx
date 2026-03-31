@@ -7,15 +7,15 @@ import {
   Sun, Moon, Sparkles, Star, Leaf, BookOpen,
   User, Globe, Lock, Zap, Eye, EyeOff, Crown, Calendar,
 } from 'lucide-react';
-import { useSettings } from '@/contexts/SettingsContext';
-import { useAuth } from '@/contexts/AuthContext';
-import type { UserSettings } from '@/contexts/SettingsContext';
+import { useSettings } from '@/features/settings';
+import { useAuth } from '@/features/auth';
+import type { UserSettings } from '@/features/settings';
 import {
   useTheme,
   ColorMode,
   CUSTOM_PRESET_LABELS,
   CUSTOM_PRESET_COLORS,
-} from '@/components/shared/themes/core/ThemeProvider';
+} from '@/features/themes/core/ThemeProvider';
 import type {
   LavaLampVariant,
   SpaceVariant,
@@ -24,8 +24,8 @@ import type {
   SubjectVariant,
   ThemeGroup,
   PremiumVariant,
-} from '@/components/shared/themes/core/ThemeProvider';
-import { ASSI_PLUS_VARIANTS, requiresAssisPlus } from '@/components/shared/themes/core/ThemeProvider';
+} from '@/features/themes/core/ThemeProvider';
+import { ASSI_PLUS_VARIANTS, requiresAssisPlus } from '@/features/themes/core/ThemeProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 

@@ -24,10 +24,10 @@ import {
   Zap, Users, Radio, ChevronRight,
   Lock, Sparkles,
 } from 'lucide-react';
-import { useAuth }     from '@/contexts/AuthContext';
-import { useFeatures } from '@/contexts/FeaturesContext';
-import { useTheme }    from '@/components/shared/themes/core/ThemeProvider';
-import SubjectDropdown, { Subject } from '@/components/shared/service-selector/SubjectDropdown';
+import { useAuth }     from '@/features/auth';
+import { useFeatures } from '@/features/platform';
+import { useTheme }    from '@/features/themes/core/ThemeProvider';
+import SubjectDropdown, { Subject } from '@/features/browse/SubjectDropdown';
 import type { SessionType } from './types/SocketEvents';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';

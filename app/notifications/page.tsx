@@ -1,7 +1,7 @@
 'use client';
 
 import { Bell, RefreshCw } from 'lucide-react';
-import { useNotifications } from '@/hooks/useGlobalNotifications';
+import { useNotifications } from '@/features/notifications';
 import NotificationItem from './components/NotificationItem';
 import EmptyState from './components/EmptyState';
 

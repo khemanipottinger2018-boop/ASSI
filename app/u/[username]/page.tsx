@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import PublicProfileCard from '@/components/shared/ui/PublicProfileCard';
+import PublicProfileCard from '@/features/profile/PublicProfileCard';
 import { tutorsApi } from '@/lib/api';
-import type { UserProfileView } from '@/components/types/profile.view';
+import type { UserProfileView } from '@/features/types/profile.view';
 
 export default function PublicProfilePage({
   params,

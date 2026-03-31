@@ -14,7 +14,7 @@
  * are unaffected — the return shape is identical.
  */
 
-import { useSocket } from '@/hooks/useSocket';
+import { useSocket } from '@/features/socket';
 
 export function useChatSocket() {
   return useSocket();

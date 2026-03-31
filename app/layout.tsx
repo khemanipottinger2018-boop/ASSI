@@ -2,15 +2,15 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './styles/globals.css';
 
-import { ThemeProvider }    from '@/components/shared/themes/core/ThemeProvider';
-import { AuthProvider }     from '@/contexts/AuthContext';
-import { SettingsProvider } from '@/contexts/SettingsContext';
-import { FeaturesProvider } from '@/contexts/FeaturesContext';
-import { SocketProvider }   from '@/contexts/SocketContext';
+import { ThemeProvider }    from '@/features/themes/core/ThemeProvider';
+import { AuthProvider }     from '@/features/auth';
+import { SettingsProvider } from '@/features/settings';
+import { FeaturesProvider } from '@/features/platform';
+import { SocketProvider }   from '@/features/socket';
 
-import AnimatedGradient from '@/components/shared/themes/visuals/AnimatedGradient';
-import FloatingBlobs    from '@/components/shared/themes/visuals/FloatingBlobs';
-import AppShell         from '@/components/AppShell';
+import AnimatedGradient from '@/features/themes/visuals/AnimatedGradient';
+import FloatingBlobs    from '@/features/themes/visuals/FloatingBlobs';
+import AppShell         from '@/features/nav/AppShell';
 
 const inter = Inter({
   subsets:  ['latin'],

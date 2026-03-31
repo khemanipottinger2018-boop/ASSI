@@ -3,10 +3,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, Loader2, X, ChevronDown } from 'lucide-react';
-import AvailableTutorCard from '@/components/student/dashboard/AvailableTutorCard';
+import AvailableTutorCard from '@/features/browse/AvailableTutorCard';
 
 import { tutorsApi }   from '@/lib/api';
-import { useCurrency } from '@/hooks/useCurrency';
+import { useCurrency } from '@/features/platform';
 import type { TutorSummary, SubjectSummary } from '@/lib/api/tutors';
 
 /* ── Types ── */

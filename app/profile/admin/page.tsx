@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useRouter } from 'next/navigation';
 import { Shield, Users, AlertTriangle, BarChart2 } from 'lucide-react';
 import { userApi } from '@/lib/api';

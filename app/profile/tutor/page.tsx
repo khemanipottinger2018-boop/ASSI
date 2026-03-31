@@ -2,20 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useRouter } from 'next/navigation';
 import {
   Star, BookOpen, DollarSign, Edit3, Clock,
   Users, TrendingUp, ChevronRight, ExternalLink, Sparkles,
 } from 'lucide-react';
 import { userApi, tutorsApi, browseApi } from '@/lib/api';
-import { useCurrency } from '@/hooks/useCurrency';
+import { useCurrency } from '@/features/platform';
 import type { UserMe } from '@/lib/api/user';
 import type { SubjectSummary } from '@/lib/api/tutors';
 import type { SessionSummary } from '@/lib/api/browse';
-import ProfileEditModal    from '@/components/shared/ui/ProfileEditModal';
-import ManageSubjectsModal from '@/components/shared/ui/ManageSubjectsModal';
-import AvailabilityModal   from '@/components/shared/ui/AvailabilityModal';
+import ProfileEditModal    from '@/features/ui/ProfileEditModal';
+import ManageSubjectsModal from '@/features/ui/ManageSubjectsModal';
+import AvailabilityModal   from '@/features/presence/AvailabilityModal';
 
 type Modal = 'edit' | 'subjects' | 'availability' | null;
 

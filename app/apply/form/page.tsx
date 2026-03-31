@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, ChevronLeft, ChevronRight, CheckCircle, BookOpen } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import SubjectDropdown, { Subject } from '@/components/shared/service-selector/SubjectDropdown';
+import { useAuth } from '@/features/auth';
+import SubjectDropdown, { Subject } from '@/features/browse/SubjectDropdown';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 

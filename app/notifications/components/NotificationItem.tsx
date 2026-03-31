@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Bell, CheckCircle2, Clock3 } from 'lucide-react';
-import type { Notification, NotificationType } from '@/components/types/notification';
+import type { Notification, NotificationType } from '@/features/types/notification';
 
 function formatTime(dateValue: string | Date) {
   const date = new Date(dateValue);

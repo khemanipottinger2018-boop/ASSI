@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/features/auth';
 import { useRouter } from 'next/navigation';
-import { useStreak } from '@/hooks/useStreak';
+import { useStreak } from '@/features/platform';
 import {
   Mail, BookOpen, Calendar, Edit3, Flame,
   Star, Zap, Trophy, Clock, ChevronRight, Sparkles,
@@ -13,7 +13,7 @@ import {
 import { userApi, browseApi } from '@/lib/api';
 import type { UserMe } from '@/lib/api/user';
 import type { SessionSummary } from '@/lib/api/browse';
-import ProfileEditModal from '@/components/shared/ui/ProfileEditModal';
+import ProfileEditModal from '@/features/ui/ProfileEditModal';
 
 const fade = (delay = 0) => ({
   initial: { opacity: 0, y: 12 },

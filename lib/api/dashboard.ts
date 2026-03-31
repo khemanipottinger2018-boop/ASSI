@@ -1,5 +1,5 @@
 // lib/api/dashboard.ts
-// Removed: was importing from '@/components/types/dashboard.view' (wrong path)
+// Removed: was importing from '@/features/types/dashboard.view' (wrong path)
 // and calling /api/dashboard which doesn't exist on the backend.
 //
 // The student dashboard fetches its own data inline via three parallel requests:

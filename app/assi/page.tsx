@@ -9,13 +9,13 @@ import {
   Paperclip, Mic, MicOff, X, Image as ImageIcon, FileText,
   Zap,
 } from 'lucide-react';
-import { useAuth }     from '@/contexts/AuthContext';
-import { useFeatures } from '@/contexts/FeaturesContext';
-import { useSubjects } from '@/hooks/useSubjects';
-import { subjectToModel, subjectHint } from '@/lib/subjectToModel';
-import AssiMessage    from '@/components/shared/assi/AssiMessage';
-import AssiTypingDots from '@/components/shared/assi/AssiTypingDots';
-import type { Subject } from '@/hooks/useSubjects';
+import { useAuth }     from '@/features/auth';
+import { useFeatures } from '@/features/platform';
+import { useSubjects } from '@/features/platform';
+import { subjectToModel, subjectHint } from '@/features/platform/subjectToModel';
+import AssiMessage    from '@/features/assi/AssiMessage';
+import AssiTypingDots from '@/features/assi/AssiTypingDots';
+import type { Subject } from '@/features/platform';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
 

@@ -7,7 +7,7 @@ import {
   Cpu, ChevronRight, Check, Loader2, Send,
   ArrowLeft, Clock, CheckCircle2, Trash2,
 } from 'lucide-react';
-import { useMessages } from '@/hooks/useMessages';
+import { useMessages } from '@/features/live-chat';
 import { messagesApi } from '@/lib/api';
 import type { InboxMessage, MessageThread } from '@/lib/api';
 
