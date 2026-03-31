@@ -47,7 +47,7 @@ const ATMOSPHERE: Record<string, string> = {
 };
 
 export default function AnimatedGradient() {
-  const { themeGroup, themeVariant, colorMode, timeOfDay, isSentinel } = useTheme();
+  const { themeGroup, themeVariant, colorMode, timeOfDay, nightIntensity, isSentinel } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -82,7 +82,7 @@ export default function AnimatedGradient() {
   const baseGradient  = resolveGradient(themeGroup, themeVariant as string);
   const atmosphereKey = `${themeGroup}_${themeVariant}`;
   const atmosphere = ATMOSPHERE[atmosphereKey] ?? '';
-  const timeOverlay   = mounted ? getTimeOverlay(timeOfDay) : 'rgba(0,0,0,0)';
+  const timeOverlay   = mounted ? getTimeOverlay(timeOfDay, nightIntensity) : 'rgba(0,0,0,0)';
   const isSpace       = themeGroup === 'space';
   const isPremium     = themeGroup === 'premium';
 

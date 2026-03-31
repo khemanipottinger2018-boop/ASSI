@@ -283,7 +283,33 @@ export function resolveTimeOfDay(): TimeOfDay {
   return 'midnight';
 }
 
-export function getTimeOverlay(tod: TimeOfDay): string {
+// Continuous 0.0–1.0 darkness value driven by actual minutes
+// 0.0 = solar noon (brightest), 1.0 = midnight (darkest)
+export function getNightIntensity(date: Date = new Date()): number {
+  const totalMinutes = date.getHours() * 60 + date.getMinutes();
+  const noon = 12 * 60;
+  const midnight = 24 * 60;
+
+  const distanceFromNoon = Math.abs(totalMinutes - noon);
+  const wrapped = Math.min(distanceFromNoon, midnight - distanceFromNoon);
+  const normalized = wrapped / 720; // 0.0 at noon, 1.0 at midnight
+
+  // Gentle ease curve — more natural than linear
+  return Math.pow(normalized, 1.4);
+}
+
+export function getTimeOverlay(tod: TimeOfDay, intensity?: number): string {
+  if (intensity !== undefined) {
+    if (intensity < 0.15) return 'rgba(0,0,0,0)';
+    if (intensity < 0.35) {
+      const alpha = (intensity - 0.15) * 1.5;
+      return `rgba(180, 80, 20, ${(alpha * 0.22).toFixed(3)})`;
+    }
+    const alpha = ((intensity - 0.35) / 0.65) * 0.68;
+    return `rgba(0, 0, 0, ${alpha.toFixed(3)})`;
+  }
+
+  // Fallback bucket mode (SSR / no intensity)
   switch (tod) {
     case 'dawn':      return 'rgba(255, 160, 80, 0.18)';
     case 'morning':   return 'rgba(255, 200, 120, 0.08)';
@@ -296,7 +322,15 @@ export function getTimeOverlay(tod: TimeOfDay): string {
   }
 }
 
-export function getBlobOpacity(tod: TimeOfDay): number {
+export function getBlobOpacity(tod: TimeOfDay, intensity?: number): number {
+  if (intensity !== undefined) {
+    // Daytime base 0.65, night floor 0.28
+    // Peek-through boost kicks in at high intensity so blobs stay visible
+    const base = 0.65 - (intensity * 0.37);
+    const peekBoost = intensity > 0.6 ? (intensity - 0.6) * 0.25 : 0;
+    return Math.max(0.22, base + peekBoost);
+  }
+
   switch (tod) {
     case 'dawn':      return 0.50;
     case 'morning':   return 0.60;
@@ -318,9 +352,10 @@ interface ThemeContextProps {
   themeVariant:  ThemeVariant;
   colorMode:     ColorMode;
   customPreset:  LavaLampVariant;
-  timeOfDay:     TimeOfDay;
-  isSentinel:    boolean;
-  isSyncing:     boolean;
+  timeOfDay:      TimeOfDay;
+  nightIntensity: number;
+  isSentinel:     boolean;
+  isSyncing:      boolean;
 
   setThemeGroup:      (group: ThemeGroup)       => void;
   setThemeVariant:    (variant: ThemeVariant)   => void;
@@ -346,8 +381,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [colorMode,       setModeState]    = useState<ColorMode>('dark');
   const [customPreset,    setPresetState]  = useState<LavaLampVariant>('assi');
   const [subjectOverride, setSubjectOverrideState] = useState<string | null>(null);
-  const [timeOfDay,       setTimeOfDay]    = useState<TimeOfDay>('day');
-  const [isSyncing,       setIsSyncing]    = useState(false);
+  const [timeOfDay,       setTimeOfDay]      = useState<TimeOfDay>('day');
+  const [nightIntensity,  setNightIntensity] = useState<number>(0);
+  const [isSyncing,       setIsSyncing]      = useState(false);
 
   // Prevents the debounced save from firing on the initial hydration write
   const hydratedRef = useRef(false);
@@ -355,8 +391,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // ── Time of day ticker ──
   useEffect(() => {
-    setTimeOfDay(resolveTimeOfDay());
-    const interval = setInterval(() => setTimeOfDay(resolveTimeOfDay()), 60_000);
+    const update = () => {
+      const now = new Date();
+      setTimeOfDay(resolveTimeOfDay());
+      setNightIntensity(getNightIntensity(now));
+    };
+    update();
+    const interval = setInterval(update, 60_000);
     return () => clearInterval(interval);
   }, []);
 
@@ -471,6 +512,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     colorMode,
     customPreset,
     timeOfDay,
+    nightIntensity,
     isSentinel,
     isSyncing,
     setThemeGroup,
@@ -482,7 +524,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     theme,
     setTheme,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, isSentinel, isSyncing]);
+  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, nightIntensity, isSentinel, isSyncing]);
 
   return (
     <ThemeContext.Provider value={value}>

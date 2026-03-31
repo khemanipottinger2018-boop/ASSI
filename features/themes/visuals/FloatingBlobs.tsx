@@ -275,7 +275,7 @@ function SpaceEffects({ variant }: { variant: SpaceVariant }) {
 /* ---------------------------------- */
 
 export default function FloatingBlobs() {
-  const { themeGroup, themeVariant, colorMode, timeOfDay, isSentinel } = useTheme();
+  const { themeGroup, themeVariant, colorMode, timeOfDay, nightIntensity, isSentinel } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   const jamaicaEvent = useMemo(() => detectJamaicaEvent(), []);
@@ -285,7 +285,7 @@ export default function FloatingBlobs() {
   if (!mounted || isSentinel) return null;
 
   const colors  = getBlobColors(themeGroup, themeVariant);
-  const opacity = getBlobOpacity(timeOfDay);
+  const opacity = getBlobOpacity(timeOfDay, nightIntensity);
 
   /* ---------- DARK / LIGHT MODE ---------- */
   // Clean flat backgrounds — no blobs, no effects
