@@ -15,9 +15,11 @@ import {
   Save, Download,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
-import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
-import { useTyping }       from '@/features/live-chat/hooks/useTyping';
+import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
+import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }        from '@/features/live-chat/hooks/useTyping';
+import { useSessionEvents } from '@/features/live-chat/hooks/useSessionEvents';
+import { useSessionStore }  from '@/features/live-chat/store/useSessionStore';
 import { StudyPanel }      from '../components/StudyPanel';
 import { api }             from '@/lib/api';
 import type { StudyTool, Problem } from '../components/StudyPanel';
@@ -57,11 +59,17 @@ export function GroupStudyView({
   const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
   const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
+  // ── Centralized session lifecycle — single .on() binding per event ──
+  useSessionEvents(sessionId);
+  const { status, endReason, setStatus, setEndReason, reset } = useSessionStore();
+  const sessionEnded  = status === 'ended';
+  const sessionPaused = status === 'paused';
+
+  // Session-aware reset: only clears state when sessionId changes (not same-session re-renders)
+  useEffect(() => { reset(sessionId); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Session state ──
   const [participants,    setParticipants]    = useState<Participant[]>([]);
-  const [sessionEnded,    setSessionEnded]    = useState(false);
-  const [sessionPaused,   setSessionPaused]   = useState(false);
-  const [endReason,       setEndReason]       = useState('');
   const [input,           setInput]           = useState('');
   const [confirmingEnd,   setConfirmingEnd]   = useState(false);
   const [showSidebar,     setShowSidebar]     = useState(true);
@@ -110,9 +118,11 @@ export function GroupStudyView({
       if (sessionRes.status === 'fulfilled') {
         const d = sessionRes.value;
         if (d.success && d.session) {
-          const { status, endedReason } = d.session;
-          if (status === 'ended') { setSessionEnded(true); setEndReason(endedReason ?? ''); }
-          else if (status === 'paused') setSessionPaused(true);
+          const { status: s, endedReason } = d.session;
+          if (s === 'ended')  { setEndReason(endedReason ?? ''); setStatus('ended'); }
+          else if (s === 'paused')  setStatus('paused');
+          else if (s === 'active')  setStatus('active');
+          else if (s === 'waiting') setStatus('waiting');
         }
       }
 
@@ -134,13 +144,20 @@ export function GroupStudyView({
     return () => { cancelled = true; };
   }, [sessionId, meta.hostId]);
 
-  // ── Join ──
+  // ── Join — wait for hydration so we know the session is valid ──
   useEffect(() => {
-    if (!isReady || !sessionId || joinedRef.current) return;
+    if (!isReady || !sessionId || hydrating || joinedRef.current) return;
+    // Do not join if session has already ended or hasn't been hydrated yet
+    if (status === null || status === 'ended') return;
     joinedRef.current = true;
     emit('session:join', { sessionId });
     return () => { joinedRef.current = false; };
-  }, [isReady, sessionId, emit]);
+  }, [isReady, sessionId, hydrating, status, emit]);
+
+  // ── Cleanup when session ends (local side-effects only) ──
+  useEffect(() => {
+    if (status === 'ended') { clearActivity(); setShowSavePrompt(true); }
+  }, [status]);
 
   // ── Activity heartbeat ──
   useEffect(() => {
@@ -154,13 +171,6 @@ export function GroupStudyView({
     const onParticipants = ({ sessionId: sid, participants: list }: { sessionId: string; participants: Participant[] }) => {
       if (sid !== sessionId) return;
       setParticipants(list);
-    };
-    const onPaused  = () => setSessionPaused(true);
-    const onStarted = ({ sessionId: sid }: { sessionId: string }) => { if (sid === sessionId) setSessionPaused(false); };
-    const onEnded   = ({ reason }: { reason: string }) => {
-      setEndReason(reason);
-      clearActivity();
-      setShowSavePrompt(true); // prompt before ending
     };
     const onInviteReq = (p: InviteRequest) => { if (p.sessionId === sessionId) setPendingApproval(p); };
     const onInviteAcc = () => { setPendingApproval(null); setInvitePending(false); };
@@ -176,9 +186,6 @@ export function GroupStudyView({
     const onJoined     = ({ username }: { username: string }) => pushActivity({ label: `${username} joined`, kind: 'joined' });
 
     on('session:participants',        onParticipants);
-    on('session:paused',              onPaused);
-    on('session:started',             onStarted);
-    on('session:ended',               onEnded);
     on('chat:invite_request',         onInviteReq);
     on('chat:invite_accepted',        onInviteAcc);
     on('chat:invite_declined',        onInviteDec);
@@ -191,9 +198,6 @@ export function GroupStudyView({
 
     return () => {
       off('session:participants',       onParticipants);
-      off('session:paused',             onPaused);
-      off('session:started',            onStarted);
-      off('session:ended',              onEnded);
       off('chat:invite_request',        onInviteReq);
       off('chat:invite_accepted',       onInviteAcc);
       off('chat:invite_declined',       onInviteDec);
@@ -208,13 +212,17 @@ export function GroupStudyView({
 
   // ── Handlers ──
   const handleEnd = useCallback(() => {
-    if (endedRef.current) return;
+    // Prevent duplicate ended transitions — guards both local double-click
+    // and the case where the backend already ended the session via socket
+    if (endedRef.current || status === 'ended') return;
     if (!confirmingEnd) { setConfirmingEnd(true); return; }
     endedRef.current = true;
     emit('session:end', { sessionId, reason: 'ended_by_host' });
     clearActivity();
+    setEndReason('ended_by_host');  // optimistic store update
+    setStatus('ended');
     setShowSavePrompt(true);
-  }, [confirmingEnd, emit, sessionId]);
+  }, [status, confirmingEnd, emit, sessionId, setEndReason, setStatus]);
 
   const handleLookupUser = useCallback(async () => {
     const username = inviteInput.trim();
@@ -275,14 +283,14 @@ export function GroupStudyView({
     finally {
       setSaving(false);
       setShowSavePrompt(false);
-      setSessionEnded(true);
+      setStatus('ended');
     }
-  }, [sessionId]);
+  }, [sessionId, setStatus]);
 
   const handleDiscard = useCallback(() => {
     setShowSavePrompt(false);
-    setSessionEnded(true);
-  }, []);
+    setStatus('ended');
+  }, [setStatus]);
 
   // ── Derived ──
   const canDrive     = studyRole === 'owner' || studyRole === 'presenter';

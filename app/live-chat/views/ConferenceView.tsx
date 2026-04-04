@@ -20,9 +20,11 @@ import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Users, Radio, Shield, MicOff, Megaphone, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
-import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
-import { useTyping }       from '@/features/live-chat/hooks/useTyping';
+import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
+import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }        from '@/features/live-chat/hooks/useTyping';
+import { useSessionEvents } from '@/features/live-chat/hooks/useSessionEvents';
+import { useSessionStore }  from '@/features/live-chat/store/useSessionStore';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, PausedBanner, LiveBadge,
@@ -81,6 +83,15 @@ export function ConferenceView({
 
   const cap = getCapabilities(viewerRole);
 
+  // ── Centralized session lifecycle — single .on() binding per event ──
+  useSessionEvents(sessionId);
+  const { status, endReason, setStatus, setEndReason, reset } = useSessionStore();
+  const sessionEnded  = status === 'ended';
+  const sessionPaused = status === 'paused';
+
+  // Session-aware reset: only clears state when sessionId changes (not same-session re-renders)
+  useEffect(() => { reset(sessionId); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Study panel config (role-gated) ───────────────────────────────────────
   // Admin monitors only — no study tools.
   const studyTools: StudyTool[] | null =
@@ -101,9 +112,6 @@ export function ConferenceView({
   const [handRaised,     setHandRaised]     = useState(false);
   // canSpeak: true for host/admin always; students start false in request mode
   const [canSpeak,       setCanSpeak]       = useState(cap.canHost);
-  const [sessionEnded,   setSessionEnded]   = useState(false);
-  const [sessionPaused,  setSessionPaused]  = useState(false);
-  const [endReason,      setEndReason]      = useState('');
   const [input,          setInput]          = useState('');
   const [confirmingEnd,  setConfirmingEnd]  = useState(false);
   const [showSidebar,    setShowSidebar]    = useState(true);
@@ -133,10 +141,12 @@ export function ConferenceView({
       .then(r => r.json())
       .then(d => {
         if (cancelled || !d.success || !d.session) return;
-        const { status, speakMode: sm, endedReason } = d.session;
+        const { status: s, speakMode: sm, endedReason } = d.session;
 
-        if (status === 'ended') { setSessionEnded(true); setEndReason(endedReason ?? ''); }
-        else if (status === 'paused') setSessionPaused(true);
+        if (s === 'ended')       { setEndReason(endedReason ?? ''); setStatus('ended'); }
+        else if (s === 'paused') setStatus('paused');
+        else if (s === 'active') setStatus('active');
+        else if (s === 'waiting') setStatus('waiting');
 
         if (sm) {
           setSpeakMode(sm as SpeakMode);
@@ -151,13 +161,20 @@ export function ConferenceView({
     return () => { cancelled = true; };
   }, [sessionId, cap.canHost]);
 
-  // ── Join ──────────────────────────────────────────────────────────────────
+  // ── Join — wait for hydration so we know the session is valid ──
   useEffect(() => {
-    if (!isReady || !sessionId || joinedRef.current) return;
+    if (!isReady || !sessionId || hydrating || joinedRef.current) return;
+    // Do not join if session has already ended or hasn't been hydrated yet
+    if (status === null || status === 'ended') return;
     joinedRef.current = true;
     emit('session:join', { sessionId });
     return () => { joinedRef.current = false; };
-  }, [isReady, sessionId, emit]);
+  }, [isReady, sessionId, hydrating, status, emit]);
+
+  // ── Cleanup when session ends (local side-effects only) ──
+  useEffect(() => {
+    if (status === 'ended') clearActivity();
+  }, [status]);
 
   // ── Activity heartbeat ────────────────────────────────────────────────────
   useEffect(() => {
@@ -199,14 +216,6 @@ export function ConferenceView({
       setCanSpeak(true);
     };
 
-    const onPaused  = () => setSessionPaused(true);
-    const onStarted = ({ sessionId: sid }: { sessionId: string }) => {
-      if (sid === sessionId) setSessionPaused(false);
-    };
-    const onEnded = ({ reason }: { reason: string }) => {
-      setEndReason(reason); setSessionEnded(true); clearActivity();
-    };
-
     const onJoined = ({ username }: { username: string }) =>
       pushActivity({ label: `${username} joined`, kind: 'joined' });
 
@@ -215,9 +224,6 @@ export function ConferenceView({
     on('conference:floor_granted',    onFloor);
     on('conference:muted',            onMuted);
     on('conference:unmuted',          onUnmuted);
-    on('session:paused',              onPaused);
-    on('session:started',             onStarted);
-    on('session:ended',               onEnded);
     on('session:participant_joined',  onJoined);
 
     return () => {
@@ -226,9 +232,6 @@ export function ConferenceView({
       off('conference:floor_granted',   onFloor);
       off('conference:muted',           onMuted);
       off('conference:unmuted',         onUnmuted);
-      off('session:paused',             onPaused);
-      off('session:started',            onStarted);
-      off('session:ended',              onEnded);
       off('session:participant_joined', onJoined);
     };
   }, [sessionId, currentUserId, cap.canHost, on, off, pushActivity]);
@@ -236,15 +239,17 @@ export function ConferenceView({
   // ── Handlers — shared ─────────────────────────────────────────────────────
 
   const handleEnd = useCallback(() => {
-    if (endedRef.current) return;
+    // Prevent duplicate ended transitions — guards both local double-click
+    // and the case where the backend already ended the session via socket
+    if (endedRef.current || status === 'ended') return;
     // Admin force-ends without confirm prompt
     if (!cap.canAdminForce && !confirmingEnd) { setConfirmingEnd(true); return; }
     endedRef.current = true;
     emit('session:end', { sessionId, reason: 'ended_by_host' });
     clearActivity();
-    setSessionEnded(true);
-    setEndReason('ended_by_host');
-  }, [cap.canAdminForce, confirmingEnd, emit, sessionId]);
+    setEndReason('ended_by_host');  // optimistic store update
+    setStatus('ended');
+  }, [status, cap.canAdminForce, confirmingEnd, emit, sessionId, setEndReason, setStatus]);
 
   const handleSpeakModeChange = useCallback((mode: SpeakMode) => {
     if (!cap.canHost || !isReady) return;

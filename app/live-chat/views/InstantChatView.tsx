@@ -24,11 +24,13 @@ import { CheckCircle, Loader2, BookOpen } from 'lucide-react';
 import { StudyPanel } from '../components/StudyPanel';
 import type { StudyTool } from '../components/StudyPanel';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
-import { useChatRoom }     from '@/features/live-chat/hooks/useChatRoom';
-import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
-import { useTyping }       from '@/features/live-chat/hooks/useTyping';
-import InviteModal         from '../components/InviteModal';
+import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
+import { useChatRoom }      from '@/features/live-chat/hooks/useChatRoom';
+import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }        from '@/features/live-chat/hooks/useTyping';
+import { useSessionEvents } from '@/features/live-chat/hooks/useSessionEvents';
+import { useSessionStore }  from '@/features/live-chat/store/useSessionStore';
+import InviteModal          from '../components/InviteModal';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, SessionWaitingRoom, PausedBanner,
@@ -70,14 +72,20 @@ export function InstantChatView({
   const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
   const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
+  // ── Centralized session lifecycle — single .on() binding per event ──
+  useSessionEvents(sessionId);
+  const { status, endReason, setStatus, setEndReason, reset } = useSessionStore();
+  const sessionEnded  = status === 'ended';
+  const sessionPaused = status === 'paused';
+
+  // Session-aware reset: only clears state when sessionId changes (not same-session re-renders)
+  useEffect(() => { reset(sessionId); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Tutor: needs to accept before joining the room ── */
   const [accepted,      setAccepted]      = useState(role === 'student');
   const [accepting,     setAccepting]     = useState(false);
 
   const [peerJoined,    setPeerJoined]    = useState(false);
-  const [sessionEnded,  setSessionEnded]  = useState(false);
-  const [sessionPaused, setSessionPaused] = useState(false);
-  const [endReason,     setEndReason]     = useState('');
   const [input,         setInput]         = useState('');
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [pendingInvite, setPendingInvite] = useState<InviteRequest | null>(null);
@@ -118,15 +126,18 @@ export function InstantChatView({
         const { status, tutorId, endedReason } = d.session;
 
         if (status === 'ended') {
-          setSessionEnded(true);
           setEndReason(endedReason ?? '');
+          setStatus('ended');
         } else if (status === 'paused') {
-          setSessionPaused(true);
+          setStatus('paused');
           if (tutorId) setPeerJoined(true);
           if (role === 'tutor' && tutorId === currentUserId) setAccepted(true);
         } else if (status === 'active' && tutorId) {
+          setStatus('active');
           setPeerJoined(true);
           if (role === 'tutor' && tutorId === currentUserId) setAccepted(true);
+        } else if (status === 'waiting') {
+          setStatus('waiting');
         }
       })
       .catch(() => {}) // hydration failure is non-fatal — socket will catch up
@@ -135,9 +146,11 @@ export function InstantChatView({
     return () => { cancelled = true; };
   }, [sessionId, currentUserId, role]);
 
-  /* ── Join room once accepted + socket ready ── */
+  /* ── Join room once hydrated + accepted + socket ready ── */
   useEffect(() => {
-    if (!isReady || !sessionId || !accepted) return;
+    if (!isReady || !sessionId || !accepted || hydrating) return;
+    // Do not join if session has already ended or hasn't been hydrated yet
+    if (status === null || status === 'ended') return;
     if (joinedRef.current) return;
 
     joinedRef.current = true;
@@ -147,7 +160,12 @@ export function InstantChatView({
       joinedRef.current = false;
       // Note: chat:leave is handled by useChatRoom — no need to duplicate here
     };
-  }, [isReady, sessionId, accepted, emit]);
+  }, [isReady, sessionId, accepted, hydrating, status, emit]);
+
+  /* ── Cleanup when session ends (local side-effects only) ── */
+  useEffect(() => {
+    if (status === 'ended') clearActivityInterval();
+  }, [status]);
 
   /* ── session:activity heartbeat — keeps server watchdog alive ── */
   useEffect(() => {
@@ -181,16 +199,6 @@ export function InstantChatView({
       if (sid === sessionId && role === 'student') setPeerJoined(true);
     };
 
-    const onPaused  = () => setSessionPaused(true);
-    const onStarted = ({ sessionId: sid }: { sessionId: string }) => {
-      if (sid === sessionId) setSessionPaused(false);
-    };
-    const onEnded = ({ reason }: { reason: string }) => {
-      setEndReason(reason);
-      setSessionEnded(true);
-      clearActivityInterval();
-    };
-
     // Invite requests — only show modal if the session is live
     const onInviteReq = (p: InviteRequest) => {
       if (p.sessionId === sessionId && peerJoined && !sessionEnded) {
@@ -201,9 +209,6 @@ export function InstantChatView({
 
     on('chat:tutor_joined',    onTutorJoined);
     on('session:ready',        onReady);
-    on('session:paused',       onPaused);
-    on('session:started',      onStarted);
-    on('session:ended',        onEnded);
     on('chat:invite_request',  onInviteReq);
     on('chat:invite_accepted', onInviteRes);
     on('chat:invite_declined', onInviteRes);
@@ -211,9 +216,6 @@ export function InstantChatView({
     return () => {
       off('chat:tutor_joined',    onTutorJoined);
       off('session:ready',        onReady);
-      off('session:paused',       onPaused);
-      off('session:started',      onStarted);
-      off('session:ended',        onEnded);
       off('chat:invite_request',  onInviteReq);
       off('chat:invite_accepted', onInviteRes);
       off('chat:invite_declined', onInviteRes);
@@ -247,7 +249,9 @@ export function InstantChatView({
   }, [accepting, isReady, sessionId]);
 
   const handleEnd = useCallback(() => {
-    if (endedRef.current) return; // idempotent — prevents double-fire
+    // Prevent duplicate ended transitions — guards both local double-click
+    // and the case where the backend already ended the session via socket
+    if (endedRef.current || status === 'ended') return;
     if (!confirmingEnd) {
       setConfirmingEnd(true);
       return;
@@ -256,9 +260,9 @@ export function InstantChatView({
     const reason = role === 'tutor' ? 'ended_by_tutor' : 'ended_by_student';
     emit('session:end', { sessionId, reason });
     clearActivityInterval();
-    setSessionEnded(true);
-    setEndReason(reason);
-  }, [confirmingEnd, role, emit, sessionId]);
+    setEndReason(reason);  // optimistic store update
+    setStatus('ended');
+  }, [status, confirmingEnd, role, emit, sessionId, setEndReason, setStatus]);
 
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault();
