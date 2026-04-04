@@ -90,11 +90,15 @@ export function InstantChatView({
   const studentTools: StudyTool[] = ['notebook', 'files'];
   const tutorTools:   StudyTool[] = ['whiteboard', 'problems', 'files', 'broadcast'];
   const endedRef    = useRef(false);               // idempotency guard for handleEnd
-  const activityRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activityRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const acceptTimerRef = useRef<ReturnType<typeof setTimeout>  | null>(null);
 
   /* ── Cleanup helpers ── */
   const clearActivityInterval = () => {
     if (activityRef.current) { clearInterval(activityRef.current); activityRef.current = null; }
+  };
+  const clearAcceptTimer = () => {
+    if (acceptTimerRef.current) { clearTimeout(acceptTimerRef.current); acceptTimerRef.current = null; }
   };
 
   useEffect(() => () => {

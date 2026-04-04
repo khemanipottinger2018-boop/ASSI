@@ -270,8 +270,7 @@ export default function AdminSessionsPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                      {session.status !== 'ended' && (
-                        <button
+                      <button
                           onClick={(e) => forceEnd(session.sessionId, e)}
                           disabled={!!endingId}
                           style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.15)', cursor: endingId ? 'default' : 'pointer', opacity: endingId && !isEnding ? 0.3 : 1, transition: 'all 0.15s ease' }}
@@ -281,7 +280,6 @@ export default function AdminSessionsPage() {
                             : <XCircle size={12} style={{ color: 'rgba(255,69,58,0.6)' }} />
                           }
                         </button>
-                      )}
                       {isOpen
                         ? <ChevronUp size={13} style={{ color: 'rgba(0,180,255,0.4)' }} />
                         : <ChevronDown size={13} style={{ color: 'rgba(255,255,255,0.2)' }} />
