@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ClipboardList, User, Check, X, Loader2, Clock,
-  Eye, ChevronDown, ChevronUp, BookOpen, GraduationCap,
-  Briefcase, Heart, Calendar, RefreshCw,
+  ClipboardList, Check, X, Loader2, Clock,
+  ChevronDown, ChevronUp, BookOpen, GraduationCap,
+  Briefcase, Heart, Calendar, RefreshCw, AlertTriangle,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import type { AdminApplication, AdminApplicationDetail, ApplicationStatus } from '@/lib/api';
@@ -13,6 +13,7 @@ import type { AdminApplication, AdminApplicationDetail, ApplicationStatus } from
 export default function TutorApplicationsPage() {
   const [applications,  setApplications]  = useState<AdminApplication[]>([]);
   const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState<string | null>(null);
   const [actioning,     setActioning]     = useState<string | null>(null);
   const [expanded,      setExpanded]      = useState<string | null>(null);
   const [details,       setDetails]       = useState<Record<string, AdminApplicationDetail>>({});
@@ -20,11 +21,14 @@ export default function TutorApplicationsPage() {
 
   async function loadApplications() {
     setLoading(true);
+    setError(null);
     try {
       const data = await adminApi.getApplications();
       if (data.success) setApplications(data.applications ?? []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      else setError('Failed to load applications');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load applications');
+    } finally { setLoading(false); }
   }
 
   useEffect(() => { loadApplications(); }, []);
@@ -37,26 +41,23 @@ export default function TutorApplicationsPage() {
     try {
       const data = await adminApi.getApplication(id);
       if (data.success) setDetails(prev => ({ ...prev, [id]: data.application }));
-    } catch { /* silent */ }
-    finally { setLoadingDetail(null); }
+      else setError('Failed to load application details');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load application details');
+    } finally { setLoadingDetail(null); }
   }
 
   async function handleAction(id: string, action: 'approve' | 'reject') {
     setActioning(id);
     try {
-      action === 'approve'
+      const res = action === 'approve'
         ? await adminApi.approveApplication(id)
         : await adminApi.rejectApplication(id);
+      if (!res.success) { setError(`Failed to ${action} application`); return; }
       setExpanded(null);
       await loadApplications();
-    } finally { setActioning(null); }
-  }
-
-  async function handleStatusUpdate(id: string, status: 'seen' | 'under_review') {
-    setActioning(id);
-    try {
-      await adminApi.setApplicationStatus(id, status);
-      await loadApplications();
+    } catch (err: any) {
+      setError(err?.message ?? `Failed to ${action} application`);
     } finally { setActioning(null); }
   }
 
@@ -86,6 +87,13 @@ export default function TutorApplicationsPage() {
         </button>
       </motion.div>
 
+      {error && (
+        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400/80 text-sm">{error}</p>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 size={20} className="text-white/30 animate-spin" />
@@ -103,9 +111,7 @@ export default function TutorApplicationsPage() {
                   loadingDetail={loadingDetail === app.id}
                   onToggle={() => toggleExpand(app.id)}
                   onApprove={() => handleAction(app.id, 'approve')}
-                  onReject={() => handleAction(app.id, 'reject')}
-                  onMarkSeen={() => handleStatusUpdate(app.id, 'seen')}
-                  onMarkReview={() => handleStatusUpdate(app.id, 'under_review')} />
+                  onReject={() => handleAction(app.id, 'reject')} />
               ))}
             </section>
           )}
@@ -182,7 +188,7 @@ function DetailField({ label, value, icon: Icon }: {
 
 /* ── Application card ── */
 
-function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onToggle, onApprove, onReject, onMarkSeen, onMarkReview }: {
+function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onToggle, onApprove, onReject }: {
   app:           AdminApplication;
   actioning:     boolean;
   expanded:      boolean;
@@ -191,8 +197,6 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
   onToggle:      () => void;
   onApprove?:    () => void;
   onReject?:     () => void;
-  onMarkSeen?:   () => void;
-  onMarkReview?: () => void;
 }) {
   const isPending    = app.status === 'pending';
   const isInProgress = app.status === 'seen' || app.status === 'under_review';
@@ -236,18 +240,6 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
         {/* Quick action buttons */}
         {canAction && onApprove && onReject && (
           <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
-            {isPending && onMarkSeen && (
-              <button onClick={onMarkSeen} disabled={actioning} title="Mark seen"
-                className="w-7 h-7 rounded-lg glass-soft text-white/25 hover:text-blue-400 hover:bg-blue-500/10 disabled:opacity-40 transition flex items-center justify-center">
-                <Eye size={11} />
-              </button>
-            )}
-            {isInProgress && onMarkReview && (
-              <button onClick={onMarkReview} disabled={actioning} title="Mark under review"
-                className="w-7 h-7 rounded-lg glass-soft text-white/25 hover:text-purple-400 hover:bg-purple-500/10 disabled:opacity-40 transition flex items-center justify-center">
-                <Briefcase size={11} />
-              </button>
-            )}
             <button onClick={onReject} disabled={actioning} title="Reject"
               className="w-7 h-7 rounded-lg glass-soft text-white/30 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition flex items-center justify-center">
               {actioning ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}

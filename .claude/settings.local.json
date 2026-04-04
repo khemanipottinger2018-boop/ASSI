@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(cp \"components/types/profile.view.ts\" \"features/profile/profile.view.ts\")",
+      "Bash(cp \"components/shared/ui/ProfileCard.tsx\" \"features/profile/ProfileCard.tsx\")",
+      "Bash(cp \"components/shared/ui/PublicProfileCard.tsx\" \"features/profile/PublicProfileCard.tsx\")",
+      "Bash(cp \"components/shared/booking/BookingModal.tsx\" \"features/booking/BookingModal.tsx\")",
+      "Bash(cp \"components/student/dashboard/RecentSessionRow.tsx\" \"features/sessions/RecentSessionRow.tsx\")",
+      "Bash(grep -r from.*@/components/ /c/Users/Tyreke/assi-platform/components --include=*.ts --include=*.tsx -n)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r @/components/ /c/Users/Tyreke/assi-platform --include=*.ts --include=*.tsx -l)",
+      "Bash(grep -r @/components/ /c/Users/Tyreke/assi-platform --include=*.ts --include=*.tsx -n)",
+      "Bash(grep -r adminApi /c/Users/Tyreke/assi-platform --include=*.ts --include=*.tsx -l)",
+      "Bash(while read:*)",
+      "Bash(do sed:*)",
+      "Bash(cat \"/c/Users/Tyreke/assi-platform/app/\\(admin\\)/admin/layout.tsx\")",
+      "Bash(cat \"/c/Users/Tyreke/assi-platform/app/\\(admin\\)/admin/page.tsx\")",
+      "Bash(grep -A 20 \"GET \\\\`/api/presence/me\\\\`\" /c/Users/Tyreke/assi-platform/ASSI_API_CONTRACT.md)",
+      "Bash(find /c/Users/Tyreke/assi-platform -name .env* -type f)",
+      "Bash(find c:/Users/Tyreke/assi-platform -maxdepth 2 -name *.md)"
+    ]
+  }
+}

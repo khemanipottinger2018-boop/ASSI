@@ -22,5 +22,6 @@ export type {
 } from './presenceApi';
 
 export { default as PresenceBadge }           from './PresenceBadge';
+export { default as PresenceDot, PRESENCE_LABEL_COLOR } from './PresenceDot';
 export { default as TutorAvailabilityToggle } from './TutorAvailabilityToggle';
 export { default as AvailabilityModal }        from './AvailabilityModal';

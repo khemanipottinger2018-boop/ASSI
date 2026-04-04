@@ -65,9 +65,10 @@ export const browseApi = {
       `/api/browse/sessions/${sessionId}/confirm`
     ),
 
-  cancel: (sessionId: string) =>
+  cancel: (sessionId: string, reason?: string) =>
     api.patch<{ success: boolean }>(
-      `/api/browse/sessions/${sessionId}/cancel`
+      `/api/browse/sessions/${sessionId}/cancel`,
+      reason ? { reason } : undefined
     ),
 
   complete: (sessionId: string) =>

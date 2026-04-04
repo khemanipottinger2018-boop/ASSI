@@ -2,6 +2,7 @@
 // Detects user's currency from their timezone setting,
 // fetches live exchange rate from exchangerate-api (free tier),
 // and returns a formatter + converted amount helper.
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useSettings } from '@/features/settings';

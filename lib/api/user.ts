@@ -13,14 +13,25 @@ export type UserMe = {
   username:  string;
   email:     string | null;
   role:      'student' | 'tutor' | 'tutor_applicant' | 'admin';
-  tier:      'early_bird' | 'alpha' | 'standard';  // new
+  tier:      'early_bird' | 'alpha' | 'standard' | 'beta' | 'tester' | 'pro';
   createdAt: string;
+  // Extended fields returned by backend
+  creditBalance?:     number;
+  assiPlus?:          boolean;
+  assiPlusExpiresAt?: string | null;
+  // Note: disclaimerAccepted / isDemo / demoExpiresAt live on AuthUser (from /api/auth/me).
+  // They may also appear here but rely on useAuth() for those values.
+  disclaimerAccepted?: boolean;
+  isDemo?:             boolean;
+  demoExpiresAt?:      string | null;
+  twoFactorEnabled?:   boolean;
+  showPhone?:          boolean;
   tutor: {
     id:          string;
     hourlyRate:  number | null;
     isAvailable: boolean;
-    bio:         string | null;       // new — tutor bio
-    timezone:    string | null;       // new — tutor timezone
+    bio:         string | null;
+    timezone:    string | null;
   } | null;
 };
 
@@ -64,6 +75,36 @@ export type UserFeaturesResponse = {
   success:  boolean;
   tier:     string;
   features: UserFeatures;
+};
+
+/* ── GET /api/user/credits ────────────────────────────────────── */
+
+export type CreditTransaction = {
+  id:          string;
+  amount:      number;        // positive = earned, negative = spent
+  reason:      string;
+  referenceId: string | null;
+  balance:     number;        // running total after this transaction
+  createdAt:   string;
+};
+
+/* ── GET /api/user/quota ──────────────────────────────────────── */
+
+export type UserQuota = {
+  ai_queries: { used: number; limit: number };
+  sessions:   { used: number; limit: number };
+};
+
+/* ── GET /api/user/tasks/today ────────────────────────────────── */
+
+export type DailyTask = {
+  id:          string;
+  slug:        'login' | 'send_message' | 'complete_session' | 'submit_assignment' | string;
+  title:       string;
+  description: string;
+  completed:   boolean;
+  completedAt: string | null;
+  reward:      number;   // credits awarded on completion
 };
 
 /* ── API client ───────────────────────────────────────────────── */
@@ -111,4 +152,39 @@ export const userApi = {
    */
   getFeatures: () =>
     api.get<UserFeaturesResponse>('/api/user/features'),
+
+  /* GET /api/user/credits */
+  getCredits: () =>
+    api.get<{ success: boolean; balance: number; transactions: CreditTransaction[] }>(
+      '/api/user/credits'
+    ),
+
+  /* POST /api/user/credits/spend */
+  spendCredits: (body: { amount: number; reason: string; referenceId?: string }) =>
+    api.post<{ success: boolean; balance: number }>(
+      '/api/user/credits/spend',
+      body
+    ),
+
+  /* GET /api/user/quota */
+  getQuota: () =>
+    api.get<{ success: boolean; quota: UserQuota }>('/api/user/quota'),
+
+  /* GET /api/user/tasks/today */
+  getDailyTasks: () =>
+    api.get<{ success: boolean; tasks: DailyTask[] }>('/api/user/tasks/today'),
+
+  /* POST /api/auth/2fa/setup — generates TOTP secret + QR code */
+  setup2FA: () =>
+    api.post<{ success: boolean; otpauth: string; qrDataUrl: string }>(
+      '/api/auth/2fa/setup'
+    ),
+
+  /* POST /api/auth/2fa/verify — activates 2FA after scanning QR */
+  verify2FA: (code: string) =>
+    api.post<{ success: boolean }>('/api/auth/2fa/verify', { code }),
+
+  /* POST /api/auth/2fa/disable */
+  disable2FA: (code: string) =>
+    api.post<{ success: boolean }>('/api/auth/2fa/disable', { code }),
 };

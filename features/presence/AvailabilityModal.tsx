@@ -9,22 +9,22 @@ interface Props {
 }
 
 export default function AvailabilityModal({ onClose }: Props) {
-  const { presence, setIntent, isLoading } = usePresence();
-  const { variant, canChangeIntent }       = usePresenceDisplay();
+  const { presence, setIntent } = usePresence();
+  const { variant, canChangeIntent } = usePresenceDisplay();
 
-  const isAvailable  = presence?.intent === 'available';
-  const isBusy       = presence?.intent === 'busy_session';
-  const isConnecting = isLoading || !presence?.online || !presence?.socketConnected;
+  // Derive from variant — the source of truth — not raw presence fields.
+  const isAvailable  = variant === 'available';
+  const isBusy       = variant === 'busy';
 
-  // Disable both buttons while loading, busy in a session, or socket not ready
-  const disabled = isConnecting || isBusy || !canChangeIntent;
+  // canChangeIntent already encodes offline/reconnecting/busy_session/loading rules
+  const disabled = !canChangeIntent;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       {/* Backdrop tap to close */}
       <div onClick={onClose} className="absolute inset-0" />
 
-      <div className="relative w-full max-w-sm rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-6 space-y-6">
+      <div className="relative w-full max-w-sm rounded-2xl glass p-6 space-y-6">
 
         {/* Header */}
         <div className="flex items-start justify-between">

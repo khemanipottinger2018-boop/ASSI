@@ -9,8 +9,9 @@ import {
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
-type SessionStatus = 'waiting' | 'active' | 'paused' | 'ended';
-type SessionType   = 'instant' | 'booked';
+// Backend only returns 'waiting' | 'active' from /api/admin/sessions/live
+type SessionStatus = 'waiting' | 'active';
+type SessionType   = 'instant' | 'scheduled';
 
 type LiveSession = {
   sessionId:        string;
@@ -21,19 +22,16 @@ type LiveSession = {
   subjectId:        string | null;
   startedAt:        number;
   participantCount: number;
-  messageCount?:    number;
 };
 
 const STATUS_CONFIG: Record<SessionStatus, {
   dot: string; dotGlow: string; label: string; labelColor: string; rowBorder: string;
 }> = {
-  waiting: { dot: '#facc15', dotGlow: '0 0 8px rgba(250,204,21,0.8)', label: 'WAITING', labelColor: 'rgba(250,204,21,0.85)', rowBorder: 'rgba(250,204,21,0.1)'    },
-  active:  { dot: '#34d399', dotGlow: '0 0 8px rgba(52,211,153,0.8)', label: 'ACTIVE',  labelColor: 'rgba(52,211,153,0.85)', rowBorder: 'rgba(52,211,153,0.12)'   },
-  paused:  { dot: '#fb923c', dotGlow: '0 0 8px rgba(251,146,60,0.7)', label: 'PAUSED',  labelColor: 'rgba(251,146,60,0.85)', rowBorder: 'rgba(251,146,60,0.1)'    },
-  ended:   { dot: 'rgba(255,255,255,0.2)', dotGlow: 'none',           label: 'ENDED',   labelColor: 'rgba(255,255,255,0.25)', rowBorder: 'rgba(255,255,255,0.06)' },
+  waiting: { dot: '#facc15', dotGlow: '0 0 8px rgba(250,204,21,0.8)', label: 'WAITING', labelColor: 'rgba(250,204,21,0.85)', rowBorder: 'rgba(250,204,21,0.1)' },
+  active:  { dot: '#34d399', dotGlow: '0 0 8px rgba(52,211,153,0.8)', label: 'ACTIVE',  labelColor: 'rgba(52,211,153,0.85)', rowBorder: 'rgba(52,211,153,0.12)' },
 };
 
-const STATUS_ORDER: SessionStatus[] = ['active', 'waiting', 'paused', 'ended'];
+const STATUS_ORDER: SessionStatus[] = ['active', 'waiting'];
 
 function elapsed(startedAt: number): string {
   const s = Math.floor((Date.now() - startedAt) / 1000);
@@ -50,6 +48,7 @@ function shortId(id: string): string {
 export default function AdminSessionsPage() {
   const [sessions,    setSessions]    = useState<LiveSession[]>([]);
   const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
   const [endingId,    setEndingId]    = useState<string | null>(null);
   const [expanded,    setExpanded]    = useState<string | null>(null);
   const [filter,      setFilter]      = useState<SessionStatus | 'all'>('all');
@@ -58,6 +57,7 @@ export default function AdminSessionsPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
+    setError(null);
     try {
       const data = await adminApi.getLiveSessions();
       if (data.success) {
@@ -66,9 +66,12 @@ export default function AdminSessionsPage() {
             (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
           )
         );
+      } else {
+        setError('Failed to load live sessions');
       }
-    } catch { /* silent */ }
-    finally { setLoading(false); setLastSync(new Date()); }
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load live sessions');
+    } finally { setLoading(false); setLastSync(new Date()); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -88,8 +91,11 @@ export default function AdminSessionsPage() {
     if (!confirm('Force-end this session? Both participants will be disconnected.')) return;
     setEndingId(sessionId);
     try {
-      await adminApi.endSession(sessionId);
+      const res = await adminApi.endSession(sessionId);
+      if (!res.success) { setError('Failed to end session'); return; }
       await load();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to end session');
     } finally { setEndingId(null); }
   }
 
@@ -98,8 +104,6 @@ export default function AdminSessionsPage() {
     all:     sessions.length,
     active:  sessions.filter(s => s.status === 'active').length,
     waiting: sessions.filter(s => s.status === 'waiting').length,
-    paused:  sessions.filter(s => s.status === 'paused').length,
-    ended:   sessions.filter(s => s.status === 'ended').length,
   };
 
   return (
@@ -145,11 +149,17 @@ export default function AdminSessionsPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+      {error && (
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.2)', color: 'rgba(255,100,90,0.85)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <XCircle size={13} style={{ flexShrink: 0 }} />
+          {error}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
         {[
           { label: 'Active',  count: counts.active,  color: '#34d399' },
           { label: 'Waiting', count: counts.waiting, color: '#facc15' },
-          { label: 'Paused',  count: counts.paused,  color: '#fb923c' },
           { label: 'Total',   count: counts.all,     color: '#00b4ff' },
         ].map(({ label, count, color }) => (
           <div key={label} style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(0,10,22,0.75)', border: `1px solid ${color}22`, position: 'relative', overflow: 'hidden' }}>
@@ -163,7 +173,7 @@ export default function AdminSessionsPage() {
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
-        {(['all', 'active', 'waiting', 'paused', 'ended'] as const).map((f) => {
+        {(['all', 'active', 'waiting'] as const).map((f) => {
           const active = filter === f;
           const cfg    = f === 'all' ? null : STATUS_CONFIG[f];
           return (
@@ -176,7 +186,7 @@ export default function AdminSessionsPage() {
               transition: 'all 0.15s ease', display: 'flex', alignItems: 'center', gap: 5,
             }}>
               {cfg && <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />}
-              {f === 'all' ? `All (${counts.all})` : `${f} (${counts[f]})`}
+              {f === 'all' ? `All (${counts.all})` : `${f} (${counts[f as keyof typeof counts]})`}
             </button>
           );
         })}

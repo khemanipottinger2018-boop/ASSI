@@ -1,11 +1,31 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, RefreshCw } from 'lucide-react';
 import { useNotifications } from '@/features/notifications';
 import NotificationItem from './components/NotificationItem';
 import EmptyState from './components/EmptyState';
+import type { Notification } from '@/features/types/notification';
+
+function resolveNotificationRoute(n: Notification): string | null {
+  const sessionId = n.metadata?.sessionId as string | undefined;
+  switch (n.type) {
+    case 'session_request':
+    case 'booking_confirmed':
+    case 'booking_cancelled':
+      return sessionId ? `/sessions` : '/sessions';
+    case 'chat_request':
+    case 'session_started':
+    case 'group_study_invite':
+      return sessionId ? `/live-chat/${sessionId}` : null;
+    default:
+      return null;
+  }
+}
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const {
     notifications,
     unreadCount,
@@ -14,6 +34,12 @@ export default function NotificationsPage() {
     refresh,
     markAllRead,   // markRead(id) removed — no per-notification endpoint exists
   } = useNotifications();
+
+  // Auto-mark all read when the page is visited
+  useEffect(() => {
+    if (unreadCount > 0) markAllRead();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -76,7 +102,7 @@ export default function NotificationsPage() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div
               key={i}
-              className="rounded-xl p-4 border border-white/10 bg-white/5 backdrop-blur-xl"
+              className="rounded-xl p-4 panel"
             >
               <div className="flex justify-between gap-3">
                 <div className="flex-1 space-y-2">
@@ -100,6 +126,8 @@ export default function NotificationsPage() {
               // Real-time socket events keep the list fresh
               onClick={() => {
                 if (unreadCount > 0) markAllRead();
+                const route = resolveNotificationRoute(notification);
+                if (route) router.push(route);
               }}
             />
           ))}

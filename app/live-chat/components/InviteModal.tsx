@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserPlus, X, Check } from 'lucide-react';
-import type { InviteRequest } from '../types/SocketEvents';
+import type { InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
 interface Props {
   invite: InviteRequest;

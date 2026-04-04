@@ -68,3 +68,25 @@ export type ThemeVariant =
   | SubjectVariant
   | PremiumVariant
   | 'sentinel';
+
+// ==============================
+// AUTOMATION
+// ==============================
+
+// Lightweight weather descriptor — not a full theme variant
+export type WeatherOverlay =
+  | 'clear'    // no overlay — sunny and open
+  | 'sunny'    // warm radial boost
+  | 'cloudy'   // soft grey atmosphere, muted blobs
+  | 'rainy'    // reuses rainy season atmosphere + rain particle layer
+  | 'stormy'   // heavy dark overlay, blob suppression
+  | 'foggy'    // elevated blur, low contrast atmosphere
+  | 'windy';   // subtle diagonal streak layer (CSS only)
+
+export interface AutomationState {
+  seasonAuto:     boolean;
+  weatherAuto:    boolean;
+  currentSeason:  SeasonVariant;
+  currentWeather: WeatherOverlay;
+  weatherLoading: boolean;
+}

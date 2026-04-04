@@ -520,7 +520,7 @@ function ChatView({
     <div className="flex flex-col w-full" style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/6 flex-shrink-0 bg-black/10 backdrop-blur-sm">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-white/6 flex-shrink-0" style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'radial-gradient(circle at 30% 30%, #ff9aa2, #b84cff)' }}>

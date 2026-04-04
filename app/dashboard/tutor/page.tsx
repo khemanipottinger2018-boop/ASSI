@@ -8,9 +8,8 @@ import {
   Bell, BarChart2, Wifi, WifiOff, Calendar, Star, Zap,
 } from 'lucide-react';
 import { useAuth }            from '@/features/auth';
-import { usePresence }        from '@/features/presence';
-import { usePresenceDisplay } from '@/features/presence/usePresenceDisplay';
-import { useSocket }          from '@/features/socket';
+import { usePresence, usePresenceDisplay } from '@/features/presence';
+import { useSocketContext }   from '@/features/socket';
 import { sessionsApi, tutorsApi, api } from '@/lib/api';
 import type { ChatSession } from '@/lib/api';
 
@@ -92,11 +91,11 @@ export default function TutorDashboard() {
 
   const { presence, eligibility, isLoading } = usePresence();
   const display       = usePresenceDisplay();
-  const { subscribe } = useSocket();
+  const { subscribe } = useSocketContext();
 
-  const hydrated     = !isLoading && presence !== null;
-  const available    = presence?.intent === 'available' && presence?.socketConnected;
-  const busy         = presence?.intent === 'busy_session';
+  const hydrated  = !isLoading && presence !== null;
+  const available = display.variant === 'available';
+  const busy      = display.variant === 'busy';
 
   const [queue,          setQueue]          = useState<QueueEntry[]>([]);
   const [activeRequest,  setActiveRequest]  = useState<QueueEntry | null>(null);
@@ -327,7 +326,7 @@ export default function TutorDashboard() {
                       exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
                       <TutorLiveRequestCard
                         sessionId={req.sessionId}
-                        subjectId={req.subjectId}
+                        subjectName={req.subjectName}
                         arrivedAt={req.requestedAt}
                         onExpire={id => setQueue(prev => prev.filter(q => q.sessionId !== id))}
                       />

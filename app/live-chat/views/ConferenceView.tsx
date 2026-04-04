@@ -4,29 +4,33 @@
 //
 // Three distinct actors, one view:
 //
-//   student     — raise/lower hand, speak when floor is granted or mode is open
+//   attendee    — raise/lower hand, speak when floor is granted or mode is open
 //   tutor host  — speak mode toggle, grant floor, mute/unmute individuals, end session
 //   admin       — everything tutor has + mute all, broadcast announcements, force end (no confirm)
 //
+// Conference is a tutor-only feature. Tutors start and host the session;
+// anyone who joins via the broadcast link is an attendee.
+//
 // Role is determined by the caller ([chatId]/page.tsx):
-//   admin  → user.role === 'admin'
-//   tutor  → meta.hostId === user.id
-//   student → everyone else
+//   admin    → user.role === 'admin'
+//   tutor    → meta.hostId === user.id
+//   attendee → everyone else
 
 import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Users, Radio, Shield, MicOff, Megaphone, BookOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '../hooks/useChatSocket';
-import { useChatMessages } from '../hooks/useChatMessages';
-import { useTyping }       from '../hooks/useTyping';
+import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
+import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }       from '@/features/live-chat/hooks/useTyping';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, PausedBanner, LiveBadge,
   ParticipantList, ParticipantSidebar,
   SpeakModeToggle, HandRaiseButton,
+  ActivityFeed, useActivityEvents,
 } from '../components/SessionShared';
-import type { SessionMeta, Participant, SpeakMode } from '../types/SocketEvents';
+import type { SessionMeta, Participant, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 import { StudyPanel } from '@/features/live-chat';
 import type { StudyTool, StudyPermissions } from '@/features/live-chat';
 
@@ -35,7 +39,7 @@ const ACTIVITY_INTERVAL  = 30_000;
 
 // ─── Prop shape ──────────────────────────────────────────────────────────────
 
-export type ConferenceRole = 'student' | 'tutor' | 'admin';
+export type ConferenceRole = 'attendee' | 'tutor' | 'admin';
 
 interface Props {
   sessionId:       string;
@@ -60,7 +64,7 @@ function getCapabilities(role: ConferenceRole): Capabilities {
   return {
     canHost:       role === 'tutor' || role === 'admin',
     canAdminForce: role === 'admin',
-    isParticipant: role === 'student' || role === 'tutor',
+    isParticipant: role === 'attendee' || role === 'tutor',
   };
 }
 
@@ -71,8 +75,9 @@ export function ConferenceView({
 }: Props) {
   const router = useRouter();
   const { emit, on, off, isConnected, isReady } = useChatSocket();
-  const { messages, sendMessage } = useChatMessages(sessionId);
-  const { onKeystroke, stopTyping, someoneIsTyping } = useTyping(sessionId);
+  const { messages, sendMessage } = useChatMessages(sessionId, { id: currentUserId, name: currentUsername });
+  const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
+  const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
   const cap = getCapabilities(viewerRole);
 
@@ -81,7 +86,7 @@ export function ConferenceView({
   const studyTools: StudyTool[] | null =
     viewerRole === 'tutor'
       ? ['whiteboard', 'problems', 'broadcast', 'timer', 'notebook']
-      : viewerRole === 'student'
+      : viewerRole === 'attendee'
         ? ['notebook', 'files', 'whiteboard']
         : null;
 
@@ -137,7 +142,7 @@ export function ConferenceView({
           setSpeakMode(sm as SpeakMode);
           // In open mode everyone can speak; in request mode only hosts start with floor
           if (sm === 'open') setCanSpeak(true);
-          if (sm === 'request' && !cap.canHost) setCanSpeak(false);
+          if (sm === 'request' && !cap.canHost)  setCanSpeak(false);
         }
       })
       .catch(() => {})
@@ -202,26 +207,31 @@ export function ConferenceView({
       setEndReason(reason); setSessionEnded(true); clearActivity();
     };
 
-    on('session:participants',     onParticipants);
-    on('conference:speak_mode',    onSpeakMode);
-    on('conference:floor_granted', onFloor);
-    on('conference:muted',         onMuted);
-    on('conference:unmuted',       onUnmuted);
-    on('session:paused',           onPaused);
-    on('session:started',          onStarted);
-    on('session:ended',            onEnded);
+    const onJoined = ({ username }: { username: string }) =>
+      pushActivity({ label: `${username} joined`, kind: 'joined' });
+
+    on('session:participants',        onParticipants);
+    on('conference:speak_mode',       onSpeakMode);
+    on('conference:floor_granted',    onFloor);
+    on('conference:muted',            onMuted);
+    on('conference:unmuted',          onUnmuted);
+    on('session:paused',              onPaused);
+    on('session:started',             onStarted);
+    on('session:ended',               onEnded);
+    on('session:participant_joined',  onJoined);
 
     return () => {
-      off('session:participants',     onParticipants);
-      off('conference:speak_mode',    onSpeakMode);
-      off('conference:floor_granted', onFloor);
-      off('conference:muted',         onMuted);
-      off('conference:unmuted',       onUnmuted);
-      off('session:paused',           onPaused);
-      off('session:started',          onStarted);
-      off('session:ended',            onEnded);
+      off('session:participants',       onParticipants);
+      off('conference:speak_mode',      onSpeakMode);
+      off('conference:floor_granted',   onFloor);
+      off('conference:muted',           onMuted);
+      off('conference:unmuted',         onUnmuted);
+      off('session:paused',             onPaused);
+      off('session:started',            onStarted);
+      off('session:ended',              onEnded);
+      off('session:participant_joined', onJoined);
     };
-  }, [sessionId, currentUserId, cap.canHost, on, off]);
+  }, [sessionId, currentUserId, cap.canHost, on, off, pushActivity]);
 
   // ── Handlers — shared ─────────────────────────────────────────────────────
 
@@ -330,6 +340,7 @@ export function ConferenceView({
           subtitle={headerSubtitle}
           connected={isConnected}
           participantCount={participants.length}
+          startedAt={meta.startedAt}
           onEnd={handleEnd}
           confirmingEnd={confirmingEnd}
           onCancelEnd={() => setConfirmingEnd(false)}
@@ -461,8 +472,8 @@ export function ConferenceView({
           )}
         </AnimatePresence>
 
-        {/* ── Student speak status bar ── */}
-        {viewerRole === 'student' && (
+        {/* ── Attendee speak status bar ── */}
+        {viewerRole === 'attendee' && (
           <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-white/[0.05] bg-black/5">
             {speakMode === 'open' ? (
               <span className="text-emerald-400/60 text-xs">Open floor — everyone can speak freely</span>
@@ -490,24 +501,25 @@ export function ConferenceView({
         <MessageFeed
           messages={messages}
           currentUserId={currentUserId}
-          someoneIsTyping={someoneIsTyping}
           showSenders
           emptySlot={
             <div className="flex justify-center pt-12">
               <div className="glass-soft rounded-2xl px-6 py-5 text-center space-y-1">
                 <Radio size={18} className="text-red-400/50 mx-auto" />
                 <p className="text-white/25 text-sm">
-                  {viewerRole === 'admin'  ? 'Monitoring conference.' :
-                   viewerRole === 'tutor'  ? 'Conference is live — your students are listening.' :
-                                             'Conference is live.'}
+                  {viewerRole === 'admin'    ? 'Monitoring conference.' :
+                   viewerRole === 'tutor'    ? 'Conference is live — you\'re broadcasting.' :
+                                               'Conference is live.'}
                 </p>
-                {viewerRole === 'student' && !canSpeak && speakMode === 'request' && (
+                {viewerRole === 'attendee' && !canSpeak && speakMode === 'request' && (
                   <p className="text-white/15 text-xs">Raise your hand to speak.</p>
                 )}
               </div>
             </div>
           }
         />
+
+        <ActivityFeed typingUsernames={typingUsernames} events={activityEvents} />
 
         {/* ── Input ── */}
         {/* Admin can always type (broadcast aside, they may also chat).
@@ -522,7 +534,7 @@ export function ConferenceView({
           placeholder={
             !isReady                                          ? 'Reconnecting…'
             : sessionPaused                                   ? 'Session paused…'
-            : viewerRole === 'tutor'                          ? 'Say something to your class…'
+            : viewerRole === 'tutor'                          ? 'Say something to your attendees…'
             : viewerRole === 'admin'                          ? 'Send as admin…'
             : !canSpeak && speakMode === 'request'            ? 'Raise your hand to speak…'
             : 'Type a message…'

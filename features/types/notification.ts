@@ -3,6 +3,7 @@
 
 export type NotificationType =
   | 'chat_request'        | 'chat_message'         | 'chat_ended'
+  | 'group_study_invite'
   | 'session_request'     | 'session_started'       | 'session_paused'
   | 'session_resumed'     | 'session_ended'         | 'session_inactivity'
   | 'session_no_tutor'
@@ -14,7 +15,9 @@ export type NotificationType =
   | 'tutor_available'     | 'tutor_unavailable'     | 'cooldown_active' | 'cooldown_expired'
   | 'system'              | 'announcement'          | 'policy_update' | 'maintenance'
   | 'account_warning'     | 'account_suspended'     | 'account_restored'
-  | 'login_alert'         | 'parental_consent_required' | 'parental_consent_approved';
+  | 'login_alert'         | 'parental_consent_required' | 'parental_consent_approved'
+  // Engagement
+  | 'streak_milestone'    | 'badge_awarded'          | 'credits_earned' | 'goal_completed';
 
 export interface Notification {
   id:        string;
@@ -27,16 +30,14 @@ export interface Notification {
   expiresAt: string | null;
 }
 
+/** Returns notifications that have not yet expired. */
+export function filterActive(notifications: Notification[]): Notification[] {
+  const now = Date.now();
+  return notifications.filter(n => !n.expiresAt || new Date(n.expiresAt).getTime() > now);
+}
+
 export interface NotificationInboxResponse {
   success:       boolean;
   notifications: Notification[];
-  unreadCount:   number;
-}
-
-export function filterActive(notifications: Notification[]): Notification[] {
-  const now = new Date();
-  return notifications.filter(n => {
-    if (!n.expiresAt) return true;
-    return new Date(n.expiresAt) > now;
-  });
+  // No unreadCount — derive from notifications.filter(n => !n.isRead).length
 }

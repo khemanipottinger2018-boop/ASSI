@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { useSocketContext } from '@/features/socket';
 import { presenceApi } from './presenceApi';
 
 /* ─────────────────────────────────────────────
@@ -50,62 +50,72 @@ export interface PresenceContextValue {
 const PresenceContext = createContext<PresenceContextValue | undefined>(undefined);
 
 /* ─────────────────────────────────────────────
-   SINGLETON SOCKET
-   Persists across re-renders; created once per session.
-───────────────────────────────────────────── */
-
-let socket: Socket | null = null;
-
-function getSocket(): Socket {
-  if (!socket) {
-    socket = io(process.env.NEXT_PUBLIC_BACKEND_URL ?? '/', {
-      withCredentials: true,                         // FIX: sends session cookie for auth
-      transports: ['websocket', 'polling'],          // FIX: polling fallback required by handover
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
-  }
-  return socket;
-}
-
-/* ─────────────────────────────────────────────
    PROVIDER
+   Reuses the auth-gated socket from SocketContext
+   instead of creating its own connection.
 ───────────────────────────────────────────── */
 
 export function PresenceProvider({ children }: { children: React.ReactNode }) {
-  const [presence, setPresence] = useState<FullPresence | null>(null);
-  const [eligibility, setEligibility] = useState<Eligibility | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isConnected, subscribe, emit } = useSocketContext();
 
-  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isTabVisible = useRef(true);
+  const [presence, setPresence]     = useState<FullPresence | null>(null);
+  const [eligibility, setEligibility] = useState<Eligibility | null>(null);
+  const [isLoading, setIsLoading]   = useState(true);
+
+  const heartbeatRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryRef        = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isTabVisible    = useRef(true);
+  // Track previous connection state to detect transitions
+  const wasConnected    = useRef(false);
+  // Generation counter — incremented on every fetchPresence call so out-of-order
+  // responses (e.g. socket-connect fetch racing with heartbeat-chain fetch) are discarded.
+  const fetchGenRef     = useRef(0);
+  // Mirrors presence.intent so fireHeartbeat can send it without closing over stale state.
+  const currentIntentRef = useRef<StatusIntent>('do_not_disturb');
 
   /* ─── Fetch presence from server ─── */
   const fetchPresence = useCallback(async () => {
+    const gen = ++fetchGenRef.current;
     try {
       const data = await presenceApi.getMe();
+      // Discard if a newer fetch already resolved — prevents a slow in-flight
+      // request (e.g. socket-connect fetch sent before Redis had the key) from
+      // overwriting a fresher response and leaving the tutor stuck as "Offline".
+      if (gen !== fetchGenRef.current) return;
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
+      currentIntentRef.current = data.presence.intent;
       setPresence(data.presence);
       setEligibility(data.eligibility);
     } catch (err: any) {
-      // api client throws on non-2xx — check message for 401
+      if (gen !== fetchGenRef.current) return;
       if (err?.message?.includes('401')) {
-        window.location.href = '/login';
+        window.location.href = '/signin';
         return;
       }
       console.error('[PresenceProvider] fetchPresence error', err);
+      // Single retry after 3s — prevents permanent "Offline" on transient failures.
+      // Guard with ref so concurrent failures don't stack multiple retries.
+      if (!retryRef.current) {
+        retryRef.current = setTimeout(() => {
+          retryRef.current = null;
+          fetchPresence();
+        }, 3_000);
+      }
     } finally {
-      setIsLoading(false);
+      if (gen === fetchGenRef.current) setIsLoading(false);
     }
   }, []);
 
   /* ─── Heartbeat ─── */
   const fireHeartbeat = useCallback(async () => {
     try {
-      await presenceApi.heartbeat();
+      await presenceApi.heartbeat(currentIntentRef.current);
     } catch (err: any) {
       if (err?.message?.includes('401')) {
-        window.location.href = '/login';
+        window.location.href = '/signin';
       } else {
         console.warn('[PresenceProvider] heartbeat error', err);
       }
@@ -113,8 +123,8 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startHeartbeat = useCallback(() => {
-    if (heartbeatRef.current) return; // already running
-    heartbeatRef.current = setInterval(fireHeartbeat, 60_000); // FIX: 60s, not 45s
+    if (heartbeatRef.current) return;
+    heartbeatRef.current = setInterval(fireHeartbeat, 60_000);
   }, [fireHeartbeat]);
 
   const stopHeartbeat = useCallback(() => {
@@ -129,6 +139,7 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     async (intent: Exclude<StatusIntent, 'busy_session'>) => {
       try {
         const data = await presenceApi.setIntent(intent);
+        currentIntentRef.current = data.presence.intent;
         setPresence(data.presence);
         setEligibility(data.eligibility);
       } catch (err) {
@@ -138,45 +149,66 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  /* ─── Socket setup ─── */
+  /* ─── React to socket connect/disconnect via SocketContext ─── */
   useEffect(() => {
-    const sock = getSocket();
+    const connected = isConnected;
 
-    const onConnect = async () => {
-      // FIX: always re-fetch on (re)connect — socket reconnect resets server state
-      await fetchPresence();
+    if (connected && !wasConnected.current) {
+      // Transition: disconnected → connected.
+      // Only fetch if we have no presence data yet (i.e. mount fetch hasn't
+      // resolved). If data already exists this is a reconnect — rely on the
+      // server-pushed presence:update event instead of racing a redundant fetch.
+      if (!presence) fetchPresence();
+    }
 
-      setPresence((prev) =>
-        prev ? { ...prev, socketConnected: true } : prev
-      );
-    };
-
-    const onDisconnect = () => {
-      // Optimistically mark socket as disconnected while server catches up
+    if (!connected && wasConnected.current) {
+      // Transition: connected → disconnected
+      // Optimistically mark socket as disconnected
       setPresence((prev) =>
         prev ? { ...prev, socketConnected: false } : prev
       );
-    };
+    }
 
-    sock.on('connect', onConnect);
-    sock.on('disconnect', onDisconnect);
+    wasConnected.current = connected;
+  }, [isConnected, presence, fetchPresence]);
 
-    return () => {
-      sock.off('connect', onConnect);
-      sock.off('disconnect', onDisconnect);
-    };
-  }, [fetchPresence]);
+  /* ─── Listen for server-pushed presence updates ─── */
+  useEffect(() => {
+    const unsub = subscribe('presence:update', (data: { presence: FullPresence; eligibility: Eligibility }) => {
+      const p = data.presence;
+      const e = data.eligibility;
+      currentIntentRef.current = p.intent;
+      // Return prev reference unchanged when nothing changed — prevents
+      // downstream re-renders on repeated heartbeat pushes.
+      setPresence(prev =>
+        prev &&
+        prev.online === p.online &&
+        prev.socketConnected === p.socketConnected &&
+        prev.intent === p.intent &&
+        prev.lastActivity === p.lastActivity &&
+        prev.socketCount === p.socketCount
+          ? prev : p
+      );
+      setEligibility(prev =>
+        prev && e &&
+        prev.eligible === e.eligible &&
+        prev.reason === e.reason
+          ? prev : (e ?? null)
+      );
+    });
+    return unsub;
+  }, [subscribe]);
 
   /* ─── Tab visibility ─── */
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // FIX: tab hidden → pause heartbeat
         isTabVisible.current = false;
         stopHeartbeat();
+        emit('presence:page_hidden');
       } else {
-        // FIX: tab visible → fire immediate beat, then resume interval
         isTabVisible.current = true;
+        emit('presence:page_visible');
         fireHeartbeat();
         startHeartbeat();
       }
@@ -184,20 +216,24 @@ export function PresenceProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [fireHeartbeat, startHeartbeat, stopHeartbeat]);
+  }, [emit, fireHeartbeat, startHeartbeat, stopHeartbeat]);
 
   /* ─── Mount: initial fetch + heartbeat ─── */
   useEffect(() => {
-    fetchPresence();
+    // Fire heartbeat immediately so the Redis presence key exists before we fetch.
+    // Without this, fetchPresence() returns online:false on first load because
+    // the scheduled heartbeat interval doesn't fire for 60s.
+    fireHeartbeat().then(() => fetchPresence());
     startHeartbeat();
 
     return () => {
       stopHeartbeat();
-      // Note: we intentionally do NOT disconnect the socket here.
-      // The singleton persists for the session lifetime.
-      // If you want full teardown (e.g. on logout), call socket.disconnect() explicitly.
+      if (retryRef.current) {
+        clearTimeout(retryRef.current);
+        retryRef.current = null;
+      }
     };
-  }, [fetchPresence, startHeartbeat, stopHeartbeat]);
+  }, [fetchPresence, fireHeartbeat, startHeartbeat, stopHeartbeat]);
 
   return (
     <PresenceContext.Provider

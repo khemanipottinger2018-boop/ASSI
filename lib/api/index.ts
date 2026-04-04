@@ -7,7 +7,18 @@ export type {
   UserBadge,
   UserFeatures,
   UserFeaturesResponse,
+  CreditTransaction,
+  UserQuota,
+  DailyTask,
 } from './user';
+
+export { goalsApi } from './goals';
+export type {
+  UserGoal,
+  GoalType,
+  CreateGoalBody,
+  UpdateGoalBody,
+} from './goals';
 
 export { presenceApi } from './presence';
 export type { 

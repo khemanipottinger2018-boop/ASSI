@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Users, MessageCircle, BarChart2, ClipboardList,
-  AlertTriangle, ShieldCheck, Loader2,
+  AlertTriangle, ShieldCheck, Loader2, XCircle,
   RefreshCw, ArrowRight, Wifi, Clock, Inbox, Cpu,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
@@ -49,10 +49,12 @@ export default function AdminDashboard() {
   const [pendingApps, setPendingApps] = useState<PendingApp[]>([]);
   const [activeSess,  setActiveSess]  = useState(0);
   const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
   const [lastSync,    setLastSync]    = useState<Date>(new Date());
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const [metricsRes, errorsRes, appsRes, sessRes] = await Promise.allSettled([
         adminApi.getMetrics(),
@@ -63,6 +65,8 @@ export default function AdminDashboard() {
 
       if (metricsRes.status === 'fulfilled' && metricsRes.value.success) {
         setMetrics((metricsRes.value as any).metrics);
+      } else if (metricsRes.status === 'rejected') {
+        setError('Failed to load metrics');
       }
       if (errorsRes.status === 'fulfilled' && errorsRes.value.success) {
         setErrors(((errorsRes.value as any).errors ?? []).slice(0, 5));
@@ -75,8 +79,9 @@ export default function AdminDashboard() {
         const sess = (sessRes.value as any).sessions ?? [];
         setActiveSess(sess.filter((s: any) => s.status === 'active').length);
       }
-    } catch { /* silent */ }
-    finally { setLoading(false); setLastSync(new Date()); }
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load dashboard data');
+    } finally { setLoading(false); setLastSync(new Date()); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -185,6 +190,15 @@ export default function AdminDashboard() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </motion.div>
+
+      {/* ── Error banner ── */}
+      {error && (
+        <motion.div custom={0.5} variants={fade} initial="initial" animate="animate"
+          className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          <XCircle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400/80 text-sm">{error}</p>
+        </motion.div>
+      )}
 
       {/* ── Stat grid ── */}
       {loading && !metrics ? (

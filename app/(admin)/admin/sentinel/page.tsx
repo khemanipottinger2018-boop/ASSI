@@ -174,6 +174,7 @@ export default function SentinelPage() {
         body:        JSON.stringify({
           message: msg,
           history: historyRef.current.slice(-12),
+          context,
         }),
       });
       const data = await res.json();

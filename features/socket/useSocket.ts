@@ -89,10 +89,6 @@ export function useSocket() {
     };
   }, [isAuthenticated, isLoading, user?.id, options]);
 
-  /* ─── emit ───────────────────────────────────────────────────
-     Always reads socketRef.current at call time — safe across
-     reconnects. Silently no-ops if socket isn't up yet.
-  ──────────────────────────────────────────────────────────── */
   const emit = useCallback(
     (event: string, payload?: any, callback?: (response: any) => void) => {
       socketRef.current?.emit(event, payload, callback);
@@ -100,12 +96,6 @@ export function useSocket() {
     []
   );
 
-  /* ─── on / off ───────────────────────────────────────────────
-     FIX: Both now read socketRef.current inside the callback body
-     rather than closing over it at creation time. This means they
-     always target the live socket instance, even after a reconnect
-     replaces the ref.
-  ──────────────────────────────────────────────────────────── */
   const on = useCallback((event: string, handler: AnyHandler) => {
     socketRef.current?.on(event, handler);
   }, []);
@@ -116,19 +106,21 @@ export function useSocket() {
 
   /* ─── subscribe ──────────────────────────────────────────────
      Convenience wrapper that returns an unsubscribe function.
-     Useful for effects that need cleanup without a separate off() call.
+     Reads socketRef.current at call time — callers that use this
+     inside a useEffect should include isConnected in their deps
+     so the subscription is re-registered after a reconnect.
   ──────────────────────────────────────────────────────────── */
   const subscribe = useCallback((event: string, handler: AnyHandler) => {
     const s = socketRef.current;
     if (!s) return () => {};
     s.on(event, handler);
     return () => s.off(event, handler);
-  }, []);
+  }, [isConnected]); 
 
   return {
     socket: socketRef.current,
     isConnected,
-    isReady,           // NEW: isConnected && !isLoading && isAuthenticated
+    isReady,           
     emit,
     on,
     off,

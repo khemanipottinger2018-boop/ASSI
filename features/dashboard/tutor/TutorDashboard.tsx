@@ -5,18 +5,22 @@ import { useRouter }           from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BookOpen, Clock, ArrowRight, Loader2,
-  CheckCircle, XCircle, Bell, BarChart2,
-  Wifi, WifiOff, MessageCircle, Calendar,
-  Star, Zap,
+  CheckCircle, CheckCircle2, Circle, XCircle,
+  Bell, BarChart2, Wifi, WifiOff,
+  MessageCircle, Calendar, Star, Zap, Flame,
 } from 'lucide-react';
 import { useAuth }             from '@/features/auth';
+import { useStreak }           from '@/features/platform';
 import { usePresence }         from '@/features/presence';
-import { usePresenceDisplay } from '@/features/presence';
-import { useSocket }           from '@/features/socket';
+import { usePresenceDisplay }  from '@/features/presence';
+import { useSocketContext }    from '@/features/socket';
 import PresenceBadge           from '@/features/presence/PresenceBadge';
 import TutorAvailabilityToggle from '@/features/presence/TutorAvailabilityToggle';
-import { sessionsApi, tutorsApi, api } from '@/lib/api';
+import { sessionsApi, tutorsApi, notificationsApi, userApi, api } from '@/lib/api';
+import { filterActive } from '@/features/types/notification';
 import type { ChatSession } from '@/lib/api';
+import type { Notification } from '@/features/types/notification';
+import type { DailyTask } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -75,7 +79,6 @@ function duration(ts: number): string {
   return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-// ChatSession has status + startedAt (ISO) — no scheduledAt or durationMinutes
 function deriveStats(sessions: ChatSession[]): TutorStats {
   const completed  = sessions.filter(s => s.status === 'completed');
   const today      = new Date().toDateString();
@@ -89,7 +92,6 @@ function deriveStats(sessions: ChatSession[]): TutorStats {
   return {
     sessionsTotal:  completed.length,
     sessionsToday:  todayDone.length,
-    // durationMinutes not on ChatSession — show count as proxy until endpoint exposes it
     hoursThisWeek:  weekDone.length,
     avgRating:      null,
     totalReviews:   0,
@@ -109,50 +111,56 @@ export default function TutorDashboard() {
   const router   = useRouter();
   const { user } = useAuth();
 
-  // Source of truth — same context TutorHomeSelector reads from.
-  // Any toggle on the home page is instantly reflected here and vice versa.
   const { presence, eligibility, isLoading } = usePresence();
   const display = usePresenceDisplay();
-  const { subscribe } = useSocket();
+  const { subscribe } = useSocketContext();
+  const { streak }    = useStreak();
 
   const hydrated     = !isLoading && presence !== null;
   const discoverable = eligibility?.eligible ?? false;
-  const isOnline     = presence?.online ?? false;
+  const isOnline     = display.variant !== 'offline';
 
   // ── Data state ──
   const [queue,          setQueue]          = useState<QueueEntry[]>([]);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [stats,          setStats]          = useState<TutorStats | null>(null);
   const [subjects,       setSubjects]       = useState<TutorSubject[]>([]);
+  const [notifications,  setNotifications]  = useState<Notification[]>([]);
+  const [dailyTasks,     setDailyTasks]     = useState<DailyTask[]>([]);
   const [acceptingId,    setAcceptingId]    = useState<string | null>(null);
   const [decliningId,    setDecliningId]    = useState<string | null>(null);
-  const [loadingStats,   setLoadingStats]   = useState(true);
+  const [loadingData,    setLoadingData]    = useState(true);
 
-  // ── Fetch sessions + subjects ──
+  // ── Fetch ──
   const fetchData = useCallback(async () => {
     try {
-      const [sessionsData, activeData] = await Promise.all([
+      const [sessionsData, activeData, notifData, tasksData] = await Promise.all([
         sessionsApi.getChatSessions(),
         sessionsApi.getActiveSession(),
+        notificationsApi.getAll(),
+        userApi.getDailyTasks(),
       ]);
 
-      if (sessionsData.success) {
-        setStats(deriveStats(sessionsData.sessions));
-      }
+      if (sessionsData.success) setStats(deriveStats(sessionsData.sessions));
 
-      // Hydrate active session on mount — socket events keep it live after this
       if (activeData.success && activeData.session) {
         const s = activeData.session;
         setActiveSessions([{
           sessionId:   s.sessionId,
-          studentName: s.tutorName, // field name from backend — represents the partner
+          studentName: s.tutorName,
           subjectName: s.subjectName,
           startedAt:   new Date(s.startedAt).getTime(),
           status:      'active',
         }]);
       }
+
+      if (notifData.success) {
+        setNotifications(filterActive(notifData.notifications ?? []).slice(0, 4));
+      }
+
+      if (tasksData.success) setDailyTasks(tasksData.tasks ?? []);
     } catch { /* silent */ }
-    finally { setLoadingStats(false); }
+    finally { setLoadingData(false); }
   }, []);
 
   const fetchSubjects = useCallback(async () => {
@@ -174,7 +182,7 @@ export default function TutorDashboard() {
     fetchSubjects();
   }, [fetchData, fetchSubjects]);
 
-  // ── Socket: incoming requests + session lifecycle ──
+  // ── Socket ──
   useEffect(() => {
     const unsubReq = subscribe('session:request', (payload: any) => {
       setQueue(prev => {
@@ -197,7 +205,6 @@ export default function TutorDashboard() {
     });
 
     const unsubStarted = subscribe('session:started', (payload: any) => {
-      // Move from queue to active when tutor accepts
       setQueue(prev => {
         const entry = prev.find(q => q.sessionId === payload.sessionId);
         if (entry) {
@@ -221,7 +228,7 @@ export default function TutorDashboard() {
     if (acceptingId) return;
     setAcceptingId(sessionId);
     try {
-      const data = await api.post<{ success: boolean }>(`/live-chat/${sessionId}/accept`);
+      const data = await api.post<{ success: boolean }>(`/api/live-chat/${sessionId}/accept`);
       if (data.success) router.push(`/live-chat/${sessionId}`);
     } catch { /* silent */ }
     finally { setAcceptingId(null); }
@@ -230,26 +237,34 @@ export default function TutorDashboard() {
   const declineRequest = useCallback((sessionId: string) => {
     if (decliningId) return;
     setDecliningId(sessionId);
-    // No server endpoint — remove locally; Redis TTL cleans up the session
     setQueue(prev => prev.filter(q => q.sessionId !== sessionId));
     setDecliningId(null);
   }, [decliningId]);
 
-  const isTutorApp = user?.role === 'tutor_applicant';
+  const isTutorApp      = user?.role === 'tutor_applicant';
+  const tasksCompleted  = dailyTasks.filter(t => t.completed).length;
+  const tasksTotal      = dailyTasks.length;
+  const unreadNotifs    = notifications.filter(n => !n.isRead).length;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-7">
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
 
       {/* ── Header ── */}
       <motion.div custom={0} variants={fade} initial="initial" animate="animate">
         <div className="panel rounded-2xl p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-white/40 text-xs tracking-widest uppercase mb-1">
                 {isTutorApp ? 'Application Pending' : 'Tutor Dashboard'}
               </p>
-              <h1 className="text-white font-semibold text-xl tracking-tight">
+              <h1 className="text-white font-semibold text-xl tracking-tight flex items-center gap-2">
                 Hey, {user?.username} 👋
+                {streak.currentStreak > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/20 text-[11px] font-semibold text-orange-400">
+                    <Flame size={10} />
+                    {streak.currentStreak}d
+                  </span>
+                )}
               </h1>
               <p className="text-white/40 text-sm mt-1">
                 {isTutorApp
@@ -259,19 +274,16 @@ export default function TutorDashboard() {
 
               {!isTutorApp && (
                 <div className="flex items-center gap-2.5 flex-wrap mt-2.5">
-                  {/* PresenceBadge receives the full display object */}
                   <PresenceBadge display={display} />
-                  <span className="text-[10px] text-white/35 px-2 py-1 rounded-full border border-white/10">
-                    socket: {String(presence?.socketConnected ?? false)}
-                  </span>
-                  <span className="text-[10px] text-white/35 px-2 py-1 rounded-full border border-white/10">
-                    discoverable: {String(discoverable)}
-                  </span>
+                  {hydrated && (
+                    <span className="text-[10px] text-white/35 px-2 py-1 rounded-full border border-white/10">
+                      {discoverable ? 'discoverable' : 'not discoverable'}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Toggle reads from context — synced with TutorHomeSelector */}
             {!isTutorApp && (
               <div className="flex-shrink-0">
                 <TutorAvailabilityToggle />
@@ -302,7 +314,7 @@ export default function TutorDashboard() {
         <motion.div custom={1} variants={fade} initial="initial" animate="animate" className="grid grid-cols-4 gap-2.5">
           {STAT_CARDS.map(({ label, suffix, color, icon: Icon, key }) => {
             const raw   = stats?.[key as keyof TutorStats];
-            const value = loadingStats
+            const value = loadingData
               ? null
               : key === 'avgRating'
                 ? (typeof raw === 'number' ? raw.toFixed(1) : '—')
@@ -335,9 +347,56 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Active session rejoin ── */}
+      {!isTutorApp && activeSessions.length > 0 && (
+        <motion.div custom={2} variants={fade} initial="initial" animate="animate">
+          <div className="flex items-center gap-2 mb-2.5">
+            <MessageCircle size={13} className="text-emerald-400" />
+            <h2 className="text-white/70 text-sm font-medium">Active Sessions</h2>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
+              {activeSessions.length}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {activeSessions.map((session) => (
+              <motion.button
+                key={session.sessionId}
+                layout
+                onClick={() => router.push(`/live-chat/${session.sessionId}`)}
+                className="panel rounded-2xl p-4 text-left w-full border border-emerald-500/[0.18] hover:bg-white/[0.06] transition group"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="relative">
+                    <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-emerald-400 text-[13px] font-bold bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 border border-emerald-500/20">
+                      {session.studentName?.[0]?.toUpperCase() ?? 'S'}
+                    </div>
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-black/40"
+                      style={{ boxShadow: '0 0 6px rgba(52,211,153,0.8)' }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/80 text-[13px] font-semibold">{session.studentName}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-blue-400 text-[10px]">{session.subjectName}</span>
+                      <span className="text-white/20 text-[10px] flex items-center gap-1">
+                        <Clock size={9} /> {duration(session.startedAt)}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
+                    Rejoin →
+                  </span>
+                </div>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Incoming requests ── */}
       {!isTutorApp && (
-        <motion.div custom={2} variants={fade} initial="initial" animate="animate">
+        <motion.div custom={3} variants={fade} initial="initial" animate="animate">
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-2">
               <Bell size={13} className={queue.length > 0 ? 'text-orange-400' : 'text-white/30'} />
@@ -449,56 +508,50 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
-      {/* ── Active sessions ── */}
-      {!isTutorApp && activeSessions.length > 0 && (
-        <motion.div custom={3} variants={fade} initial="initial" animate="animate">
-          <div className="flex items-center gap-2 mb-2.5">
-            <MessageCircle size={13} className="text-emerald-400" />
-            <h2 className="text-white/70 text-sm font-medium">Active Sessions</h2>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
-              {activeSessions.length}
-            </span>
+      {/* ── Daily tasks ── */}
+      {!isTutorApp && (loadingData || dailyTasks.length > 0) && (
+        <motion.div custom={4} variants={fade} initial="initial" animate="animate">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={13} className="text-white/30" />
+              <h2 className="text-white/70 text-sm font-medium">
+                Daily Tasks{tasksTotal > 0 ? ` (${tasksCompleted}/${tasksTotal})` : ''}
+              </h2>
+            </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            {activeSessions.map((session) => (
-              <motion.button
-                key={session.sessionId}
-                layout
-                onClick={() => router.push(`/live-chat/${session.sessionId}`)}
-                className="panel rounded-2xl p-4 text-left w-full border border-emerald-500/[0.18] hover:bg-white/[0.06] transition group"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="relative">
-                    <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-emerald-400 text-[13px] font-bold bg-gradient-to-br from-emerald-500/20 to-emerald-700/10 border border-emerald-500/20">
-                      {session.studentName?.[0]?.toUpperCase() ?? 'S'}
-                    </div>
-                    <span
-                      className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-black/40"
-                      style={{ boxShadow: '0 0 6px rgba(52,211,153,0.8)' }}
-                    />
-                  </div>
+            {loadingData ? (
+              [0, 1, 2].map(i => <div key={i} className="panel rounded-2xl h-10 animate-pulse" />)
+            ) : (
+              dailyTasks.map((task, i) => (
+                <div key={task.id || task.slug || i}
+                  className={`flex items-center gap-3 panel rounded-2xl px-4 py-3 transition ${
+                    task.completed ? 'opacity-50' : ''
+                  }`}>
+                  {task.completed
+                    ? <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
+                    : <Circle size={14} className="text-white/20 flex-shrink-0" />
+                  }
                   <div className="flex-1 min-w-0">
-                    <p className="text-white/80 text-[13px] font-semibold">{session.studentName}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-blue-400 text-[10px]">{session.subjectName}</span>
-                      <span className="text-white/20 text-[10px] flex items-center gap-1">
-                        <Clock size={9} /> {duration(session.startedAt)}
-                      </span>
-                    </div>
+                    <p className={`text-sm leading-tight ${task.completed ? 'line-through text-white/30' : 'text-white/75'}`}>
+                      {task.title}
+                    </p>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/12 border border-emerald-500/25 text-emerald-400">
-                    Rejoin →
-                  </span>
+                  {task.reward > 0 && (
+                    <span className="text-[10px] text-orange-400/70 font-semibold flex-shrink-0">
+                      +{task.reward}cr
+                    </span>
+                  )}
                 </div>
-              </motion.button>
-            ))}
+              ))
+            )}
           </div>
         </motion.div>
       )}
 
       {/* ── Subjects ── */}
       {subjects.length > 0 && (
-        <motion.div custom={4} variants={fade} initial="initial" animate="animate">
+        <motion.div custom={5} variants={fade} initial="initial" animate="animate">
           <div className="flex items-center gap-2 mb-2.5">
             <BookOpen size={13} className="text-white/40" />
             <h2 className="text-white/70 text-sm font-medium">Subjects I Teach</h2>
@@ -532,12 +585,56 @@ export default function TutorDashboard() {
         </motion.div>
       )}
 
+      {/* ── Notifications preview ── */}
+      <motion.div custom={6} variants={fade} initial="initial" animate="animate">
+        <div className="flex items-center justify-between mb-2.5">
+          <div className="flex items-center gap-2">
+            <Bell size={13} className={unreadNotifs > 0 ? 'text-orange-400' : 'text-white/30'} />
+            <h2 className="text-white/70 text-sm font-medium">Notifications</h2>
+            {unreadNotifs > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/15 border border-orange-500/30 text-orange-400">
+                {unreadNotifs}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => router.push('/notifications')}
+            className="flex items-center gap-0.5 text-white/30 hover:text-white/60 text-xs transition"
+          >
+            See all <ArrowRight size={11} />
+          </button>
+        </div>
+        {loadingData ? (
+          <div className="flex flex-col gap-1.5">
+            {[0, 1].map(i => <div key={i} className="panel rounded-2xl h-12 animate-pulse" />)}
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="panel rounded-2xl px-4 py-5 text-center">
+            <p className="text-white/30 text-sm">You&apos;re all caught up</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {notifications.map(n => (
+              <div key={n.id} className="flex items-start gap-3 panel rounded-2xl px-4 py-3">
+                {!n.isRead && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5 flex-shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/75 text-sm font-medium">{n.title}</p>
+                  <p className="text-white/35 text-xs mt-0.5 leading-relaxed">{n.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
       {/* ── Quick links ── */}
       {!isTutorApp && (
-        <motion.div custom={5} variants={fade} initial="initial" animate="animate" className="grid grid-cols-2 gap-2.5">
+        <motion.div custom={7} variants={fade} initial="initial" animate="animate" className="grid grid-cols-2 gap-2.5">
           {[
             { label: 'Session History', sub: 'View past sessions', icon: Calendar, path: '/sessions'      },
-            { label: 'Notifications',   sub: 'Alerts and updates', icon: Bell,     path: '/notifications' },
+            { label: 'Live Lobby',      sub: 'Start a session',    icon: MessageCircle, path: '/live-chat' },
           ].map(({ label, sub, icon: Icon, path }) => (
             <button
               key={path}

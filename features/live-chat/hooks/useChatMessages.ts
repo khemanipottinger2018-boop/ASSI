@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useChatSocket } from './useChatSocket';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -14,7 +14,10 @@ export interface ChatMessage {
   timestamp:   number;
 }
 
-export function useChatMessages(sessionId: string) {
+export function useChatMessages(
+  sessionId: string,
+  sender?: { id: string; name?: string },
+) {
   const { emit, on, off, isConnected } = useChatSocket();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -75,17 +78,36 @@ export function useChatMessages(sessionId: string) {
     return () => off('chat:message', handleMessage);
   }, [isConnected, sessionId, on, off]);
 
-  /* ── Send ────────────────────────────────────────────────── */
+  /* ── Send (1-second rate limit) ─────────────────────────── */
+  const lastSentRef = useRef(0);
+  const SEND_COOLDOWN_MS = 1000;
+
   const sendMessage = useCallback(
     (content: string) => {
-      if (!content.trim()) return;
-      emit('chat:message', {
-        sessionId,
-        content:   content.trim(),
-        messageId: crypto.randomUUID(),
-      });
+      const now = Date.now();
+      if (!content.trim() || now - lastSentRef.current < SEND_COOLDOWN_MS) return;
+      lastSentRef.current = now;
+      const messageId = crypto.randomUUID();
+      const trimmed   = content.trim();
+
+      // Optimistic update — show message immediately without waiting for echo
+      if (sender?.id) {
+        setMessages(prev => {
+          if (prev.some(m => m.messageId === messageId)) return prev;
+          return [...prev, {
+            messageId,
+            sessionId,
+            senderId:   sender.id,
+            senderName: sender.name,
+            content:    trimmed,
+            timestamp:  Date.now(),
+          }];
+        });
+      }
+
+      emit('chat:message', { sessionId, content: trimmed, messageId });
     },
-    [emit, sessionId]
+    [emit, sender, sessionId]
   );
 
   return { messages, sendMessage };

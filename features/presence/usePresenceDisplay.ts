@@ -43,12 +43,25 @@ export type PresenceDisplayOutput = {
 export function usePresenceDisplay(): PresenceDisplayOutput {
   const { presence, eligibility, isLoading } = usePresence();
 
-  // Loading state
-  if (isLoading || !presence) {
+  // Initial load — data not yet fetched
+  if (isLoading) {
     return {
       intent: null,
       label: 'Checking...',
       subtitle: 'Loading presence',
+      pulse: false,
+      variant: 'offline',
+      eligibilityReason: null,
+      canChangeIntent: false,
+    };
+  }
+
+  // API failed or no presence record — degrade gracefully, do not stay on "Checking..."
+  if (!presence) {
+    return {
+      intent: null,
+      label: 'Offline',
+      subtitle: 'Could not load status',
       pulse: false,
       variant: 'offline',
       eligibilityReason: null,

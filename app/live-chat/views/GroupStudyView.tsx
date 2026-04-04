@@ -15,9 +15,9 @@ import {
   Save, Download,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '../hooks/useChatSocket';
-import { useChatMessages } from '../hooks/useChatMessages';
-import { useTyping }       from '../hooks/useTyping';
+import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
+import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }       from '@/features/live-chat/hooks/useTyping';
 import { StudyPanel }      from '../components/StudyPanel';
 import { api }             from '@/lib/api';
 import type { StudyTool, Problem } from '../components/StudyPanel';
@@ -25,8 +25,9 @@ import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, PausedBanner,
   ParticipantList, ParticipantSidebar,
+  ActivityFeed, useActivityEvents,
 } from '../components/SessionShared';
-import type { SessionMeta, Participant, InviteRequest } from '../types/SocketEvents';
+import type { SessionMeta, Participant, InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
 export type StudyRole = 'owner' | 'presenter' | 'member';
 
@@ -52,8 +53,9 @@ export function GroupStudyView({
 }: Props) {
   const router = useRouter();
   const { emit, on, off, isConnected, isReady } = useChatSocket();
-  const { messages, sendMessage }               = useChatMessages(sessionId);
-  const { onKeystroke, stopTyping, someoneIsTyping } = useTyping(sessionId);
+  const { messages, sendMessage }               = useChatMessages(sessionId, { id: currentUserId, name: currentUsername });
+  const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
+  const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
   // ── Session state ──
   const [participants,    setParticipants]    = useState<Participant[]>([]);
@@ -68,6 +70,9 @@ export function GroupStudyView({
   const [inviteInput,     setInviteInput]     = useState('');
   const [invitePending,   setInvitePending]   = useState(false);
   const [pendingApproval, setPendingApproval] = useState<InviteRequest | null>(null);
+  const [inviteLooking,   setInviteLooking]   = useState(false);
+  const [inviteFound,     setInviteFound]     = useState<{ id: string; username: string } | null>(null);
+  const [inviteLookupErr, setInviteLookupErr] = useState<string | null>(null);
   const [hydrating,       setHydrating]       = useState(true);
 
   // ── Study role ──
@@ -96,19 +101,38 @@ export function GroupStudyView({
     let cancelled = false;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-    fetch(`${API_URL}/api/live-chat/${sessionId}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        if (cancelled || !d.success || !d.session) return;
-        const { status, endedReason } = d.session;
-        if (status === 'ended') { setSessionEnded(true); setEndReason(endedReason ?? ''); }
-        else if (status === 'paused') setSessionPaused(true);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setHydrating(false); });
+    Promise.allSettled([
+      fetch(`${API_URL}/api/live-chat/${sessionId}`, { credentials: 'include' }).then(r => r.json()),
+      fetch(`${API_URL}/api/group-study/${sessionId}/participants`, { credentials: 'include' }).then(r => r.json()),
+    ]).then(([sessionRes, participantsRes]) => {
+      if (cancelled) return;
+
+      if (sessionRes.status === 'fulfilled') {
+        const d = sessionRes.value;
+        if (d.success && d.session) {
+          const { status, endedReason } = d.session;
+          if (status === 'ended') { setSessionEnded(true); setEndReason(endedReason ?? ''); }
+          else if (status === 'paused') setSessionPaused(true);
+        }
+      }
+
+      if (participantsRes.status === 'fulfilled') {
+        const d = participantsRes.value;
+        if (d.success && Array.isArray(d.participants)) {
+          setParticipants(d.participants.map((p: any) => ({
+            userId:     p.userId,
+            username:   p.user?.username ?? '',
+            role:       p.role ?? 'student',
+            isMuted:    false,
+            handRaised: false,
+            isHost:     p.userId === meta.hostId,
+          })));
+        }
+      }
+    }).finally(() => { if (!cancelled) setHydrating(false); });
 
     return () => { cancelled = true; };
-  }, [sessionId]);
+  }, [sessionId, meta.hostId]);
 
   // ── Join ──
   useEffect(() => {
@@ -146,28 +170,41 @@ export function GroupStudyView({
       if (userId === currentUserId) setStudyRole(role);
     };
 
-    on('session:participants',  onParticipants);
-    on('session:paused',        onPaused);
-    on('session:started',       onStarted);
-    on('session:ended',         onEnded);
-    on('chat:invite_request',   onInviteReq);
-    on('chat:invite_accepted',  onInviteAcc);
-    on('chat:invite_declined',  onInviteDec);
-    on('chat:invite_error',     onInviteErr);
-    on('study:role_assign',     onRoleAssign);
+    const onDrawStart  = ({ username }: { username: string }) => pushActivity({ label: `${username} is drawing`, kind: 'drawing' });
+    const onDrawStop   = () => {};
+    const onProbPosted = ({ username }: { username: string }) => pushActivity({ label: `${username} sent a problem`, kind: 'problem' });
+    const onJoined     = ({ username }: { username: string }) => pushActivity({ label: `${username} joined`, kind: 'joined' });
+
+    on('session:participants',        onParticipants);
+    on('session:paused',              onPaused);
+    on('session:started',             onStarted);
+    on('session:ended',               onEnded);
+    on('chat:invite_request',         onInviteReq);
+    on('chat:invite_accepted',        onInviteAcc);
+    on('chat:invite_declined',        onInviteDec);
+    on('chat:invite_error',           onInviteErr);
+    on('study:role_assign',           onRoleAssign);
+    on('study:drawing:start',         onDrawStart);
+    on('study:drawing:stop',          onDrawStop);
+    on('study:problem:posted',        onProbPosted);
+    on('session:participant_joined',  onJoined);
 
     return () => {
-      off('session:participants',  onParticipants);
-      off('session:paused',        onPaused);
-      off('session:started',       onStarted);
-      off('session:ended',         onEnded);
-      off('chat:invite_request',   onInviteReq);
-      off('chat:invite_accepted',  onInviteAcc);
-      off('chat:invite_declined',  onInviteDec);
-      off('chat:invite_error',     onInviteErr);
-      off('study:role_assign',     onRoleAssign);
+      off('session:participants',       onParticipants);
+      off('session:paused',             onPaused);
+      off('session:started',            onStarted);
+      off('session:ended',              onEnded);
+      off('chat:invite_request',        onInviteReq);
+      off('chat:invite_accepted',       onInviteAcc);
+      off('chat:invite_declined',       onInviteDec);
+      off('chat:invite_error',          onInviteErr);
+      off('study:role_assign',          onRoleAssign);
+      off('study:drawing:start',        onDrawStart);
+      off('study:drawing:stop',         onDrawStop);
+      off('study:problem:posted',       onProbPosted);
+      off('session:participant_joined', onJoined);
     };
-  }, [sessionId, currentUserId, on, off]);
+  }, [sessionId, currentUserId, on, off, pushActivity]);
 
   // ── Handlers ──
   const handleEnd = useCallback(() => {
@@ -179,13 +216,40 @@ export function GroupStudyView({
     setShowSavePrompt(true);
   }, [confirmingEnd, emit, sessionId]);
 
-  const handleSendInvite = useCallback(() => {
+  const handleLookupUser = useCallback(async () => {
     const username = inviteInput.trim();
-    if (!username || invitePending || !isReady) return;
+    if (!username) return;
+    setInviteLooking(true);
+    setInviteFound(null);
+    setInviteLookupErr(null);
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    try {
+      const res  = await fetch(`${API_URL}/api/users-public/${encodeURIComponent(username)}`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok && data.success && data.user) {
+        if (data.user.id === currentUserId) {
+          setInviteLookupErr("That's you.");
+        } else if (participants.some(p => p.userId === data.user.id)) {
+          setInviteLookupErr('Already in this session.');
+        } else {
+          setInviteFound({ id: data.user.id, username: data.user.username });
+        }
+      } else {
+        setInviteLookupErr('User not found.');
+      }
+    } catch {
+      setInviteLookupErr('Could not look up user.');
+    } finally {
+      setInviteLooking(false);
+    }
+  }, [inviteInput, currentUserId, participants]);
+
+  const handleSendInvite = useCallback(() => {
+    if (!inviteFound || invitePending || !isReady) return;
     setInvitePending(true);
-    emit('chat:invite_request', { sessionId, fromUsername: currentUsername, inviteeUsername: username });
-    setInviteInput(''); setShowInvite(false);
-  }, [inviteInput, invitePending, isReady, emit, sessionId, currentUsername]);
+    emit('chat:invite_request', { sessionId, fromUsername: currentUsername, inviteeUsername: inviteFound.username });
+    setInviteInput(''); setInviteFound(null); setInviteLookupErr(null); setShowInvite(false);
+  }, [inviteFound, invitePending, isReady, emit, sessionId, currentUsername]);
 
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault();
@@ -284,6 +348,7 @@ export function GroupStudyView({
           subtitle={`${participants.length}/${maxParticipants} members${isPlus ? '' : ' · upgrade for 6'}`}
           connected={isConnected}
           participantCount={participants.length}
+          startedAt={meta.startedAt}
           onEnd={handleEnd}
           confirmingEnd={confirmingEnd}
           onCancelEnd={() => setConfirmingEnd(false)}
@@ -342,19 +407,45 @@ export function GroupStudyView({
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }}
               className="shrink-0 overflow-hidden border-b border-white/[0.07]">
-              <div className="flex items-center gap-2 px-4 py-2.5">
-                <input autoFocus value={inviteInput} onChange={e => setInviteInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSendInvite()}
-                  placeholder="Username to invite…"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 outline-none focus:border-white/20 transition" />
-                <button onClick={handleSendInvite} disabled={!inviteInput.trim()}
-                  className="p-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/15 hover:text-white disabled:opacity-30 transition">
-                  <Check size={13} />
-                </button>
-                <button onClick={() => { setShowInvite(false); setInviteInput(''); }}
-                  className="p-2 rounded-lg glass-soft text-white/30 hover:text-white/60 transition">
-                  <X size={13} />
-                </button>
+              <div className="flex flex-col gap-1.5 px-4 py-2.5">
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={inviteInput}
+                    onChange={e => { setInviteInput(e.target.value); setInviteFound(null); setInviteLookupErr(null); }}
+                    onKeyDown={e => e.key === 'Enter' && handleLookupUser()}
+                    placeholder="Enter exact username…"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/25 outline-none focus:border-white/20 transition"
+                  />
+                  <button
+                    onClick={handleLookupUser}
+                    disabled={!inviteInput.trim() || inviteLooking}
+                    className="px-3 py-2 rounded-lg bg-white/10 text-white/60 hover:bg-white/15 hover:text-white disabled:opacity-30 transition text-[11px]"
+                  >
+                    {inviteLooking ? <Loader2 size={12} className="animate-spin" /> : 'Find'}
+                  </button>
+                  <button
+                    onClick={() => { setShowInvite(false); setInviteInput(''); setInviteFound(null); setInviteLookupErr(null); }}
+                    className="p-2 rounded-lg glass-soft text-white/30 hover:text-white/60 transition"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+                {inviteLookupErr && (
+                  <p className="text-red-400/70 text-[10px] px-1">{inviteLookupErr}</p>
+                )}
+                {inviteFound && (
+                  <div className="flex items-center justify-between px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                    <span className="text-white/70 text-[11px]">@{inviteFound.username}</span>
+                    <button
+                      onClick={handleSendInvite}
+                      disabled={invitePending}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/25 text-emerald-300 text-[11px] hover:bg-emerald-500/30 disabled:opacity-40 transition"
+                    >
+                      <Check size={11} /> Invite
+                    </button>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -394,7 +485,7 @@ export function GroupStudyView({
 
         <MessageFeed
           messages={messages} currentUserId={currentUserId}
-          someoneIsTyping={someoneIsTyping} showSenders
+          showSenders
           emptySlot={
             <div className="flex flex-col items-center gap-2 pt-12">
               <div className="glass-soft rounded-2xl px-6 py-4 text-center">
@@ -407,6 +498,8 @@ export function GroupStudyView({
             </div>
           }
         />
+
+        <ActivityFeed typingUsernames={typingUsernames} events={activityEvents} />
 
         <ChatInput
           value={input} onChange={setInput} onSubmit={handleSubmit} onKeystroke={onKeystroke}

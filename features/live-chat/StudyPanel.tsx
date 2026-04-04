@@ -354,6 +354,7 @@ function WhiteboardTool({ sessionId, canDrive, emit, on, off }: WhiteboardToolPr
     if (!canDrive) return;
     isDrawing.current = true;
     currentPath.current = [getPos(e)];
+    emit('study:drawing:start', { sessionId });
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
     ctx.beginPath();
@@ -377,6 +378,7 @@ function WhiteboardTool({ sessionId, canDrive, emit, on, off }: WhiteboardToolPr
   const handleMouseUp = () => {
     if (!isDrawing.current || !canDrive) return;
     isDrawing.current = false;
+    emit('study:drawing:stop', { sessionId });
     if (currentPath.current.length > 1) {
       emit('study:whiteboard_draw', {
         sessionId,

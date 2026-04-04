@@ -92,6 +92,7 @@ export type ThemeType    = ThemeVariant;
 export type CustomPreset = LavaLampVariant;
 export type ColorMode    = 'dark' | 'light' | 'custom';
 export type TimeOfDay    = 'dawn' | 'morning' | 'day' | 'afternoon' | 'dusk' | 'evening' | 'night' | 'midnight';
+export type WeatherOverlay = 'clear' | 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'foggy' | 'windy';
 
 // =============================================================================
 // COLOR DEFINITIONS
@@ -231,11 +232,16 @@ export function detectJamaicaEvent(): EventVariant | null {
 }
 
 export function detectSeason(): SeasonVariant {
-  const month = new Date().getMonth() + 1;
-  if (month >= 12 || month <= 2) return 'winter';
-  if (month >= 3  && month <= 5) return 'spring';
-  if (month >= 6  && month <= 8) return 'summer';
-  return 'autumn';
+  const month = new Date().getMonth(); // 0-indexed
+
+  // Jamaica calendar:
+  // Jan–Apr  (0–3)  — dry
+  // May–Jun  (4–5)  — rainy (early wet season)
+  // Jul–Aug  (6–7)  — dry (summer dry spell)
+  // Sep–Oct  (8–9)  — rainy (peak — hurricane season)
+  // Nov–Dec  (10–11) — dry (late dry / Christmas)
+  const RAINY_MONTHS = new Set([4, 5, 8, 9]);
+  return RAINY_MONTHS.has(month) ? 'rainy' : 'dry';
 }
 
 export const SUBJECT_NAME_TO_VARIANT: Record<string, SubjectVariant> = {
@@ -344,6 +350,50 @@ export function getBlobOpacity(tod: TimeOfDay, intensity?: number): number {
 }
 
 // =============================================================================
+// WEATHER
+// =============================================================================
+
+function interpretWeatherCode(code: number): WeatherOverlay {
+  if (code === 0)                return 'sunny';   // clear sky
+  if (code <= 2)                 return 'cloudy';  // partly/mostly cloudy
+  if (code === 3)                return 'cloudy';  // overcast
+  if (code >= 45 && code <= 48)  return 'foggy';   // fog / rime fog
+  if (code >= 51 && code <= 67)  return 'rainy';   // drizzle / rain
+  if (code >= 71 && code <= 77)  return 'cloudy';  // snow — cloudy for JA
+  if (code >= 80 && code <= 82)  return 'rainy';   // rain showers
+  if (code >= 85 && code <= 86)  return 'cloudy';  // snow showers — cloudy
+  if (code >= 95 && code <= 99)  return 'stormy';  // thunderstorm
+  return 'clear';
+}
+
+async function fetchWeather(): Promise<WeatherOverlay> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve('clear');
+
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const { latitude: lat, longitude: lon } = coords;
+          const url = `https://api.open-meteo.com/v1/forecast`
+            + `?latitude=${lat}&longitude=${lon}`
+            + `&current=weather_code`
+            + `&forecast_days=1`;
+
+          const res  = await fetch(url);
+          const data = await res.json();
+          const code = data?.current?.weather_code ?? 0;
+          resolve(interpretWeatherCode(code));
+        } catch {
+          resolve('clear');
+        }
+      },
+      () => resolve('clear'),      // permission denied — no overlay
+      { timeout: 8000 }
+    );
+  });
+}
+
+// =============================================================================
 // CONTEXT
 // =============================================================================
 
@@ -363,8 +413,23 @@ interface ThemeContextProps {
   setCustomPreset:    (preset: LavaLampVariant) => void;
   setSubjectOverride: (subjectName: string | null) => void;
 
+  // Automation
+  seasonAuto:     boolean;
+  weatherAuto:    boolean;
+  currentSeason:  SeasonVariant;
+  currentWeather: WeatherOverlay;
+  weatherLoading: boolean;
+  setSeasonAuto:  (val: boolean) => void;
+  setWeatherAuto: (val: boolean) => void;
+
   // Called by SettingsContext after GET /api/user/settings resolves
-  hydrateFromServer: (prefs: { colorMode: string; themeGroup: string; themeVariant: string }) => void;
+  hydrateFromServer: (prefs: { colorMode: string; themeGroup: string; themeVariant: string; seasonAuto?: boolean; weatherAuto?: boolean }) => void;
+
+  // Called by SettingsContext on logout — resets to defaults and disables DB persistence
+  resetTheme: () => void;
+
+  // Atomic setter — sets mode + group + variant in one call, persists once
+  applyTheme: (mode: ColorMode, group: ThemeGroup, variant: ThemeVariant) => void;
 
   theme:    ThemeType;
   setTheme: (t: ThemeType) => void;
@@ -384,6 +449,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [timeOfDay,       setTimeOfDay]      = useState<TimeOfDay>('day');
   const [nightIntensity,  setNightIntensity] = useState<number>(0);
   const [isSyncing,       setIsSyncing]      = useState(false);
+  const [seasonAuto,      setSeasonAuto]     = useState<boolean>(false);
+  const [weatherAuto,     setWeatherAuto]    = useState<boolean>(false);
+  const [currentSeason,   setCurrentSeason]  = useState<SeasonVariant>(detectSeason());
+  const [currentWeather,  setCurrentWeather] = useState<WeatherOverlay>('clear');
+  const [weatherLoading,  setWeatherLoading] = useState<boolean>(false);
 
   // Prevents the debounced save from firing on the initial hydration write
   const hydratedRef = useRef(false);
@@ -400,6 +470,33 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const interval = setInterval(update, 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── Season automation — re-detect hourly ──
+  useEffect(() => {
+    if (!seasonAuto) return;
+    setCurrentSeason(detectSeason());
+    const interval = setInterval(() => setCurrentSeason(detectSeason()), 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [seasonAuto]);
+
+  // ── Weather automation — fetch on enable, then every 30 minutes ──
+  useEffect(() => {
+    if (!weatherAuto) {
+      setCurrentWeather('clear');
+      return;
+    }
+
+    const run = async () => {
+      setWeatherLoading(true);
+      const overlay = await fetchWeather();
+      setCurrentWeather(overlay);
+      setWeatherLoading(false);
+    };
+
+    run();
+    const interval = setInterval(run, 30 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [weatherAuto]);
 
   // ── Sync data-attributes to <html> ──
   useEffect(() => {
@@ -427,6 +524,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             colorMode: mode,
             themeGroup: group,
             themeVariant: variant,
+            seasonAuto,
+            weatherAuto,
           }),
         });
       } catch (err) {
@@ -443,6 +542,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     colorMode: string;
     themeGroup: string;
     themeVariant: string;
+    seasonAuto?:  boolean;
+    weatherAuto?: boolean;
   }) => {
     const mode    = (prefs.colorMode    as ColorMode)    || 'dark';
     const group   = (prefs.themeGroup   as ThemeGroup)   || 'lavalamp';
@@ -451,9 +552,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setModeState(mode);
     setGroupState(group);
     setVariantState(variant);
+    if (prefs.seasonAuto  !== undefined) setSeasonAuto(prefs.seasonAuto);
+    if (prefs.weatherAuto !== undefined) setWeatherAuto(prefs.weatherAuto);
 
     // Mark hydrated — future changes will trigger DB saves
     hydratedRef.current = true;
+  }, []);
+
+  // ── Reset to defaults on logout — stops DB persistence until next hydration ──
+  const resetTheme = useCallback(() => {
+    hydratedRef.current = false;
+    setModeState('dark');
+    setGroupState('lavalamp');
+    setVariantState('assi');
+    setPresetState('assi');
+    setSubjectOverrideState(null);
+    setSeasonAuto(false);
+    setWeatherAuto(false);
   }, []);
 
   // ── Resolve active variant (subject override wins) ──
@@ -502,6 +617,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Subject override is ephemeral (page-scoped) — never persisted to DB
   }
 
+  function applyTheme(mode: ColorMode, group: ThemeGroup, variant: ThemeVariant) {
+    setModeState(mode);
+    setGroupState(group);
+    setVariantState(variant);
+    persistToDb(mode, group, variant);
+  }
+
   const isSentinel = activeVariant === 'sentinel';
   const theme      = activeVariant as ThemeType;
   function setTheme(t: ThemeType) { setThemeVariant(t); }
@@ -515,16 +637,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     nightIntensity,
     isSentinel,
     isSyncing,
+    seasonAuto,
+    weatherAuto,
+    currentSeason,
+    currentWeather,
+    weatherLoading,
     setThemeGroup,
     setThemeVariant,
     setColorMode,
     setCustomPreset,
     setSubjectOverride,
+    setSeasonAuto,
+    setWeatherAuto,
     hydrateFromServer,
+    resetTheme,
+    applyTheme,
     theme,
     setTheme,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, nightIntensity, isSentinel, isSyncing]);
+  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, nightIntensity, isSentinel, isSyncing, seasonAuto, weatherAuto, currentSeason, currentWeather, weatherLoading]);
 
   return (
     <ThemeContext.Provider value={value}>

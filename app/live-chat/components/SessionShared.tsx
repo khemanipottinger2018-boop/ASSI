@@ -8,18 +8,44 @@ import {
   Send, PhoneOff, Users, PauseCircle,
   Hand, Mic, MicOff, Settings, ChevronDown,
 } from 'lucide-react';
-import type { ChatMessage, Participant, SpeakMode } from '../types/SocketEvents';
+import type { ChatMessage, Participant, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 
 /* ── Timer ── */
-export function SessionTimer({ className = '' }: { className?: string }) {
-  const [s, setS] = useState(0);
+export function SessionTimer({
+  className = '',
+  startedAt,
+  mode = 'elapsed',
+  limitSecs,
+}: {
+  className?: string;
+  startedAt?: number;
+  mode?: 'elapsed' | 'countdown';
+  limitSecs?: number;
+}) {
+  const [s, setS] = useState(() =>
+    startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0
+  );
   useEffect(() => {
     const t = setInterval(() => setS(n => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
+
+  let display: number;
+  let warning = false;
+  if (mode === 'countdown' && limitSecs !== undefined) {
+    display  = Math.max(0, limitSecs - s);
+    warning  = display <= 300; // amber under 5 min
+  } else {
+    display = s;
+  }
+
+  const mm  = Math.floor(display / 60);
+  const ss  = (display % 60).toString().padStart(2, '0');
+  const col = warning ? 'text-amber-400' : className;
+
   return (
-    <span className={`font-mono tabular-nums text-xs ${className}`}>
-      {Math.floor(s / 60)}:{(s % 60).toString().padStart(2, '0')}
+    <span className={`font-mono tabular-nums text-xs ${col}`}>
+      {mm}:{ss}
     </span>
   );
 }
@@ -48,6 +74,9 @@ export function LiveBadge() {
 interface HeaderProps {
   title: string; subtitle?: string; connected: boolean;
   participantCount?: number;
+  startedAt?: number;
+  timerMode?: 'elapsed' | 'countdown';
+  timerLimitSecs?: number;
   onEnd: () => void; confirmingEnd: boolean;
   onCancelEnd: () => void; onConfirmEnd: () => void;
   rightSlot?: React.ReactNode; badge?: React.ReactNode;
@@ -55,10 +84,11 @@ interface HeaderProps {
 
 export function SessionHeader({
   title, subtitle, connected, participantCount,
+  startedAt, timerMode = 'elapsed', timerLimitSecs,
   onEnd, confirmingEnd, onCancelEnd, onConfirmEnd, rightSlot, badge,
 }: HeaderProps) {
   return (
-    <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07] bg-black/20 backdrop-blur-sm">
+    <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]" style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}>
       <ConnDot connected={connected} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -75,7 +105,12 @@ export function SessionHeader({
         </div>
       )}
 
-      <SessionTimer className="text-white/20" />
+      <SessionTimer
+        className="text-white/20"
+        startedAt={startedAt}
+        mode={timerMode}
+        limitSecs={timerLimitSecs}
+      />
       {rightSlot}
 
       <AnimatePresence mode="wait">
@@ -129,8 +164,10 @@ export function MessageBubble({ msg, isMe, showSender }: {
       transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
       className={`flex flex-col gap-0.5 ${isMe ? 'items-end' : 'items-start'}`}
     >
-      {showSender && msg.senderName && !isMe && (
-        <span className="text-[9px] text-white/25 px-3">{msg.senderName}</span>
+      {showSender && (isMe || msg.senderName) && (
+        <span className={`text-[9px] px-3 ${isMe ? 'text-orange-400/40' : 'text-white/25'}`}>
+          {isMe ? 'You' : msg.senderName}
+        </span>
       )}
       <div className={`
         max-w-[72%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed
@@ -166,15 +203,14 @@ export function TypingIndicator({ name }: { name?: string }) {
 }
 
 /* ── Message Feed ── */
-export function MessageFeed({ messages, currentUserId, someoneIsTyping, typingName, showSenders, emptySlot }: {
+export function MessageFeed({ messages, currentUserId, showSenders, emptySlot }: {
   messages: ChatMessage[]; currentUserId: string;
-  someoneIsTyping: boolean; typingName?: string;
   showSenders?: boolean; emptySlot?: React.ReactNode;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, someoneIsTyping]);
+  }, [messages.length]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
@@ -184,7 +220,6 @@ export function MessageFeed({ messages, currentUserId, someoneIsTyping, typingNa
           <MessageBubble key={msg.messageId} msg={msg}
             isMe={msg.senderId === currentUserId} showSender={showSenders} />
         ))}
-        {someoneIsTyping && <TypingIndicator key="typing" name={typingName} />}
       </AnimatePresence>
       <div ref={bottomRef} />
     </div>
@@ -214,6 +249,70 @@ export function ChatInput({ value, onChange, onSubmit, onKeystroke, disabled, pl
   );
 }
 
+/* ── Activity Feed ── */
+export interface ActivityEvent {
+  id:    string;
+  label: string;
+  kind:  'drawing' | 'problem' | 'joined';
+}
+
+function typingLabel(names: string[]): string {
+  if (names.length === 0)  return '';
+  if (names.length === 1)  return `${names[0]} is typing…`;
+  if (names.length < 5)    return `${names.length} people are typing…`;
+  return 'Many people are typing…';
+}
+
+export function ActivityFeed({
+  typingUsernames = [],
+  events = [],
+}: {
+  typingUsernames?: string[];
+  events?: ActivityEvent[];
+}) {
+  const typingText = typingLabel(typingUsernames);
+  const items      = [...(typingText ? [{ id: '__typing__', label: typingText }] : []), ...events];
+
+  return (
+    <div className="shrink-0 min-h-[22px] px-4 pb-1 flex flex-col gap-0.5">
+      <AnimatePresence initial={false}>
+        {items.map(item => (
+          <motion.p
+            key={item.id}
+            initial={{ opacity: 0, y: 3 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -3 }}
+            transition={{ duration: 0.16 }}
+            className="text-[10px] text-white/30 leading-none"
+          >
+            {item.label}
+          </motion.p>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Hook for managing auto-dismissing activity events (3 s TTL). */
+export function useActivityEvents() {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const push = (event: Omit<ActivityEvent, 'id'>) => {
+    const id = `${event.kind}-${Date.now()}-${Math.random()}`;
+    setEvents(prev => [...prev, { ...event, id }]);
+    const t = setTimeout(() => {
+      setEvents(prev => prev.filter(e => e.id !== id));
+      timers.current.delete(id);
+    }, 3000);
+    timers.current.set(id, t);
+  };
+
+  useEffect(() => () => { timers.current.forEach(t => clearTimeout(t)); }, []);
+
+  return { events, push };
+}
+
 /* ── Session Ended ── */
 const END_REASONS: Record<string, string> = {
   inactivity:         'Ended due to inactivity.',
@@ -222,6 +321,7 @@ const END_REASONS: Record<string, string> = {
   ended_by_tutor:     'The tutor ended the session.',
   ended_by_student:   'You ended the session.',
   ended_by_host:      'The host ended the session.',
+  time_limit_reached: 'Your 30-minute session has ended.',
 };
 
 export function SessionEndedScreen({ reason, onDismiss }: { reason: string; onDismiss?: () => void }) {

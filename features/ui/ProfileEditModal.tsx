@@ -62,7 +62,7 @@ export default function ProfileEditModal({
 
       <form
         onSubmit={handleSubmit}
-        className="relative w-full max-w-lg rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-8 space-y-6"
+        className="relative w-full max-w-lg rounded-2xl glass p-8 space-y-6"
       >
         <button
           type="button"

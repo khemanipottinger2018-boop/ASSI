@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, ChevronRight, Sparkles, Zap,
@@ -9,14 +9,13 @@ import {
   PenTool, BookMarked, MessageSquare, TrendingUp,
   Trophy, GraduationCap, User, Settings, HelpCircle,
   LayoutDashboard, Users, DollarSign, Star, BarChart2,
-  BookOpen, Radio,
+  BookOpen, Radio, Video, Shield,
 } from 'lucide-react';
 import { useAuth }            from '@/features/auth';
 import { useNotifications }   from '@/features/notifications';
-import { usePresenceDisplay } from '@/features/presence/usePresenceDisplay';
+import { usePresenceDisplay, PresenceDot, PRESENCE_LABEL_COLOR } from '@/features/presence';
 import AvailabilityModal      from '@/features/presence/AvailabilityModal';
 import type { UserFeatures }  from '@/lib/api/user';
-import type { PresenceVariant } from '@/features/presence/usePresenceDisplay';
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -39,36 +38,30 @@ type Category = {
 };
 
 // ─────────────────────────────────────────────────────────────────
-// Presence helpers
-// ─────────────────────────────────────────────────────────────────
-
-function variantStyles(variant: PresenceVariant) {
-  switch (variant) {
-    case 'available':   return { dot: 'bg-emerald-400', text: 'text-emerald-400' };
-    case 'busy':        return { dot: 'bg-orange-400',  text: 'text-orange-400'  };
-    case 'unavailable': return { dot: 'bg-red-400',     text: 'text-red-400'     };
-    default:            return { dot: 'bg-white/25',    text: 'text-white/35'    };
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
 // Nav config
 // ─────────────────────────────────────────────────────────────────
 
 const STUDENT_CATEGORIES: Category[] = [
   {
-    id: 'core', label: 'Home', icon: Home,
+    id: 'home', label: 'Home', icon: Home,
     items: [
-      { label: 'Home',          href: '/',              icon: Home },
-      { label: 'Browse Tutors', href: '/browse',        icon: Search },
-      { label: 'Live Chat',     href: '/live-chat',     icon: MessageCircle },
-      { label: 'Sessions',      href: '/sessions',      icon: Calendar },
-      { label: 'Inbox',         href: '/inbox',         icon: Inbox,  badge: 'messages' },
-      { label: 'Notifications', href: '/notifications', icon: Bell,   badge: 'notifications' },
+      { label: 'Home',          href: '/',                  icon: Home },
+      { label: 'Dashboard',     href: '/dashboard/student', icon: LayoutDashboard },
+      { label: 'Sessions',      href: '/sessions',          icon: Calendar },
+      { label: 'Inbox',         href: '/inbox',             icon: Inbox, badge: 'messages' },
+      { label: 'Notifications', href: '/notifications',     icon: Bell,  badge: 'notifications' },
     ],
   },
   {
-    id: 'learning', label: 'Learning', icon: Sparkles,
+    id: 'live', label: 'Live', icon: Radio,
+    items: [
+      { label: 'Request Tutor', href: '/live-chat',                  icon: MessageCircle },
+      { label: 'Group Study',   href: '/live-chat?mode=group_study', icon: Users },
+      { label: 'Browse & Book', href: '/browse',                     icon: Search },
+    ],
+  },
+  {
+    id: 'learn', label: 'Learn', icon: Sparkles,
     items: [
       { label: 'ASSI',        href: '/assi',        icon: Sparkles,   feature: 'ai_bundles' },
       { label: 'Assignments', href: '/assignments', icon: PenTool,    feature: 'assignments' },
@@ -79,10 +72,9 @@ const STUDENT_CATEGORIES: Category[] = [
   {
     id: 'social', label: 'Social', icon: Users,
     items: [
-      { label: 'Forums',       href: '/forums',       icon: MessageSquare, feature: 'forums', soon: true },
-      { label: 'Study Groups', href: '/study-groups', icon: Users,         soon: true },
-      { label: 'Leaderboard',  href: '/leaderboard',  icon: Trophy,        soon: true },
-      { label: 'Become Tutor', href: '/apply',        icon: GraduationCap },
+      { label: 'Forums',         href: '/forums',      icon: MessageSquare, feature: 'forums', soon: true },
+      { label: 'Leaderboard',    href: '/leaderboard', icon: Trophy,        soon: true },
+      { label: 'Become a Tutor', href: '/apply',       icon: GraduationCap },
     ],
   },
   {
@@ -97,10 +89,10 @@ const STUDENT_CATEGORIES: Category[] = [
 
 const TUTOR_CATEGORIES: Category[] = [
   {
-    id: 'core', label: 'Home', icon: Home,
+    id: 'home', label: 'Home', icon: Home,
     items: [
-      { label: 'Home',          href: '/',                icon: Home },
-      { label: 'Dashboard',     href: '/dashboard/tutor', icon: LayoutDashboard },
+      { label: 'Home',          href: '/',                 icon: Home },
+      { label: 'Dashboard',     href: '/dashboard/tutor',  icon: LayoutDashboard },
       { label: 'Sessions',      href: '/sessions',        icon: Calendar },
       { label: 'Inbox',         href: '/inbox',           icon: Inbox, badge: 'messages' },
       { label: 'Notifications', href: '/notifications',   icon: Bell,  badge: 'notifications' },
@@ -109,9 +101,9 @@ const TUTOR_CATEGORIES: Category[] = [
   {
     id: 'live', label: 'Live', icon: Radio,
     items: [
-      { label: 'Live Sessions', href: '/live-chat',                  icon: Radio },
-      { label: 'Group Study',   href: '/live-chat?mode=group_study', icon: Users },
-      { label: 'Conference',    href: '/live-chat?mode=conference',  icon: Radio },
+      { label: 'Live Lobby',  href: '/live-chat',                  icon: Radio },
+      { label: 'Conference',  href: '/live-chat?mode=conference',  icon: Video },
+      { label: 'Group Study', href: '/live-chat?mode=group_study', icon: Users },
     ],
   },
   {
@@ -129,6 +121,25 @@ const TUTOR_CATEGORIES: Category[] = [
       { label: 'Earnings',  href: '/earnings',  icon: DollarSign, soon: true },
       { label: 'Reviews',   href: '/reviews',   icon: Star,       soon: true },
       { label: 'Analytics', href: '/analytics', icon: BarChart2,  soon: true },
+    ],
+  },
+  {
+    id: 'account', label: 'Account', icon: User,
+    items: [
+      { label: 'Profile',  href: '/profile',  icon: User },
+      { label: 'Settings', href: '/settings', icon: Settings },
+      { label: 'Help',     href: '/support',  icon: HelpCircle },
+    ],
+  },
+];
+
+const ADMIN_CATEGORIES: Category[] = [
+  {
+    id: 'home', label: 'Home', icon: Home,
+    items: [
+      { label: 'Home',          href: '/',              icon: Home },
+      { label: 'Console',       href: '/admin',         icon: Shield },
+      { label: 'Notifications', href: '/notifications', icon: Bell, badge: 'notifications' },
     ],
   },
   {
@@ -172,20 +183,22 @@ export default function Sidebar({
 }: SidebarProps) {
   const { user }        = useAuth();
   const pathname        = usePathname();
+  const searchParams    = useSearchParams();
   const router          = useRouter();
   const { unreadCount } = useNotifications();
 
   const effectiveRole = undercoverRole ?? user?.role;
   const isTutor       = effectiveRole === 'tutor';
+  const isUndercover  = !!undercoverRole;
   const isPlus        = tier === 'early_bird' || tier === 'alpha';
 
   const [availOpen, setAvailOpen] = useState(false);
   const presenceDisplay           = usePresenceDisplay();
-  const styles                    = variantStyles(isTutor ? presenceDisplay.variant : 'offline');
 
   const categories: Category[] | null =
     effectiveRole === 'student' ? STUDENT_CATEGORIES :
-    isTutor                     ? TUTOR_CATEGORIES   : null;
+    isTutor                     ? TUTOR_CATEGORIES   :
+    effectiveRole === 'admin'   ? ADMIN_CATEGORIES   : null;
 
   const [catIndex, setCatIndex] = useState(0);
   const [dir,      setDir]      = useState(1);
@@ -207,8 +220,29 @@ export default function Sidebar({
 
   function isActive(item: NavItem) {
     if (item.href === '/') return pathname === '/';
-    const itemPath = item.href.split('?')[0];
-    return pathname.startsWith(itemPath);
+    const [itemPath, itemQuery] = item.href.split('?');
+    if (!pathname.startsWith(itemPath)) return false;
+    if (itemQuery) {
+      // Must match all required query params
+      const required = new URLSearchParams(itemQuery);
+      for (const [k, v] of required.entries()) {
+        if (searchParams.get(k) !== v) return false;
+      }
+      return true;
+    }
+    // No query params on this item — defer to a sibling that has query params if it matches
+    for (const sib of (activeCat?.items ?? [])) {
+      if (sib === item || !sib.href.includes('?')) continue;
+      const [sibPath, sibQuery] = sib.href.split('?');
+      if (!pathname.startsWith(sibPath)) continue;
+      const sibParams = new URLSearchParams(sibQuery);
+      let sibMatches = true;
+      for (const [k, v] of sibParams.entries()) {
+        if (searchParams.get(k) !== v) { sibMatches = false; break; }
+      }
+      if (sibMatches) return false; // a parameterized sibling matches better
+    }
+    return true;
   }
 
   function getBadge(item: NavItem) {
@@ -283,7 +317,7 @@ export default function Sidebar({
   // ─────────────────────────────────────────────────────────────
   return (
     <>
-      {isTutor && availOpen && (
+      {isTutor && !isUndercover && availOpen && (
         <AvailabilityModal onClose={() => setAvailOpen(false)} />
       )}
 
@@ -329,16 +363,6 @@ export default function Sidebar({
             {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
         </div>
-
-        {/* Undercover banner */}
-        {undercoverRole && !collapsed && (
-          <div className="mx-3 mt-2 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse flex-shrink-0" />
-            <span className="text-amber-300 text-[10px] font-semibold uppercase tracking-wide">
-              Undercover · {undercoverRole}
-            </span>
-          </div>
-        )}
 
         {/* ── Category carousel header (expanded) ── */}
         {categories && !collapsed && (
@@ -468,9 +492,9 @@ export default function Sidebar({
                 className="mb-1"
               >
                 <button
-                  onClick={isTutor ? () => setAvailOpen(true) : undefined}
+                  onClick={(isTutor && !isUndercover) ? () => setAvailOpen(true) : undefined}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition text-left
-                    ${isTutor ? 'hover:bg-white/6 cursor-pointer' : 'cursor-default'}
+                    ${(isTutor && !isUndercover) ? 'hover:bg-white/6 cursor-pointer' : 'cursor-default'}
                   `}
                 >
                   {/* Avatar with presence dot */}
@@ -480,12 +504,11 @@ export default function Sidebar({
                         {user.username[0]?.toUpperCase()}
                       </span>
                     </div>
-                    {isTutor && (
-                      <span className={`
-                        absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full
-                        border-2 border-[color:var(--sidebar-bg,#111)] ${styles.dot}
-                        ${presenceDisplay.pulse ? 'animate-pulse' : ''}
-                      `} />
+                    {isTutor && !isUndercover && (
+                      <PresenceDot
+                        display={presenceDisplay}
+                        className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[color:var(--sidebar-bg,#111)]"
+                      />
                     )}
                   </div>
 
@@ -494,8 +517,8 @@ export default function Sidebar({
                       <p className="text-white text-xs font-semibold truncate">{user.username}</p>
                       {isPlus && <Zap size={9} className="text-orange-400 flex-shrink-0" />}
                     </div>
-                    {isTutor ? (
-                      <p className={`text-[10px] truncate ${styles.text}`}>
+                    {(isTutor && !isUndercover) ? (
+                      <p className={`text-[10px] truncate ${PRESENCE_LABEL_COLOR[presenceDisplay.variant]}`}>
                         {presenceDisplay.label}
                       </p>
                     ) : (
@@ -514,10 +537,10 @@ export default function Sidebar({
           {/* Collapsed user card — tutors get dot, others get plain avatar */}
           {collapsed && user && (
             <button
-              onClick={isTutor ? () => setAvailOpen(true) : undefined}
-              title={isTutor ? `Availability · ${presenceDisplay.label}` : user.username}
+              onClick={(isTutor && !isUndercover) ? () => setAvailOpen(true) : undefined}
+              title={(isTutor && !isUndercover) ? `Availability · ${presenceDisplay.label}` : user.username}
               className={`w-full flex items-center justify-center py-1.5 rounded-xl transition
-                ${isTutor ? 'hover:bg-white/6 cursor-pointer' : 'cursor-default'}
+                ${(isTutor && !isUndercover) ? 'hover:bg-white/6 cursor-pointer' : 'cursor-default'}
               `}
             >
               <div className="relative">
@@ -526,12 +549,11 @@ export default function Sidebar({
                     {user.username[0]?.toUpperCase()}
                   </span>
                 </div>
-                {isTutor && (
-                  <span className={`
-                    absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full
-                    border-2 border-[color:var(--sidebar-bg,#111)] ${styles.dot}
-                    ${presenceDisplay.pulse ? 'animate-pulse' : ''}
-                  `} />
+                {isTutor && !isUndercover && (
+                  <PresenceDot
+                    display={presenceDisplay}
+                    className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[color:var(--sidebar-bg,#111)]"
+                  />
                 )}
               </div>
             </button>

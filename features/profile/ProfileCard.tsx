@@ -38,7 +38,7 @@ export default function ProfileCard({
   const isTutor    = profile.role === 'tutor';
 
   return (
-    <div className="max-w-4xl rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10 p-8 space-y-8">
+    <div className="max-w-4xl rounded-2xl glass p-8 space-y-8">
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">

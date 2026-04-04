@@ -20,6 +20,7 @@ function getTypeLabel(type?: NotificationType): string {
     session_started:    'Session',
     session_ended:      'Session',
     session_request:    'Session Request',
+    group_study_invite: 'Group Study Invite',
     booking_confirmed:  'Booking',
     booking_cancelled:  'Booking',
     payment_success:    'Payment',
@@ -50,10 +51,8 @@ export default function NotificationItem({
       whileHover={{ y: -1 }}
       onClick={onClick}
       className={`
-        w-full text-left rounded-xl p-4
-        border border-white/10 backdrop-blur-xl transition
-        hover:bg-white/10
-        ${notification.isRead ? 'bg-white/5' : 'bg-white/10'}
+        w-full text-left rounded-xl p-4 panel panel-hover transition
+        ${notification.isRead ? 'opacity-70' : ''}
       `}
     >
       <div className="flex justify-between gap-3">

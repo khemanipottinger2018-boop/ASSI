@@ -8,7 +8,7 @@ import { api } from './client';
 export type AdminUser = {
   userId:      string;
   username:    string;
-  role:        'student' | 'tutor' | 'tutor_applicant' | 'admin';
+  role:        'student' | 'tutor' | 'tutor_applicant' | 'admin' | 'moderator';
   isSuspended: boolean;
   isDemo:      boolean;
   createdAt:   string;
@@ -110,49 +110,52 @@ export const adminApi = {
       `/api/admin/users?page=${page}&limit=${limit}`
     ),
 
+  // Backend expects 'tutor-applicant' (hyphen), not 'tutor_applicant' (underscore)
   updateUserRole: (userId: string, role: string) =>
-    api.patch<{ success: boolean }>(`/api/admin/users/${userId}/role`, { role }),
+    api.patch<{ success: boolean }>(`/api/admin/users/${userId}/role`, {
+      role: role === 'tutor_applicant' ? 'tutor-applicant' : role,
+    }),
 
   suspendUser: (userId: string, suspended: boolean) =>
     api.patch<{ success: boolean }>(`/api/admin/users/${userId}/suspend`, { suspended }),
 
+  updateUserTier: (userId: string, tier: 'standard' | 'alpha' | 'tester' | 'beta') =>
+    api.patch<{ success: boolean }>(`/api/admin/users/${userId}/tier`, { tier }),
+
+  awardBadge: (userId: string, slug: string) =>
+    api.post<{ success: boolean }>(`/api/admin/users/${userId}/badges/${slug}`),
+
   /* ── Tutor Applications ─────────────────
-   * Canonical base: /api/tutor-applications/admin/*
-   * (not /api/admin/tutor-applications/*)
+   * Canonical base: /api/admin/tutor-applications/admin/*
    * ───────────────────────────────────────── */
 
-  getApplications: (status?: ApplicationStatus) => {
+  getApplications: (status?: 'pending' | 'approved' | 'rejected') => {
     const qs = status ? `?status=${status}` : '';
     return api.get<{
       success:      boolean;
+      total:        number;
       count:        number;
       applications: AdminApplication[];
-    }>(`/api/tutor-applications/admin/all${qs}`);
+    }>(`/api/admin/tutor-applications/admin/all${qs}`);
   },
 
   getApplication: (id: string) =>
     api.get<{ success: boolean; application: AdminApplicationDetail }>(
-      `/api/tutor-applications/admin/${id}`
+      `/api/admin/tutor-applications/admin/${id}`
     ),
 
-  setApplicationStatus: (id: string, status: 'seen' | 'under_review') =>
-    api.patch<{ success: boolean; status: string }>(
-      `/api/tutor-applications/admin/${id}/status`,
-      { status }
-    ),
-
-  /* POST /api/tutor-applications/admin/:id/approve */
-  approveApplication: (id: string, notes?: string) =>
+  /* POST /api/admin/tutor-applications/admin/approve/:id */
+  approveApplication: (id: string, reviewNotes?: string) =>
     api.post<{ success: boolean }>(
-      `/api/tutor-applications/admin/${id}/approve`,
-      notes ? { notes } : undefined
+      `/api/admin/tutor-applications/admin/approve/${id}`,
+      reviewNotes ? { review_notes: reviewNotes } : undefined
     ),
 
-  /* POST /api/tutor-applications/admin/:id/reject */
-  rejectApplication: (id: string, notes?: string) =>
+  /* POST /api/admin/tutor-applications/admin/reject/:id */
+  rejectApplication: (id: string, reviewNotes?: string) =>
     api.post<{ success: boolean }>(
-      `/api/tutor-applications/admin/${id}/reject`,
-      notes ? { notes } : undefined
+      `/api/admin/tutor-applications/admin/reject/${id}`,
+      reviewNotes ? { review_notes: reviewNotes } : undefined
     ),
 
   /* ── Sessions ──────────────────────────── */
@@ -176,10 +179,15 @@ export const adminApi = {
   getRuntimeMetrics: () =>
     api.get<{ success: boolean; runtime: Record<string, unknown> }>('/api/admin/metrics/runtime'),
 
-  /* ── Errors (stubbed — always returns []) ── */
+  /* ── Errors ────────────────────────────── */
 
   getErrors: (range?: '24h' | '7d' | '30d') =>
-    api.get<{ success: boolean; count: number; errors: any[] }>(
+    api.get<{ success: boolean; range: string; total: number; count: number; errors: any[] }>(
       `/api/admin/errors${range ? `?range=${range}` : ''}`
+    ),
+
+  resolveError: (id: string) =>
+    api.patch<{ success: boolean; error: { id: string; resolved: boolean } }>(
+      `/api/admin/errors/${id}/resolve`
     ),
 };

@@ -2,4 +2,4 @@
 export { notificationsApi } from './notificationsApi';
 export type { Notification } from './notificationsApi';
 
-export { useNotifications } from './useGlobalNotifications';
+export { NotificationsProvider, useNotifications } from './NotificationsContext';

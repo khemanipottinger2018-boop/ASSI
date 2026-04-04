@@ -48,19 +48,24 @@ const levelStyle: Record<string, string> = {
 export default function ErrorsPage() {
   const [logs,     setLogs]     = useState<ErrorLog[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copied,   setCopied]   = useState<string | null>(null);
   const [range,    setRange]    = useState<'24h' | '7d' | '30d'>('24h');
 
   async function load(r = range) {
     setLoading(true);
+    setError(null);
     try {
       const data = await adminApi.getErrors(r);
       if (data.success) {
         setLogs(((data as any).errors ?? []).map(normalise));
+      } else {
+        setError('Failed to load error logs');
       }
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load error logs');
+    } finally { setLoading(false); }
   }
 
   useEffect(() => { load(); }, [range]);
@@ -115,6 +120,13 @@ export default function ErrorsPage() {
           </button>
         </div>
       </motion.div>
+
+      {error && (
+        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400/80 text-sm">{error}</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">

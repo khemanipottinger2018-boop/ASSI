@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, BookOpen, Activity,
   AlertTriangle, BarChart2, Cpu, LogOut,
-  GraduationCap, UserCheck, EyeOff, Eye,
+  GraduationCap, UserCheck, EyeOff, Eye, ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth';
-
-const UNDERCOVER_KEY = 'sentinel:undercover';
+import { useViewContext } from '@/features/admin';
 
 const items = [
   { label: 'Overview',      href: '/admin',                    icon: LayoutDashboard },
@@ -26,23 +25,17 @@ export default function AdminSidebar() {
   const path   = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { isElevated, viewContext, switchContext, exitContext } = useViewContext();
 
-  const [undercover,    setUndercover]    = useState<string | null>(null);
-  const [signingOut,    setSigningOut]    = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  useEffect(() => {
-    setUndercover(localStorage.getItem(UNDERCOVER_KEY));
-  }, []);
-
-  function goUndercover(role: 'student' | 'tutor') {
-    localStorage.setItem(UNDERCOVER_KEY, role);
-    setUndercover(role);
+  async function goUndercover(role: 'student' | 'tutor') {
+    await switchContext(role);
     router.push('/');
   }
 
-  function exitUndercover() {
-    localStorage.removeItem(UNDERCOVER_KEY);
-    setUndercover(null);
+  async function handleExit() {
+    await exitContext();
     router.push('/admin');
   }
 
@@ -52,7 +45,6 @@ export default function AdminSidebar() {
       await logout();
     } catch { /* silent */ }
     finally {
-      localStorage.removeItem(UNDERCOVER_KEY);
       router.push('/signin');
     }
   }
@@ -104,6 +96,23 @@ export default function AdminSidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '4px 12px', overflowY: 'auto' }}>
+
+        {/* Exit console → back to app */}
+        <Link href="/" style={{ display: 'block', marginBottom: 10, textDecoration: 'none' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '7px 10px', borderRadius: 8,
+            background: 'rgba(0,180,255,0.04)',
+            border: '1px solid rgba(0,180,255,0.12)',
+            transition: 'all 0.15s ease',
+          }}>
+            <ArrowLeft size={13} style={{ color: 'rgba(0,180,255,0.4)', flexShrink: 0 }} />
+            <span style={{ fontSize: 11, color: 'rgba(0,180,255,0.5)', letterSpacing: '0.08em' }}>
+              Back to App
+            </span>
+          </div>
+        </Link>
+
         <p style={{ color: 'rgba(0,180,255,0.3)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', padding: '0 8px', marginBottom: 8 }}>Navigation</p>
         {items.map((item) => {
           const active     = path === item.href || (item.href !== '/admin' && path.startsWith(item.href));
@@ -141,8 +150,8 @@ export default function AdminSidebar() {
             Undercover
           </p>
 
-          {undercover ? (
-            <button onClick={exitUndercover} style={{
+          {isElevated ? (
+            <button onClick={handleExit} style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 10,
               padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
               background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.25)',
@@ -150,7 +159,7 @@ export default function AdminSidebar() {
             }}>
               <Eye size={14} style={{ color: 'rgba(251,146,60,0.8)', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: 'rgba(251,146,60,0.8)', flex: 1, textAlign: 'left' }}>
-                Exit ({undercover})
+                Exit ({viewContext})
               </span>
               <span style={{ fontSize: 9, color: 'rgba(251,146,60,0.5)', letterSpacing: '0.1em' }}>LIVE</span>
             </button>

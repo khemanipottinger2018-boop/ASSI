@@ -77,7 +77,7 @@ export default function ManageSubjectsModal({ onClose, onSaved }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div onClick={onClose} className="absolute inset-0" />
 
-      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl bg-white/10 backdrop-blur-xl border border-white/10">
+      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl glass">
 
         {/* Header */}
         <div className="flex items-start justify-between p-6 pb-4 flex-shrink-0">

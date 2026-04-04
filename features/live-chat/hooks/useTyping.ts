@@ -7,13 +7,22 @@ export function useTyping(sessionId: string) {
   const { emit, on, off, isConnected } = useChatSocket();
   const isTypingRef = useRef(false);
   const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
+
+  // userId → username map; entry absent when not typing
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isConnected || !sessionId) return;
 
-    const handleTyping = ({ userId, typing }: { userId: string; typing: boolean }) => {
-      setTypingUsers(prev => ({ ...prev, [userId]: typing }));
+    const handleTyping = ({ userId, typing, username }: { userId: string; typing: boolean; username?: string }) => {
+      setTypingUsers(prev => {
+        if (!typing) {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        }
+        return { ...prev, [userId]: username ?? userId };
+      });
     };
 
     on('chat:typing', handleTyping);
@@ -51,7 +60,8 @@ export function useTyping(sessionId: string) {
     }
   }, [emit, sessionId]);
 
-  const someoneIsTyping = Object.values(typingUsers).some(Boolean);
+  const typingUsernames = Object.values(typingUsers);
+  const someoneIsTyping = typingUsernames.length > 0; // kept for backward-compat callers
 
-  return { onKeystroke, stopTyping, someoneIsTyping };
+  return { onKeystroke, stopTyping, someoneIsTyping, typingUsernames };
 }

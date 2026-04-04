@@ -24,18 +24,18 @@ import { CheckCircle, Loader2, BookOpen } from 'lucide-react';
 import { StudyPanel } from '../components/StudyPanel';
 import type { StudyTool } from '../components/StudyPanel';
 import { useRouter } from 'next/navigation';
-import { useChatSocket }   from '../hooks/useChatSocket';
-import { useChatRoom }     from '../hooks/useChatRoom';
-import { useChatMessages } from '../hooks/useChatMessages';
-import { useTyping }       from '../hooks/useTyping';
+import { useChatSocket }   from '@/features/live-chat/hooks/useChatSocket';
+import { useChatRoom }     from '@/features/live-chat/hooks/useChatRoom';
+import { useChatMessages } from '@/features/live-chat/hooks/useChatMessages';
+import { useTyping }       from '@/features/live-chat/hooks/useTyping';
 import InviteModal         from '../components/InviteModal';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, SessionWaitingRoom, PausedBanner,
+  ActivityFeed, useActivityEvents,
 } from '../components/SessionShared';
-import type { SessionMeta, InviteRequest } from '../types/SocketEvents';
+import type { SessionMeta, InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
-const ACCEPT_TIMEOUT      = 8_000;
 const ACTIVITY_INTERVAL   = 30_000; // session:activity heartbeat — keep server watchdog alive
 
 interface Props {
@@ -66,8 +66,9 @@ export function InstantChatView({
   // isReady: auth settled + socket connected — gate all emits behind this
   const { emit, on, off, isConnected, isReady } = useChatSocket();
   const presence = useChatRoom(sessionId);
-  const { messages, sendMessage } = useChatMessages(sessionId);
-  const { onKeystroke, stopTyping, someoneIsTyping } = useTyping(sessionId);
+  const { messages, sendMessage } = useChatMessages(sessionId, { id: currentUserId, name: currentUsername });
+  const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
+  const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
   /* ── Tutor: needs to accept before joining the room ── */
   const [accepted,      setAccepted]      = useState(role === 'student');
@@ -88,20 +89,15 @@ export function InstantChatView({
   // Tools available per role
   const studentTools: StudyTool[] = ['notebook', 'files'];
   const tutorTools:   StudyTool[] = ['whiteboard', 'problems', 'files', 'broadcast'];
-  const endedRef       = useRef(false);               // idempotency guard for handleEnd
-  const acceptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const activityRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const endedRef    = useRef(false);               // idempotency guard for handleEnd
+  const activityRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ── Cleanup helpers ── */
-  const clearAcceptTimer = () => {
-    if (acceptTimerRef.current) { clearTimeout(acceptTimerRef.current); acceptTimerRef.current = null; }
-  };
   const clearActivityInterval = () => {
     if (activityRef.current) { clearInterval(activityRef.current); activityRef.current = null; }
   };
 
   useEffect(() => () => {
-    clearAcceptTimer();
     clearActivityInterval();
   }, []);
 
@@ -171,7 +167,6 @@ export function InstantChatView({
         setPeerJoined(true);
       }
       if (role === 'tutor' && tutorId === currentUserId) {
-        clearAcceptTimer();
         setAccepted(true);
         setAccepting(false);
       }
@@ -223,16 +218,29 @@ export function InstantChatView({
   }, [sessionId, currentUserId, role, peerJoined, sessionEnded, on, off]);
 
   /* ── Handlers ── */
-  const handleAccept = useCallback(() => {
+  const handleAccept = useCallback(async () => {
     if (accepting || !isReady) return;
     setAccepting(true);
-    emit('session:accept', { sessionId });
-
-    // Fallback: if server never confirms, reset accepting state
-    acceptTimerRef.current = setTimeout(() => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res  = await fetch(`${API_URL}/api/live-chat/${sessionId}/accept`, {
+        method:      'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setAccepting(false);
+        return;
+      }
+      // HTTP success → backend atomically claimed the session and emitted session:ready
+      // to the student. Transition tutor into the room immediately.
+      clearAcceptTimer();
+      setAccepted(true);
       setAccepting(false);
-    }, ACCEPT_TIMEOUT);
-  }, [accepting, isReady, emit, sessionId]);
+    } catch {
+      setAccepting(false);
+    }
+  }, [accepting, isReady, sessionId]);
 
   const handleEnd = useCallback(() => {
     if (endedRef.current) return; // idempotent — prevents double-fire
@@ -364,6 +372,9 @@ export function InstantChatView({
           subtitle={meta.subjectName}
           connected={isConnected}
           participantCount={presence.count}
+          startedAt={meta.startedAt}
+          timerMode="countdown"
+          timerLimitSecs={30 * 60}
           onEnd={handleEnd}
           confirmingEnd={confirmingEnd}
           onCancelEnd={() => setConfirmingEnd(false)}
@@ -389,13 +400,15 @@ export function InstantChatView({
         <MessageFeed
           messages={messages}
           currentUserId={currentUserId}
-          someoneIsTyping={someoneIsTyping}
+          showSenders
           emptySlot={
             <div className="flex justify-center pt-10">
               <p className="text-white/20 text-sm">Session started — say hello! 👋</p>
             </div>
           }
         />
+
+        <ActivityFeed typingUsernames={typingUsernames} events={activityEvents} />
 
         <ChatInput
           value={input}

@@ -28,6 +28,11 @@ export type UserSettings = {
   colorMode:    string;
   themeGroup:   string;
   themeVariant: string;
+  // Feature flags — returned by GET /api/user/settings
+  themesEnabled:       boolean;
+  dynamicThemes:       boolean;
+  streakEnabled:       boolean;
+  streakNotifications: boolean;
 };
 
 type SettingsContextType = {
@@ -49,7 +54,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading: authIsLoading } = useAuth();
-  const { hydrateFromServer } = useTheme();
+  const { hydrateFromServer, resetTheme } = useTheme();
 
   const [settings,  setSettings]  = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,6 +64,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   async function refresh() {
     if (!isAuthenticated) {
       setSettings(null);
+      resetTheme();
       setIsLoading(false);
       return;
     }

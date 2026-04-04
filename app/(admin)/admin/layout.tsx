@@ -1,21 +1,32 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/features/auth';
+import { useViewContext } from '@/features/admin';
 import AdminShell from '@/features/admin/shell/AdminShell';
 
-const UNDERCOVER_KEY = 'sentinel:undercover';
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+  const router   = useRouter();
+  const pathname = usePathname();
+  const { user, isLoading, isAdmin } = useAuth();
+  const { isElevated } = useViewContext();
 
   useEffect(() => {
-    // If undercover mode is active, admin should not be on the dashboard at all
-    const uc = localStorage.getItem(UNDERCOVER_KEY);
-    if (uc === 'student' || uc === 'tutor') {
-      router.replace('/');
-    }
-  }, [router]);
+    if (isLoading) return;
+
+    // Admin is viewing as student/tutor — redirect out of admin routes
+    if (isElevated) { router.replace('/'); return; }
+
+    // Not logged in or not admin → back to signin
+    if (!user || !isAdmin) { router.replace('/signin'); return; }
+  }, [user, isAdmin, isLoading, isElevated, router, pathname]);
+
+  // Still checking auth
+  if (isLoading) return null;
+
+  // Not admin — redirect is in flight
+  if (!user || !isAdmin) return null;
 
   return <AdminShell>{children}</AdminShell>;
 }

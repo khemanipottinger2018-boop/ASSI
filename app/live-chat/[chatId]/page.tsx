@@ -3,19 +3,19 @@
 // app/live-chat/[chatId]/page.tsx
 // Unified session room — routes to the correct view by session type + user role.
 
-import { use, useEffect, useState } from 'react';
+import { lazy, Suspense, use, useEffect, useState } from 'react';
 import { useRouter }   from 'next/navigation';
 import { Loader2 }     from 'lucide-react';
 import { useAuth }     from '@/features/auth';
 import { useFeatures } from '@/features/platform';
 import { api }         from '@/lib/api';
 
-import { InstantChatView }  from '../views/InstantChatView';
-import { GroupStudyView }   from '../views/GroupStudyView';
-import { ConferenceView }   from '../views/ConferenceView';
-import { AdminMonitorView } from '../views/AdminMonitorView';
+const InstantChatView  = lazy(() => import('../views/InstantChatView').then(m => ({ default: m.InstantChatView })));
+const GroupStudyView   = lazy(() => import('../views/GroupStudyView').then(m => ({ default: m.GroupStudyView })));
+const ConferenceView   = lazy(() => import('../views/ConferenceView').then(m => ({ default: m.ConferenceView })));
+const AdminMonitorView = lazy(() => import('../views/AdminMonitorView').then(m => ({ default: m.AdminMonitorView })));
 
-import type { SessionType, SessionMeta, SpeakMode } from '../types/SocketEvents';
+import type { SessionType, SessionMeta, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 import type { ConferenceRole }           from '../views/ConferenceView';
 
 
@@ -87,9 +87,19 @@ export default function ChatRoomPage({ params }: Props) {
 
   if (!user) return null;
 
+  const viewFallback = (
+    <div className="h-full flex items-center justify-center">
+      <Loader2 size={20} className="text-white/30 animate-spin" />
+    </div>
+  );
+
   /* ── Admin: monitor view for 1:1 and group sessions ── */
   if (user.role === 'admin' && meta?.type !== 'conference') {
-    return <AdminMonitorView sessionId={chatId} />;
+    return (
+      <Suspense fallback={viewFallback}>
+        <AdminMonitorView sessionId={chatId} />
+      </Suspense>
+    );
   }
 
   if (!meta) {
@@ -124,30 +134,38 @@ export default function ChatRoomPage({ params }: Props) {
     const viewerRole: ConferenceRole =
       user.role === 'admin'          ? 'admin'
       : meta.hostId === user.id      ? 'tutor'
-      :                                'student';
+      :                                'attendee';
 
     return (
-      <ConferenceView
-        sessionId={chatId}
-        currentUserId={user.id}
-        currentUsername={user.username}
-        meta={meta}
-        isPlus={isPlus}
-        viewerRole={viewerRole}
-      />
+      <Suspense fallback={viewFallback}>
+        <ConferenceView
+          sessionId={chatId}
+          currentUserId={user.id}
+          currentUsername={user.username}
+          meta={meta}
+          isPlus={isPlus}
+          viewerRole={viewerRole}
+        />
+      </Suspense>
     );
   }
 
   /* ── Group study ── */
   if (meta.type === 'group_study') {
     return (
-      <GroupStudyView
-        {...sharedProps}
-        maxParticipants={meta.maxParticipants}
-      />
+      <Suspense fallback={viewFallback}>
+        <GroupStudyView
+          {...sharedProps}
+          maxParticipants={meta.maxParticipants}
+        />
+      </Suspense>
     );
   }
 
   /* ── Default: instant 1:1 ── */
-  return <InstantChatView {...sharedProps} />;
+  return (
+    <Suspense fallback={viewFallback}>
+      <InstantChatView {...sharedProps} />
+    </Suspense>
+  );
 }

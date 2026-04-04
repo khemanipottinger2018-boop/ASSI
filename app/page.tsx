@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/features/auth';
+import { useViewContext } from '@/features/admin';
 import ServiceSelector from '@/features/browse/ServiceSelector';
 import TutorHomeSelector from '@/features/dashboard/tutor/TutorHomeSelector';
-
-const UNDERCOVER_KEY = 'sentinel:undercover';
 
 /* ── Landing ── */
 const stagger = {
@@ -63,24 +61,7 @@ function LandingView() {
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();
-  const router = useRouter();
-
-  // Admins need localStorage check — doesn't block tutor/student renders at all
-  const [undercover,    setUndercover]    = useState<string | null>(null);
-  const [adminChecked,  setAdminChecked]  = useState(false);
-
-  useEffect(() => {
-    setUndercover(localStorage.getItem(UNDERCOVER_KEY));
-    setAdminChecked(true);
-  }, []);
-
-  // Admin redirect — only after localStorage has been read
-  useEffect(() => {
-    if (isLoading || !adminChecked) return;
-    if (user?.role === 'admin' && !undercover) {
-      router.replace('/admin');
-    }
-  }, [user, isLoading, router, undercover, adminChecked]);
+  const { viewContext } = useViewContext();
 
   /* ── Auth loading ── */
   if (isLoading) {
@@ -106,24 +87,11 @@ export default function HomePage() {
     );
   }
 
-  /* ── Admin: wait for localStorage check before deciding ── */
-  if (user.role === 'admin' && !adminChecked) {
-    return (
-      <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
-        <motion.p animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 1.4, repeat: Infinity }}
-          className="text-white/50 text-xs tracking-widest uppercase">Loading…</motion.p>
-      </div>
-    );
-  }
-
-  /* ── Admin not undercover: redirect in flight, render nothing ── */
-  if (user.role === 'admin' && !undercover) return null;
-
   /* ── Determine selector ── */
   const showTutor =
     user.role === 'tutor' ||
     user.role === 'tutor_applicant' ||
-    (user.role === 'admin' && undercover === 'tutor');
+    (user.role === 'admin' && viewContext === 'tutor');
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-10">

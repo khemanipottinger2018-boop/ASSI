@@ -114,9 +114,7 @@ export default function AnimatedQuote({
         className="
           relative
           rounded-3xl
-          backdrop-blur-xl
-          bg-white/[0.04]
-          border border-white/10
+          glass-soft
           shadow-[0_20px_60px_rgba(0,0,0,0.35)]
           px-8 py-10
           text-center

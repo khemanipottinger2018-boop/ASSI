@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { Zap, ArrowRight, Clock } from 'lucide-react';
+import { Zap, ArrowRight, Clock, Loader2 } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface TutorLiveRequestCardProps {
-  sessionId: string;
-  subjectId?: string;
-  arrivedAt: number;
+  sessionId:    string;
+  subjectName?: string;
+  arrivedAt:    number;
   /** Called when the request ages out so the parent can remove it */
   onExpire: (sessionId: string) => void;
 }
@@ -17,7 +18,7 @@ const REQUEST_TTL_SECONDS = 60;
 
 export default function TutorLiveRequestCard({
   sessionId,
-  subjectId,
+  subjectName,
   arrivedAt,
   onExpire,
 }: TutorLiveRequestCardProps) {
@@ -25,6 +26,19 @@ export default function TutorLiveRequestCard({
   const [remaining, setRemaining] = useState(() =>
     Math.max(0, REQUEST_TTL_SECONDS - Math.floor((Date.now() - arrivedAt) / 1000))
   );
+  const [joining, setJoining] = useState(false);
+
+  /* ─── Accept + navigate ───────────────────────── */
+  const handleJoin = useCallback(async () => {
+    if (joining) return;
+    setJoining(true);
+    try {
+      await api.post<{ success: boolean }>(`/api/live-chat/${sessionId}/accept`);
+      router.push(`/live-chat/${sessionId}`);
+    } catch {
+      setJoining(false);
+    }
+  }, [joining, sessionId, router]);
 
   /* ─── Countdown + auto-expire ─────────────────── */
   useEffect(() => {
@@ -75,8 +89,8 @@ export default function TutorLiveRequestCard({
             </span>
           </div>
           <div className="flex items-center gap-3 mt-0.5">
-            {subjectId && (
-              <span className="text-white/35 text-xs">{subjectId}</span>
+            {subjectName && (
+              <span className="text-white/35 text-xs">{subjectName}</span>
             )}
             <span className={`flex items-center gap-1 text-xs ${urgency ? 'text-red-400' : 'text-white/30'}`}>
               <Clock size={10} />
@@ -87,10 +101,14 @@ export default function TutorLiveRequestCard({
 
         {/* CTA */}
         <button
-          onClick={() => router.push(`/live-chat/${sessionId}`)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-orange-600 font-semibold text-xs hover:bg-white/90 active:scale-95 transition shadow-md shadow-black/20 flex-shrink-0"
+          onClick={handleJoin}
+          disabled={joining}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white text-orange-600 font-semibold text-xs hover:bg-white/90 active:scale-95 disabled:opacity-60 transition shadow-md shadow-black/20 flex-shrink-0"
         >
-          Join <ArrowRight size={12} />
+          {joining
+            ? <Loader2 size={12} className="animate-spin" />
+            : <><span>Join</span> <ArrowRight size={12} /></>
+          }
         </button>
       </div>
     </motion.div>

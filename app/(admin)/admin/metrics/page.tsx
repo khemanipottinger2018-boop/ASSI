@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart2, Users, MessageCircle, Clock, TrendingUp, Loader2, RefreshCw } from 'lucide-react';
+import { BarChart2, Users, MessageCircle, TrendingUp, Loader2, RefreshCw, AlertTriangle } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
 type Metrics = {
@@ -25,14 +25,18 @@ const fade = {
 export default function MetricsPage() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
+    setError(null);
     try {
       const data = await adminApi.getMetrics();
       if (data.success) setMetrics((data as any).metrics);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      else setError('Failed to load metrics');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load metrics');
+    } finally { setLoading(false); }
   }
 
   useEffect(() => { load(); }, []);
@@ -76,6 +80,14 @@ export default function MetricsPage() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </motion.div>
+
+      {error && (
+        <motion.div custom={0.5} variants={fade} initial="initial" animate="animate"
+          className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400/80 text-sm">{error}</p>
+        </motion.div>
+      )}
 
       {loading && !metrics ? (
         <div className="flex justify-center py-16">

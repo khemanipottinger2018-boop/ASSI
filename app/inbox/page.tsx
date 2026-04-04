@@ -239,8 +239,12 @@ export default function InboxPage() {
                       initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.03, duration: 0.25 }}
                     >
-                      <button onClick={() => openThread(msg)}
-                        className={`w-full text-left rounded-xl p-4 border transition hover:bg-white/8 group ${
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openThread(msg)}
+                        onKeyDown={(e) => e.key === 'Enter' && openThread(msg)}
+                        className={`w-full text-left rounded-xl p-4 border transition hover:bg-white/8 group cursor-pointer ${
                           msg.isRead ? 'bg-white/5 border-white/8' : 'bg-white/10 border-white/15'
                         }`}
                       >
@@ -294,7 +298,7 @@ export default function InboxPage() {
                             <ChevronRight size={14} className="text-white/20 group-hover:text-white/50 transition" />
                           </div>
                         </div>
-                      </button>
+                      </div>
                     </motion.div>
                   );
                 })}

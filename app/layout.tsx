@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './styles/globals.css';
 
-import { ThemeProvider }    from '@/features/themes/core/ThemeProvider';
-import { AuthProvider }     from '@/features/auth';
-import { SettingsProvider } from '@/features/settings';
-import { FeaturesProvider } from '@/features/platform';
-import { SocketProvider }   from '@/features/socket';
+import { ThemeProvider }       from '@/features/themes/core/ThemeProvider';
+import { AuthProvider }        from '@/features/auth';
+import { ViewContextProvider } from '@/features/admin';
+import { SettingsProvider }    from '@/features/settings';
+import { FeaturesProvider }    from '@/features/platform';
+import { SocketProvider }          from '@/features/socket';
+import { NotificationsProvider }  from '@/features/notifications';
 
 import AnimatedGradient from '@/features/themes/visuals/AnimatedGradient';
 import FloatingBlobs    from '@/features/themes/visuals/FloatingBlobs';
@@ -41,7 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <AuthProvider>
+            <ViewContextProvider>
             <SocketProvider>
+              <NotificationsProvider>
               <SettingsProvider>
                 <FeaturesProvider>
                   {/*
@@ -53,7 +57,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </div>
                 </FeaturesProvider>
               </SettingsProvider>
+              </NotificationsProvider>
             </SocketProvider>
+            </ViewContextProvider>
           </AuthProvider>
 
         </ThemeProvider>

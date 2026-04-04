@@ -8,7 +8,7 @@
 //   A) From service selector / booking flow:
 //      ?mode=instant&subjectId=x&tutorId=y  → skip directly to instant tutor request
 //      ?mode=group_study&subjectId=x        → skip to group study creation
-//      ?mode=conference&subjectId=x         → skip to conference creation (tutors/ASSI+)
+//      ?mode=conference&subjectId=x         → skip to conference creation (tutors only)
 //
 //   B) Direct nav (no params):
 //      Shows the full lobby — mode picker → subject → action
@@ -22,13 +22,11 @@ import { motion, AnimatePresence }                   from 'framer-motion';
 import {
   Loader2, ArrowLeft, X, WifiOff,
   Zap, Users, Radio, ChevronRight,
-  Lock, Sparkles,
 } from 'lucide-react';
-import { useAuth }     from '@/features/auth';
-import { useFeatures } from '@/features/platform';
-import { useTheme }    from '@/features/themes/core/ThemeProvider';
+import { useAuth }  from '@/features/auth';
+import { useTheme } from '@/features/themes/core/ThemeProvider';
 import SubjectDropdown, { Subject } from '@/features/browse/SubjectDropdown';
-import type { SessionType } from './types/SocketEvents';
+import type { SessionType } from '@/features/live-chat/types/SocketEvents';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -96,8 +94,8 @@ const SESSION_MODES: SessionMode[] = [
     border:       'border-orange-500/25',
     textColor:    'text-orange-300',
     forRoles:     ['tutor'],
-    requiresPlus: true,
-    capacity:     'ASSI+ tutors only · Unlimited attendees',
+    requiresPlus: false,
+    capacity:     'Tutors only · Unlimited attendees',
   },
 ];
 
@@ -119,12 +117,10 @@ function ModeBadge({ mode }: { mode: SessionType }) {
    ════════════════════════════════════════════════════ */
 export default function LiveChatPage() {
   const { user, isLoading: authLoading } = useAuth();
-  const { tier }                          = useFeatures();
   const router                            = useRouter();
   const searchParams                      = useSearchParams();
   const { setSubjectOverride }            = useTheme();
 
-  const isPlus = tier === 'early_bird' || tier === 'alpha';
   const role   = user?.role === 'tutor' ? 'tutor' : 'student';
 
   /* ── URL params from service selector / booking flow ── */
@@ -225,9 +221,13 @@ export default function LiveChatPage() {
     setStep('creating');
 
     try {
-      // All session creation hits a unified endpoint.
-      // Backend handles Redis room creation + socket events.
-      const res  = await fetch(`${API_URL}/api/live-chat/create`, {
+      // group_study has its own endpoint — no active-session guard, proper host
+      // participant setup. instant/conference go through the unified route.
+      const endpoint = sessionType === 'group_study'
+        ? `${API_URL}/api/group-study/create`
+        : `${API_URL}/api/live-chat/create`;
+
+      const res  = await fetch(endpoint, {
         method:      'POST',
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
@@ -239,11 +239,13 @@ export default function LiveChatPage() {
       });
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || !data?.chatId) {
+      // group-study returns { session: { id } }; live-chat returns { chatId }
+      const chatId = data?.chatId ?? data?.session?.id;
+      if (!res.ok || !chatId) {
         throw new Error(data?.error || 'Could not create session');
       }
 
-      router.replace(`/live-chat/${data.chatId}`);
+      router.replace(`/live-chat/${chatId}`);
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
       setStep('error');
@@ -284,10 +286,7 @@ export default function LiveChatPage() {
   }
 
   /* ── Filtered modes for this user's role ── */
-  const availableModes = SESSION_MODES.filter(m =>
-    m.forRoles.includes(role) &&
-    (!m.requiresPlus || isPlus)
-  );
+  const availableModes = SESSION_MODES.filter(m => m.forRoles.includes(role));
 
   // If tutor-only mode was accessed by student via params, reset
   const effectiveMode = availableModes.find(m => m.type === mode) ? mode : 'instant';
@@ -347,11 +346,6 @@ export default function LiveChatPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-white/85 font-medium text-sm">{m.label}</p>
-                            {m.requiresPlus && (
-                              <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/20 text-orange-400 text-[9px] font-semibold uppercase tracking-wide">
-                                <Sparkles size={8} /> ASSI+
-                              </span>
-                            )}
                           </div>
                           <p className="text-white/35 text-xs mt-0.5 leading-relaxed">{m.description}</p>
                           <p className={`text-[10px] mt-2 ${m.textColor} opacity-70`}>{m.capacity}</p>
@@ -361,30 +355,6 @@ export default function LiveChatPage() {
                     </motion.button>
                   );
                 })}
-
-                {/* Locked conference card for non-plus tutors */}
-                {role === 'tutor' && !isPlus && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: availableModes.length * 0.06 }}
-                    className="w-full text-left glass rounded-2xl p-5 border border-white/8 opacity-50 cursor-not-allowed"
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
-                        <Radio size={18} className="text-white/25" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-white/40 font-medium text-sm">Conference</p>
-                          <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/25 text-[9px] font-semibold uppercase tracking-wide">
-                            <Lock size={8} /> ASSI+
-                          </span>
-                        </div>
-                        <p className="text-white/20 text-xs mt-0.5">Upgrade to ASSI+ to host live conferences.</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
 
                 {/* Student: show group study hint for conference */}
                 {role === 'student' && (

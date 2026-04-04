@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import {
   Shield, X, EyeOff, Eye, LayoutDashboard, Users,
   BookOpen, Activity, AlertTriangle, BarChart2, Cpu,
@@ -9,20 +10,19 @@ import {
   XCircle, Loader2, ChevronRight, Send, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth';
+import { useViewContext } from './ViewContextProvider';
+import { adminApi } from '@/lib/api';
 
 /* ══════════════════════════════════════════════════════
    CONSTANTS
    ══════════════════════════════════════════════════════ */
 
-const STORAGE_KEY    = 'sentinel_orb_pos';
-const UNDERCOVER_KEY = 'sentinel:undercover';
+const STORAGE_KEY = 'sentinel_orb_pos';
 const ORB = 52;
 const PAD = 20;
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-type Pos = { x: number; y: number };
-type UndercoverRole = 'student' | 'tutor' | null;
-
+type Pos   = { x: number; y: number };
 type TabId = 'overview' | 'users' | 'applications' | 'sessions' | 'errors' | 'metrics' | 'sentinel-ai';
 
 const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
@@ -35,20 +35,18 @@ const TABS: { id: TabId; label: string; icon: React.ElementType }[] = [
   { id: 'metrics',       label: 'Metrics',      icon: BarChart2       },
 ];
 
-interface Props {
-  onUndercoverChange?: (role: UndercoverRole) => void;
-}
-
 /* ══════════════════════════════════════════════════════
    SENTINEL LAUNCHER
    ══════════════════════════════════════════════════════ */
 
-export default function SentinelLauncher({ onUndercoverChange }: Props) {
+export default function SentinelLauncher() {
   const { user } = useAuth();
+  const { isElevated, viewContext, switchContext } = useViewContext();
+  const router = useRouter();
+
   const [pos, setPos]             = useState<Pos | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [undercover, setUndercover] = useState<UndercoverRole>(null);
   const [time, setTime]           = useState('');
   const dragging  = useRef(false);
   const dragStart = useRef<{ mx: number; my: number; ox: number; oy: number } | null>(null);
@@ -60,9 +58,6 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
       const stored = localStorage.getItem(STORAGE_KEY);
       setPos(stored ? clamp(JSON.parse(stored)) : def);
     } catch { setPos(def); }
-
-    const uc = localStorage.getItem(UNDERCOVER_KEY) as UndercoverRole;
-    if (uc) { setUndercover(uc); onUndercoverChange?.(uc); }
   }, []);
 
   /* ── Clock ── */
@@ -107,23 +102,11 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
   }
 
   /* ── Undercover ── */
-  const toggleUndercover = useCallback((role: 'student' | 'tutor') => {
-    const next = undercover === role ? null : role;
-    if (next) {
-      localStorage.setItem(UNDERCOVER_KEY, next);
-    } else {
-      localStorage.removeItem(UNDERCOVER_KEY);
-    }
-    setUndercover(next);
-    onUndercoverChange?.(next);
-
-    // Hard navigate so sidebar re-reads localStorage
-    if (next) {
-      window.location.href = '/';          // go to student/tutor home
-    } else {
-      window.location.href = '/admin';     // back to admin dashboard
-    }
-  }, [undercover, onUndercoverChange]);
+  async function toggleUndercover(role: 'student' | 'tutor') {
+    const next = isElevated && viewContext === role ? 'admin' : role;
+    await switchContext(next);
+    router.push(next === 'admin' ? '/admin' : '/');
+  }
 
   if (!pos) return null;
 
@@ -141,12 +124,12 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
           position: 'fixed',
           width: ORB, height: ORB,
           borderRadius: 999,
-          background: undercover
+          background: isElevated
             ? 'radial-gradient(circle at 35% 35%, #f59e0b, #92400e)'
             : modalOpen
             ? 'radial-gradient(circle at 35% 35%, #00d4ff, #0a0f2e)'
             : 'radial-gradient(circle at 35% 35%, #1d6fa4, #050e24)',
-          boxShadow: undercover
+          boxShadow: isElevated
             ? '0 0 0 2px rgba(245,158,11,0.5), 0 8px 28px rgba(245,158,11,0.35)'
             : modalOpen
             ? '0 0 0 2.5px rgba(0,180,255,0.6), 0 8px 32px rgba(0,180,255,0.4)'
@@ -159,7 +142,7 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
         }}
       >
         <motion.div animate={{ rotate: modalOpen ? 45 : 0 }} transition={{ duration: 0.22 }}>
-          {undercover
+          {isElevated
             ? <EyeOff size={20} color="white" />
             : modalOpen
             ? <X size={20} color="white" />
@@ -168,7 +151,7 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
         </motion.div>
 
         {/* Undercover ping ring */}
-        {undercover && (
+        {isElevated && (
           <span className="absolute inset-0 rounded-full animate-ping"
             style={{ background: 'rgba(245,158,11,0.25)', animationDuration: '2.4s' }}
           />
@@ -279,7 +262,7 @@ export default function SentinelLauncher({ onUndercoverChange }: Props) {
                   {/* Undercover toggles */}
                   <div style={{ display: 'flex', gap: 6 }}>
                     {(['student', 'tutor'] as const).map((role) => {
-                      const active = undercover === role;
+                      const active = isElevated && viewContext === role;
                       return (
                         <button key={role} onClick={() => toggleUndercover(role)} style={{
                           display: 'flex', alignItems: 'center', gap: 5,
@@ -414,8 +397,9 @@ function OverviewPanel() {
       if (sData.success)  setStats(sData.stats);
       if (ssData.success) setSessions((ssData.sessions as LiveSession[])
         .sort((a, b) => (['active','waiting','paused','ended'].indexOf(a.status)) - (['active','waiting','paused','ended'].indexOf(b.status))));
-    } catch {}
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error('[Sentinel] Overview fetch failed:', err);
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -527,7 +511,7 @@ function OverviewPanel() {
 
 const PANEL_CONFIG: Record<string, { title: string; endpoint: string; color: string; icon: React.ElementType }> = {
   users:        { title: 'User Management',      endpoint: '/api/admin/users',                color: '#00b4ff', icon: Users         },
-  applications: { title: 'Tutor Applications',   endpoint: '/api/admin/tutor-applications',   color: '#a78bfa', icon: BookOpen      },
+  applications: { title: 'Tutor Applications',   endpoint: '/api/admin/tutor-applications/admin/all', color: '#a78bfa', icon: BookOpen },
   sessions:     { title: 'Session Monitor',       endpoint: '/api/admin/sessions/live',        color: '#34d399', icon: Activity      },
   errors:       { title: 'Error Logs',            endpoint: '/api/admin/errors',               color: '#ff453a', icon: AlertTriangle },
   metrics:      { title: 'Platform Metrics',      endpoint: '/api/admin/metrics',              color: '#ff9f0a', icon: BarChart2     },
@@ -626,10 +610,19 @@ function SentinelChatPanel() {
   const [loading, setLoading]   = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError]       = useState('');
+  const [context, setContext]   = useState<Record<string, unknown> | null>(null);
   const bottomRef               = useRef<HTMLDivElement>(null);
   const inputRef                = useRef<HTMLInputElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
+
+  useEffect(() => {
+    Promise.allSettled([adminApi.getMetrics(), adminApi.getRuntimeMetrics()]).then(([mRes, rRes]) => {
+      const m = mRes.status === 'fulfilled' && mRes.value.success ? (mRes.value as any).metrics : null;
+      const r = rRes.status === 'fulfilled' && rRes.value.success ? (rRes.value as any).runtime : null;
+      if (m) setContext({ ...m, runtime: r ?? undefined });
+    });
+  }, []);
 
   async function send(text?: string) {
     const msg = (text ?? input).trim();
@@ -647,7 +640,7 @@ function SentinelChatPanel() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ message: msg, history: messages.slice(-12) }),
+        body: JSON.stringify({ message: msg, history: messages.slice(-12), context }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? 'Sentinel connection failed.'); return; }

@@ -53,15 +53,6 @@ export const tutorsApi = {
     );
   },
 
-  getMyAvailability: () =>
-    api.get<{ success: boolean; available: boolean }>('/api/tutors/availability'),
-
-  setAvailability: (available: boolean) =>
-    api.post<{ success: boolean; available: boolean }>(
-      '/api/tutors/availability',
-      { available }
-    ),
-
   browse: (filters: BrowseFilters = {}) => {
     const params = new URLSearchParams();
     if (filters.subjectId) params.set('subjectId', filters.subjectId);

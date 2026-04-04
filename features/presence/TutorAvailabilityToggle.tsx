@@ -7,16 +7,31 @@ import { usePresenceDisplay } from './usePresenceDisplay';
 
 export default function TutorAvailabilityToggle() {
   const { presence, setIntent, isLoading } = usePresence();
-  const { variant, label, subtitle, canChangeIntent } = usePresenceDisplay();
+  const { variant, label, subtitle, pulse, canChangeIntent } = usePresenceDisplay();
 
-  // Only render for tutors — canChangeIntent is false when busy_session (server-locked)
-  // and also false when not yet loaded. The early return below handles the visual states.
-  if (!presence) return null;
+  // Show spinner skeleton while initial presence hasn't loaded yet
+  if (isLoading || !presence) {
+    return (
+      <div className="relative flex items-center gap-3">
+        <div className="relative w-12 h-6 rounded-full bg-white/8 border border-white/12 flex-shrink-0">
+          <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
+            <Loader2 size={10} className="text-white/50 animate-spin" />
+          </div>
+        </div>
+        <div className="text-left">
+          <p className="text-xs font-semibold text-white/40">Checking…</p>
+          <p className="text-[10px] text-white/20 mt-0.5">Loading presence</p>
+        </div>
+      </div>
+    );
+  }
 
-  const isAvailable  = presence.intent === 'available';
-  const isBusy       = presence.intent === 'busy_session';
-  const isConnecting = isLoading || !presence.online || !presence.socketConnected;
-  const disabled     = isConnecting || isBusy;
+  // Derive visual state from the display variant — the source of truth.
+  // Using presence.intent directly would show green even when offline/reconnecting.
+  const isAvailable  = variant === 'available';
+  const isBusy       = variant === 'busy';
+  const isConnecting = variant === 'reconnecting' || variant === 'offline';
+  const disabled     = !canChangeIntent;
 
   const handleToggle = () => {
     if (disabled) return;
@@ -61,9 +76,9 @@ export default function TutorAvailabilityToggle() {
           />
         )}
 
-        {/* Pulse ring — only when available and connected */}
+        {/* Pulse ring — only when available and eligible (pulse from display) */}
         <AnimatePresence>
-          {isAvailable && !isConnecting && (
+          {pulse && (
             <motion.div
               key="pulse"
               initial={{ opacity: 0, scale: 0.8 }}

@@ -1,22 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Settings, Bell, Palette, Sliders, Check,
   Sun, Moon, Sparkles, Star, Leaf, BookOpen,
   User, Globe, Lock, Zap, Eye, EyeOff, Crown, Calendar,
+  ShieldCheck, Flame, Loader2,
 } from 'lucide-react';
 import { useSettings } from '@/features/settings';
 import { useAuth } from '@/features/auth';
+import { userApi } from '@/lib/api';
 import type { UserSettings } from '@/features/settings';
+import type { UserMe } from '@/lib/api';
 import {
   useTheme,
-  ColorMode,
   CUSTOM_PRESET_LABELS,
   CUSTOM_PRESET_COLORS,
 } from '@/features/themes/core/ThemeProvider';
 import type {
+  ColorMode,
   LavaLampVariant,
   SpaceVariant,
   SeasonVariant,
@@ -25,7 +28,6 @@ import type {
   ThemeGroup,
   PremiumVariant,
 } from '@/features/themes/core/ThemeProvider';
-import { ASSI_PLUS_VARIANTS, requiresAssisPlus } from '@/features/themes/core/ThemeProvider';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -113,27 +115,41 @@ const TIMEZONES = [
 ];
 
 const TIER_INFO: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  standard:   { label: 'Free',       color: 'text-white/60',   bg: 'bg-white/5',       border: 'border-white/10' },
-  early_bird: { label: 'Early Bird', color: 'text-amber-400',  bg: 'bg-amber-500/10',  border: 'border-amber-500/20' },
-  alpha:      { label: 'Alpha',      color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
-  pro:        { label: 'ASSI+',      color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-  // Admin tiers — full access, no paywall
-  admin:      { label: 'Admin',      color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
-  sentinel:   { label: 'Sentinel',   color: 'text-red-400',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
+  standard:   { label: 'Free',       color: 'text-white/60',    bg: 'bg-white/5',        border: 'border-white/10' },
+  early_bird: { label: 'Early Bird', color: 'text-amber-400',   bg: 'bg-amber-500/10',   border: 'border-amber-500/20' },
+  alpha:      { label: 'Alpha',      color: 'text-purple-400',  bg: 'bg-purple-500/10',  border: 'border-purple-500/20' },
+  beta:       { label: 'Beta',       color: 'text-cyan-400',    bg: 'bg-cyan-500/10',    border: 'border-cyan-500/20' },
+  tester:     { label: 'Tester',     color: 'text-violet-400',  bg: 'bg-violet-500/10',  border: 'border-violet-500/20' },
+  pro:        { label: 'ASSI+',      color: 'text-orange-400',  bg: 'bg-orange-500/10',  border: 'border-orange-500/20' },
+  admin:      { label: 'Admin',      color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
+  sentinel:   { label: 'Sentinel',   color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20' },
 };
 
-// Tiers that get full premium access (paid OR admin bypass)
-const PREMIUM_TIERS = new Set(['early_bird', 'alpha', 'pro', 'admin', 'sentinel']);
+const PREMIUM_TIERS = new Set(['early_bird', 'alpha', 'beta', 'tester', 'pro', 'admin', 'sentinel']);
+
+const GROUP_DEFAULT_VARIANT: Record<ThemeGroup, string> = {
+  lavalamp: 'assi',
+  space:    'stars',
+  seasons:  'summer',
+  events:   'christmas',
+  subjects: 'mathematics',
+  premium:  'cyberpunk',
+  sentinel: 'sentinel',
+};
 
 export default function SettingsPage() {
   const { settings, update, isLoading } = useSettings();
   const { user } = useAuth();
   const {
-    themeGroup, themeVariant, colorMode, isSentinel,
-    setThemeGroup, setThemeVariant, setColorMode, setCustomPreset,
+    themeGroup, themeVariant, colorMode, isSentinel, isSyncing,
+    applyTheme, setThemeVariant, setColorMode, setCustomPreset,
+    seasonAuto, weatherAuto, setSeasonAuto, setWeatherAuto,
   } = useTheme();
 
   const [saved,         setSaved]         = useState(false);
+  const [userMe,        setUserMe]        = useState<UserMe | null>(null);
+
+  // Profile state
   const [username,      setUsername]      = useState('');
   const [email,         setEmail]         = useState('');
   const [phoneNumber,   setPhoneNumber]   = useState('');
@@ -142,12 +158,28 @@ export default function SettingsPage() {
   const [profileError,  setProfileError]  = useState<string | null>(null);
   const [profileSaved,  setProfileSaved]  = useState(false);
 
-  const tier = (user as any)?.tier ?? 'standard';
-  const tierInfo = TIER_INFO[tier] ?? TIER_INFO.standard;
+  // 2FA state
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [twoFaStep,    setTwoFaStep]    = useState<'idle' | 'verify' | 'disable'>('idle');
+  const [twoFaQr,      setTwoFaQr]      = useState('');
+  const [twoFaCode,    setTwoFaCode]    = useState('');
+  const [twoFaError,   setTwoFaError]   = useState('');
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
 
-  // Admins (sentinel tier or admin tier) bypass the ASSI+ paywall entirely
+  useEffect(() => {
+    userApi.getMe().then(data => {
+      if (data?.user) {
+        setUserMe(data.user);
+        setShowPhone(data.user.showPhone ?? false);
+        setTwoFaEnabled(data.user.twoFactorEnabled ?? false);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const tier     = user?.role === 'admin' ? 'admin' : (userMe?.tier ?? 'standard');
+  const tierInfo = TIER_INFO[tier] ?? TIER_INFO.standard;
   const hasAssisPlus = PREMIUM_TIERS.has(tier) || isSentinel;
-  const isAdmin      = tier === 'admin' || tier === 'sentinel' || isSentinel;
+  const isAdmin      = user?.role === 'admin' || isSentinel;
 
   async function handleUpdate(patch: Partial<UserSettings>) {
     await update(patch);
@@ -156,14 +188,7 @@ export default function SettingsPage() {
   }
 
   function handleGroupSelect(value: ThemeGroup) {
-    if (value === 'lavalamp') setThemeVariant('assi');
-    if (value === 'space')    setThemeVariant('stars');
-    if (value === 'seasons')  setThemeVariant('summer');
-    if (value === 'events')   setThemeVariant('christmas');
-    if (value === 'subjects') setThemeVariant('mathematics');
-    if (value === 'premium')  setThemeVariant('cyberpunk');
-    setThemeGroup(value);
-    setColorMode('custom');
+    applyTheme('custom', value, GROUP_DEFAULT_VARIANT[value] as any);
   }
 
   async function handleProfileSave() {
@@ -193,6 +218,55 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleEnable2FA() {
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const data = await userApi.setup2FA();
+      setTwoFaQr(data.qrDataUrl);
+      setTwoFaStep('verify');
+    } catch (err: any) {
+      setTwoFaError(err?.message || 'Failed to start 2FA setup');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleVerify2FA() {
+    if (twoFaCode.length !== 6) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      await userApi.verify2FA(twoFaCode);
+      setTwoFaEnabled(true);
+      setTwoFaStep('idle');
+      setTwoFaCode('');
+      setTwoFaQr('');
+    } catch (err: any) {
+      setTwoFaError(err?.message || 'Invalid code');
+      setTwoFaCode('');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleDisable2FA() {
+    if (twoFaCode.length !== 6) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      await userApi.disable2FA(twoFaCode);
+      setTwoFaEnabled(false);
+      setTwoFaStep('idle');
+      setTwoFaCode('');
+    } catch (err: any) {
+      setTwoFaError(err?.message || 'Invalid code');
+      setTwoFaCode('');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
   if (isLoading || !settings) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
@@ -219,7 +293,10 @@ export default function SettingsPage() {
             <p className="text-white/60 text-xs">Personalize your ASSI experience</p>
           </div>
         </div>
-        <AnimatedCheck visible={saved} />
+        <div className="flex items-center gap-2">
+          {isSyncing && <Loader2 size={13} className="text-white/30 animate-spin" />}
+          <AnimatedCheck visible={saved} />
+        </div>
       </motion.div>
 
       {/* Tier badge */}
@@ -240,7 +317,11 @@ export default function SettingsPage() {
                     ? 'Upgrade to ASSI+ for unlimited AI, more subjects & priority tutors'
                     : tier === 'early_bird'
                       ? 'Early bird — grandfathered pricing forever 🎉'
-                      : 'Full platform access'}
+                      : tier === 'beta'
+                        ? 'Beta tester — early access to new features'
+                        : tier === 'tester'
+                          ? 'Internal tester — full platform access'
+                          : 'Full platform access'}
               </p>
             </div>
           </div>
@@ -249,7 +330,7 @@ export default function SettingsPage() {
               Upgrade
             </button>
           ) : (
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${tierInfo.color} ${tierInfo.border}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${tierInfo.color} ${tierInfo.border} flex-shrink-0`}>
               {tierInfo.label}
             </span>
           )}
@@ -319,32 +400,49 @@ export default function SettingsPage() {
           onChange={(v) => handleUpdate({ pushNotifications: v })} />
       </motion.div>
 
-      {/* Appearance */}
+      {/* Streak */}
       <motion.div custom={4} variants={fade} initial="initial" animate="animate"
+        className="panel rounded-3xl p-5 space-y-4"
+      >
+        <SectionHeader icon={Flame} title="Streak" />
+        <ToggleRow label="Daily login streak"
+          description="Track consecutive login days — reach 365 to earn ASSI+ for a full year"
+          value={settings.streakEnabled}
+          onChange={(v) => handleUpdate({ streakEnabled: v })} />
+        <ToggleRow label="Streak reminders"
+          description="Get a reminder if you haven't logged in by evening"
+          value={settings.streakNotifications}
+          onChange={(v) => handleUpdate({ streakNotifications: v })} />
+      </motion.div>
+
+      {/* Appearance */}
+      <motion.div custom={5} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-5"
       >
         <SectionHeader icon={Palette} title="Appearance" />
         <div>
           <p className="text-white/75 text-xs font-medium mb-3">UI Mode</p>
           <div className="grid grid-cols-3 gap-2">
-            {COLOR_MODES.map(({ value, label, icon: Icon, desc }) => {
-              const active = colorMode === value;
-              return (
-                <button key={value} onClick={() => setColorMode(value)}
-                  className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center transition-all ${
-                    active ? 'bg-white/15 border-white/30 text-white' : 'bg-white/4 border-white/8 text-white/55 hover:text-white/80 hover:bg-white/8'
-                  }`}>
-                  <Icon size={16} className={active ? 'text-orange-400' : 'text-white/50'} />
-                  <span className="text-xs font-semibold">{label}</span>
-                  <span className="text-[10px] leading-tight text-white/40 hidden sm:block">{desc}</span>
-                </button>
-              );
-            })}
+            {COLOR_MODES
+              .filter(m => settings.themesEnabled || m.value !== 'custom')
+              .map(({ value, label, icon: Icon, desc }) => {
+                const active = colorMode === value;
+                return (
+                  <button key={value} onClick={() => setColorMode(value)}
+                    className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center transition-all ${
+                      active ? 'bg-white/15 border-white/30 text-white' : 'bg-white/4 border-white/8 text-white/55 hover:text-white/80 hover:bg-white/8'
+                    }`}>
+                    <Icon size={16} className={active ? 'text-orange-400' : 'text-white/50'} />
+                    <span className="text-xs font-semibold">{label}</span>
+                    <span className="text-[10px] leading-tight text-white/40 hidden sm:block">{desc}</span>
+                  </button>
+                );
+              })}
           </div>
         </div>
 
         <AnimatePresence>
-          {colorMode === 'custom' && (
+          {colorMode === 'custom' && settings.themesEnabled && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.22 }}
               className="overflow-hidden space-y-4"
@@ -354,7 +452,6 @@ export default function SettingsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   {THEME_GROUPS.map(({ value, label, icon: Icon, desc, plus }) => {
                     const active = themeGroup === value;
-                    // Admins are never locked — only lock standard users from premium
                     const locked = plus && !hasAssisPlus;
                     return (
                       <button key={value}
@@ -368,10 +465,9 @@ export default function SettingsPage() {
                         <div className="text-left">
                           <div className="flex items-center gap-1.5">
                             <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/35' : 'text-white/60'}`}>{label}</p>
-                            {/* Admin sees "ADMIN" badge instead of lock */}
-                            {plus && isAdmin    && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">ADMIN</span>}
+                            {plus && isAdmin                    && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">ADMIN</span>}
                             {plus && !isAdmin && hasAssisPlus  && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
-                            {plus && !hasAssisPlus && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
+                            {plus && !hasAssisPlus             && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
                           </div>
                           <p className="text-[10px] text-white/30">{desc}</p>
                         </div>
@@ -407,7 +503,7 @@ export default function SettingsPage() {
                   <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
                     <span className="text-orange-400 text-xs mt-0.5">✦</span>
                     <p className="text-white/40 text-xs leading-relaxed">
-                      Events are also auto-detected by date — ASSI will switch to the right theme automatically around each holiday.
+                      Events are also auto-detected by date — ASSI switches to the right theme automatically around each holiday.
                     </p>
                   </div>
                 </>
@@ -446,6 +542,20 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              {settings.dynamicThemes && (
+                <div className="space-y-3 pt-1 border-t border-white/8">
+                  <p className="text-white/75 text-xs font-medium pt-1">Dynamic Themes</p>
+                  <ToggleRow label="Season auto-switch"
+                    description="Automatically match the theme to the current Caribbean season"
+                    value={seasonAuto}
+                    onChange={setSeasonAuto} />
+                  <ToggleRow label="Weather overlay"
+                    description="Adjust theme warmth based on local weather (requires location access)"
+                    value={weatherAuto}
+                    onChange={setWeatherAuto} />
+                </div>
+              )}
+
               <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
                 <span className="text-orange-400 text-xs mt-0.5">✦</span>
                 <p className="text-white/40 text-xs leading-relaxed">
@@ -458,7 +568,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Language & Region */}
-      <motion.div custom={5} variants={fade} initial="initial" animate="animate"
+      <motion.div custom={6} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Globe} title="Language & Region" />
@@ -469,7 +579,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* ASSI Assistant */}
-      <motion.div custom={6} variants={fade} initial="initial" animate="animate"
+      <motion.div custom={7} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sparkles} title="ASSI Assistant" />
@@ -483,8 +593,113 @@ export default function SettingsPage() {
           onChange={(v) => handleUpdate({ reduceMotion: v })} />
       </motion.div>
 
+      {/* Security */}
+      <motion.div custom={8} variants={fade} initial="initial" animate="animate"
+        className="panel rounded-3xl p-5 space-y-4"
+      >
+        <SectionHeader icon={ShieldCheck} title="Security" />
+
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-white text-sm font-medium">Two-factor authentication</p>
+            <p className="text-white/55 text-xs mt-0.5">
+              {twoFaEnabled
+                ? 'Your account is protected with 2FA'
+                : 'Add an extra layer of security to your account'}
+            </p>
+          </div>
+          {twoFaEnabled ? (
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+              Enabled
+            </span>
+          ) : (
+            <button onClick={handleEnable2FA}
+              disabled={twoFaLoading || twoFaStep !== 'idle'}
+              className="px-4 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/15 disabled:opacity-40 transition flex-shrink-0">
+              {twoFaLoading && twoFaStep === 'idle'
+                ? <Loader2 size={12} className="animate-spin" />
+                : 'Enable'}
+            </button>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {twoFaStep === 'verify' && (
+            <motion.div key="verify"
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
+              className="overflow-hidden space-y-3"
+            >
+              <p className="text-white/55 text-xs">
+                Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to confirm.
+              </p>
+              {twoFaQr && (
+                <div className="flex justify-center py-1">
+                  <img src={twoFaQr} alt="2FA QR Code" className="w-36 h-36 rounded-xl ring-1 ring-white/20 bg-white p-1.5" />
+                </div>
+              )}
+              {twoFaError && <p className="text-red-400 text-xs">{twoFaError}</p>}
+              <div className="flex gap-2">
+                <input
+                  type="text" inputMode="numeric" maxLength={6} placeholder="000000"
+                  autoFocus value={twoFaCode}
+                  onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="flex-1 glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition"
+                />
+                <button onClick={handleVerify2FA}
+                  disabled={twoFaLoading || twoFaCode.length !== 6}
+                  className="px-4 py-2.5 rounded-xl bg-white text-orange-600 font-semibold text-xs disabled:opacity-40 transition hover:bg-white/90 flex-shrink-0">
+                  {twoFaLoading ? <Loader2 size={12} className="animate-spin" /> : 'Verify'}
+                </button>
+              </div>
+              <button
+                onClick={() => { setTwoFaStep('idle'); setTwoFaQr(''); setTwoFaCode(''); setTwoFaError(''); }}
+                className="text-xs text-white/30 hover:text-white/60 transition">
+                Cancel
+              </button>
+            </motion.div>
+          )}
+
+          {twoFaStep === 'disable' && (
+            <motion.div key="disable"
+              initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
+              className="overflow-hidden space-y-3"
+            >
+              <p className="text-white/55 text-xs">Enter your current 6-digit authenticator code to disable 2FA.</p>
+              {twoFaError && <p className="text-red-400 text-xs">{twoFaError}</p>}
+              <div className="flex gap-2">
+                <input
+                  type="text" inputMode="numeric" maxLength={6} placeholder="000000"
+                  autoFocus value={twoFaCode}
+                  onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="flex-1 glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition"
+                />
+                <button onClick={handleDisable2FA}
+                  disabled={twoFaLoading || twoFaCode.length !== 6}
+                  className="px-4 py-2.5 rounded-xl bg-red-500/20 text-red-400 text-xs font-semibold border border-red-500/20 disabled:opacity-40 transition hover:bg-red-500/30 flex-shrink-0">
+                  {twoFaLoading ? <Loader2 size={12} className="animate-spin" /> : 'Disable'}
+                </button>
+              </div>
+              <button
+                onClick={() => { setTwoFaStep('idle'); setTwoFaCode(''); setTwoFaError(''); }}
+                className="text-xs text-white/30 hover:text-white/60 transition">
+                Cancel
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {twoFaEnabled && twoFaStep === 'idle' && (
+          <button onClick={() => setTwoFaStep('disable')}
+            className="text-xs text-red-400/50 hover:text-red-400 transition">
+            Disable 2FA
+          </button>
+        )}
+      </motion.div>
+
       {/* Privacy */}
-      <motion.div custom={7} variants={fade} initial="initial" animate="animate"
+      <motion.div custom={9} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Lock} title="Privacy" />
@@ -506,7 +721,7 @@ export default function SettingsPage() {
       </motion.div>
 
       {/* Advanced */}
-      <motion.div custom={8} variants={fade} initial="initial" animate="animate"
+      <motion.div custom={10} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sliders} title="Advanced" />

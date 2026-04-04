@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Search, RefreshCw, Loader2, ShieldCheck, ShieldOff, ChevronDown, Check } from 'lucide-react';
+import { Users, Search, RefreshCw, Loader2, ShieldCheck, ShieldOff, ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import type { AdminUser } from '@/lib/api';
 
@@ -11,12 +11,13 @@ import type { AdminUser } from '@/lib/api';
 
 type UserRole = AdminUser['role'];
 
-const ROLES: UserRole[] = ['student', 'tutor', 'tutor_applicant', 'admin'];
+const ROLES: UserRole[] = ['student', 'tutor', 'tutor_applicant', 'moderator', 'admin'];
 
 const ROLE_LABELS: Record<UserRole, string> = {
   student:         'Student',
   tutor:           'Tutor',
   tutor_applicant: 'Applicant',
+  moderator:       'Moderator',
   admin:           'Admin',
 };
 
@@ -25,22 +26,27 @@ const roleStyle: Record<UserRole, string> = {
   tutor:           'text-emerald-400 bg-emerald-500/15 border-emerald-500/20',
   student:         'text-blue-400 bg-blue-500/15 border-blue-500/20',
   tutor_applicant: 'text-purple-400 bg-purple-500/15 border-purple-500/20',
+  moderator:       'text-cyan-400 bg-cyan-500/15 border-cyan-500/20',
 };
 
 export default function AdminUsersPage() {
   const [users,     setUsers]     = useState<AdminUser[]>([]);
   const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState<string | null>(null);
   const [query,     setQuery]     = useState('');
   const [actioning, setActioning] = useState<string | null>(null);
   const [roleMenu,  setRoleMenu]  = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await adminApi.getUsers();
       if (data.success) setUsers(data.users ?? []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      else setError('Failed to load users');
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load users');
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -55,10 +61,11 @@ export default function AdminUsersPage() {
   async function toggleSuspend(user: AdminUser) {
     setActioning(user.userId);
     try {
-      await adminApi.suspendUser(user.userId, !user.isSuspended);
-      setUsers(prev => prev.map(u =>
-        u.userId === user.userId ? { ...u, isSuspended: !u.isSuspended } : u
-      ));
+      const res = await adminApi.suspendUser(user.userId, !user.isSuspended);
+      if (!res.success) { setError('Failed to update suspension status'); return; }
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to update suspension status');
     } finally { setActioning(null); }
   }
 
@@ -66,11 +73,11 @@ export default function AdminUsersPage() {
     setRoleMenu(null);
     setActioning(userId);
     try {
-      await adminApi.updateUserRole(userId, role);
-      // Cast role to UserRole so TypeScript is satisfied with AdminUser shape
-      setUsers(prev => prev.map(u =>
-        u.userId === userId ? { ...u, role } : u
-      ));
+      const res = await adminApi.updateUserRole(userId, role);
+      if (!res.success) { setError('Failed to update role'); return; }
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to update role');
     } finally { setActioning(null); }
   }
 
@@ -98,6 +105,13 @@ export default function AdminUsersPage() {
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </motion.div>
+
+      {error && (
+        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
+          <p className="text-red-400/80 text-sm">{error}</p>
+        </div>
+      )}
 
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05, duration: 0.3 }} className="relative">

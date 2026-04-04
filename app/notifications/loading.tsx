@@ -13,7 +13,7 @@ export default function NotificationsLoading() {
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-xl p-4 border border-white/10 bg-white/5 backdrop-blur-xl"
+            className="rounded-xl p-4 panel"
           >
             <div className="flex justify-between gap-3">
               <div className="flex-1 space-y-2">

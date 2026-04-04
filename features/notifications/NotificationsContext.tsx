@@ -1,40 +1,52 @@
 'use client';
 
 /**
- * useNotifications
+ * NotificationsContext
  *
- * Fetches and manages the notification inbox.
- * Now also fetches message unread count so the bell badge
- * reflects both notifications AND unread messages combined.
+ * Provides a single shared notification state across the entire app.
+ * All consumers (Sidebar badge, notifications page, etc.) read from
+ * the same instance — so markAllRead() in one place updates all.
  *
- * Backend endpoints:
- *   GET  /api/notifications            → { success, notifications }
- *   POST /api/notifications/read-all   → { success }
- *   GET  /api/messages/unread-count    → { success, count }
- *
- * Real-time: listens to socket events:
- *   'notification:new'  — new notification pushed
- *   'message:new'       — new direct message (bumps badge)
- *   'message:broadcast' — new broadcast (bumps badge)
+ * Wrap the app once with <NotificationsProvider> inside SocketProvider.
+ * Call useNotifications() anywhere to consume.
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { useAuth }           from '@/features/auth';
-import { useSocket }         from '@/features/socket';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
+import { useAuth }    from '@/features/auth';
+import { useSocket }  from '@/features/socket';
 import { notificationsApi, messagesApi } from '@/lib/api';
 import type { Notification } from '@/features/types/notification';
 
-export function useNotifications() {
+interface NotificationsState {
+  notifications:      Notification[];
+  unreadCount:        number;
+  notifUnreadCount:   number;
+  messageUnreadCount: number;
+  loading:            boolean;
+  error:              string | null;
+  refresh:            () => Promise<void>;
+  markAllRead:        () => Promise<void>;
+}
+
+const NotificationsContext = createContext<NotificationsState | null>(null);
+
+export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
   const { subscribe }       = useSocket();
 
-  const [notifications,       setNotifications]       = useState<Notification[]>([]);
-  const [notifUnreadCount,    setNotifUnreadCount]    = useState(0);
-  const [messageUnreadCount,  setMessageUnreadCount]  = useState(0);
-  const [loading,             setLoading]             = useState(false);
-  const [error,               setError]               = useState<string | null>(null);
+  const [notifications,      setNotifications]      = useState<Notification[]>([]);
+  const [notifUnreadCount,   setNotifUnreadCount]   = useState(0);
+  const [messageUnreadCount, setMessageUnreadCount] = useState(0);
+  const [loading,            setLoading]            = useState(false);
+  const [error,              setError]              = useState<string | null>(null);
 
-  // Combined badge count — what the bell shows
   const unreadCount = notifUnreadCount + messageUnreadCount;
 
   const refresh = useCallback(async () => {
@@ -43,17 +55,15 @@ export function useNotifications() {
       setLoading(true);
       setError(null);
 
-      // Fetch both in parallel
       const [notifData, msgData] = await Promise.allSettled([
         notificationsApi.getAll(),
         messagesApi.getUnreadCount(),
       ]);
 
       if (notifData.status === 'fulfilled') {
-        // Server already filters expired notifications — do not filter client-side
         const all = notifData.value.notifications ?? [];
         setNotifications(all);
-        setNotifUnreadCount(all.filter(n => !n.isRead).length);
+        setNotifUnreadCount(all.filter((n: Notification) => !n.isRead).length);
       }
 
       if (msgData.status === 'fulfilled') {
@@ -66,6 +76,7 @@ export function useNotifications() {
     }
   }, [isAuthenticated]);
 
+  // Initial load + reset on auth change
   useEffect(() => {
     if (!isAuthenticated) {
       setNotifications([]);
@@ -78,7 +89,7 @@ export function useNotifications() {
     refresh();
   }, [isAuthenticated, refresh]);
 
-  /* ── Real-time: notification:new ── */
+  // Real-time: new notification pushed via socket
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -88,8 +99,7 @@ export function useNotifications() {
         type:      payload.type    ?? 'system',
         title:     payload.title   ?? '',
         body:      payload.body    ?? payload.message ?? null,
-        // Backend socket payload uses `data`, not `metadata`
-        metadata:  payload.data ?? null,
+        metadata:  payload.data    ?? null,
         isRead:    false,
         createdAt: payload.createdAt ?? new Date().toISOString(),
         expiresAt: payload.expiresAt ?? null,
@@ -106,7 +116,7 @@ export function useNotifications() {
     return unsub;
   }, [isAuthenticated, subscribe]);
 
-  /* ── Real-time: message:new / message:broadcast → bump badge ── */
+  // Real-time: message badge bump
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -116,31 +126,39 @@ export function useNotifications() {
     return () => { unsubDirect(); unsubBroadcast(); };
   }, [isAuthenticated, subscribe]);
 
-  /* ── Mark all notifications read ── */
   const markAllRead = useCallback(async () => {
     if (!isAuthenticated) return;
 
+    // Optimistic clear
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     setNotifUnreadCount(0);
 
     try {
       await notificationsApi.markAllRead();
-      // Re-fetch authoritative state — guards against socket events that
-      // fire between the optimistic clear and the API completing
       await refresh();
     } catch {
       await refresh();
     }
   }, [isAuthenticated, refresh]);
 
-  return {
-    notifications,
-    unreadCount,          // combined — use this for the bell badge
-    notifUnreadCount,     // notifications only
-    messageUnreadCount,   // messages only
-    loading,
-    error,
-    refresh,
-    markAllRead,
-  };
+  return (
+    <NotificationsContext.Provider value={{
+      notifications,
+      unreadCount,
+      notifUnreadCount,
+      messageUnreadCount,
+      loading,
+      error,
+      refresh,
+      markAllRead,
+    }}>
+      {children}
+    </NotificationsContext.Provider>
+  );
+}
+
+export function useNotifications(): NotificationsState {
+  const ctx = useContext(NotificationsContext);
+  if (!ctx) throw new Error('useNotifications must be used inside NotificationsProvider');
+  return ctx;
 }

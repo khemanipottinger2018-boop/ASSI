@@ -26,6 +26,7 @@ export type ChatSession = {
   partnerName: string;
   subjectName: string;
   status:      SessionStatus;
+  live:        boolean;        // true = currently active/waiting
   startedAt:   string | null; // ISO (null until active)
 };
 
@@ -47,18 +48,35 @@ export type SessionMessage = {
 /* ===================================================== */
 
 export const sessionsApi = {
-  /* GET all sessions (active + historical) */
+  /* GET all sessions (active + historical)
+   * Backend returns `id` not `sessionId` — we remap here so callers stay stable.
+   */
   getChatSessions: () =>
-    api.get<{ success: boolean; sessions: ChatSession[] }>(
-      '/api/chat/sessions'
-    ),
+    api
+      .get<{ success: boolean; sessions: (Omit<ChatSession, 'sessionId'> & { id: string })[] }>(
+        '/api/chat/sessions'
+      )
+      .then(res => ({
+        ...res,
+        sessions: res.sessions.map(s => {
+          const { id, ...rest } = s;
+          return { sessionId: id, ...rest } as ChatSession;
+        }),
+      })),
 
   /* GET messages */
   getSessionMessages: (sessionId: string) =>
     api.get<{
       success: boolean;
       messages: SessionMessage[];
-    }>(`/api/chat/sessions/${sessionId}/messages`),
+    }>(`/api/live-chat/${sessionId}/messages`),
+
+  /* POST cancel a live/instant session */
+  cancelLive: (sessionId: string, reason?: string) =>
+    api.post<{ success: boolean }>(
+      `/api/live-chat/${sessionId}/cancel`,
+      reason ? { reason } : undefined
+    ),
 
   /* GET currently active session (if any) */
   getActiveSession: () =>

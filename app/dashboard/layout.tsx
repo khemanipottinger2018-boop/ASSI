@@ -31,7 +31,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-black/40 backdrop-blur-xl">
+    <div className="min-h-screen">
       {children}
     </div>
   );

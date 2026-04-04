@@ -2,43 +2,71 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth }     from '@/features/auth';
-import { useSettings } from '@/features/settings';
-import { useFeatures } from '@/features/platform';
+import { useAuth }        from '@/features/auth';
+import { useSettings }    from '@/features/settings';
+import { useFeatures }    from '@/features/platform';
+import { useSocketContext } from '@/features/socket';
 import { PresenceProvider } from '@/features/presence';
+import { useViewContext, ViewContextBanner } from '@/features/admin';
 
 import Sidebar               from './Sidebar';
 import MobileNav             from './MobileNav';
 import AssiFloatingLauncher  from '@/features/assi/AssiFloatingLauncher';
 import SentinelLauncher      from '@/features/admin/SentinelLauncher';
 import AuthModals            from '@/features/auth/AuthModals';
+import TutorRequestModal     from '@/features/dashboard/tutor/TutorRequestModal';
+
+type GlobalRequest = {
+  sessionId:   string;
+  studentName: string;
+  subjectName: string;
+  requestedAt: number;
+};
+
+// Pages that already mount their own session:request handler
+const SESSION_REQUEST_HANDLED_ROUTES = ['/dashboard/tutor', '/assi'];
 
 const STORAGE_KEY      = 'assi:sidebar-collapsed';
-const UNDERCOVER_KEY   = 'sentinel:undercover';
 
 const BARE_ROUTES      = ['/signin', '/signup'];
 const ADMIN_ROUTES     = ['/admin', '/sentinel'];
 const NO_SCROLL_ROUTES = ['/assi', '/live-chat'];
 
-type UndercoverRole = 'student' | 'tutor' | null;
-
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user }                                       = useAuth();
   const { settings }                                   = useSettings();
-  const { features, tier, isLoading: featuresLoading } = useFeatures();
+  const { features, tier } = useFeatures();
+  const { subscribe }                                  = useSocketContext();
+  const { viewContext, isElevated }                    = useViewContext();
   const pathname                                       = usePathname();
 
-  const [collapsed,      setCollapsed]  = useState(false);
-  const [mounted,        setMounted]    = useState(false);
-  const [undercoverRole, setUndercover] = useState<UndercoverRole>(null);
+  const [collapsed,      setCollapsed]     = useState(false);
+  const [mounted,        setMounted]       = useState(false);
+  const [globalRequest,  setGlobalRequest] = useState<GlobalRequest | null>(null);
 
   useEffect(() => {
     setMounted(true);
     const sc = localStorage.getItem(STORAGE_KEY);
     if (sc !== null) setCollapsed(sc === 'true');
-    const uc = localStorage.getItem(UNDERCOVER_KEY) as UndercoverRole;
-    if (uc) setUndercover(uc);
   }, []);
+
+  // Global session:request handler — fires for tutors on pages that don't
+  // have their own handler (i.e. NOT /dashboard/tutor and NOT /assi).
+  useEffect(() => {
+    const isTutorRole = user?.role === 'tutor' || user?.role === 'tutor_applicant';
+    if (!isTutorRole) return;
+    const alreadyHandled = SESSION_REQUEST_HANDLED_ROUTES.some(r => pathname.startsWith(r));
+    if (alreadyHandled) return;
+
+    return subscribe('session:request', (payload: any) => {
+      setGlobalRequest(prev => prev ?? {
+        sessionId:   payload.sessionId   ?? '',
+        studentName: payload.studentName ?? 'Student',
+        subjectName: payload.subjectName ?? '',
+        requestedAt: payload.requestedAt ?? Date.now(),
+      });
+    });
+  }, [user?.role, pathname, subscribe]);
 
   const handleToggle = useCallback(() => {
     setCollapsed((prev) => {
@@ -60,9 +88,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <>
         {children}
         <AuthModals />
-        {mounted && user?.role === 'admin' && (
-          <SentinelLauncher onUndercoverChange={setUndercover} />
-        )}
+        {mounted && user?.role === 'admin' && <SentinelLauncher />}
       </>
     );
   }
@@ -84,19 +110,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isTutor   = user?.role === 'tutor' || user?.role === 'tutor_applicant';
   const isPlus    = tier === 'early_bird' || tier === 'alpha';
 
+  // Derive undercoverRole for Sidebar prop (view only — not authority)
+  const undercoverRole = isElevated ? (viewContext as 'student' | 'tutor') : null;
+
   const assiAllowed = settings?.assiEnabled !== false;
-  const assiEnabled = featuresLoading ? false : features.ai_bundles || isPlus;
   const showAssi =
     assiAllowed &&
-    ((isStudent && assiEnabled) ||
-     (isTutor   && assiEnabled) ||
-     (isAdmin   && undercoverRole !== null));
+    (isStudent || isTutor || (isAdmin && isElevated));
 
   const noScroll = NO_SCROLL_ROUTES.some((r) => pathname.startsWith(r));
 
   // ── Authenticated shell ──────────────────────────────────────
   return (
     <PresenceProvider>
+      <ViewContextBanner />
       <div className="flex h-full w-full overflow-hidden">
 
         <Sidebar
@@ -119,12 +146,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {mounted && showAssi && <AssiFloatingLauncher enabled isPlus={isPlus} />}
 
-        {mounted && isAdmin && (
-          <SentinelLauncher onUndercoverChange={setUndercover} />
-        )}
+        {mounted && isAdmin && <SentinelLauncher />}
       </div>
 
       <AuthModals />
+
+      {/* Global tutor session-request modal — shown when tutor is outside /dashboard/tutor and /assi */}
+      {globalRequest && (
+        <TutorRequestModal
+          key={globalRequest.sessionId}
+          sessionId={globalRequest.sessionId}
+          studentName={globalRequest.studentName}
+          subjectName={globalRequest.subjectName}
+          arrivedAt={globalRequest.requestedAt}
+          onAccept={() => setGlobalRequest(null)}
+          onDecline={() => setGlobalRequest(null)}
+        />
+      )}
     </PresenceProvider>
   );
 }
