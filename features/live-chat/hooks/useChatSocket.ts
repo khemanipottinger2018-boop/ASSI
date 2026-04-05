@@ -3,19 +3,18 @@
 /**
  * useChatSocket
  *
- * Previously opened its own module-level Socket.IO connection with
- * autoConnect:true and no auth awareness. That meant every user on
- * the chat page had TWO active connections: one from useSocket
- * (notifications/presence) and one from here.
+ * Delegates to the SocketContext that is already established at the
+ * root layout (SocketProvider wraps the entire app). This guarantees
+ * exactly ONE socket connection per user session regardless of how
+ * many components call useChatSocket() — useChatMessages, useTyping,
+ * useChatRoom, and every view all share the same underlying socket.
  *
- * Now it's a thin re-export of useSocket. One connection, one auth
- * lifecycle, one Redis pub/sub channel per user. All existing
- * consumers (useChatRoom, useChatMessages, useTyping, the views)
- * are unaffected — the return shape is identical.
+ * Previously called useSocket() directly, which instantiated a NEW
+ * Socket.IO client per caller — causing N connections per page.
  */
 
-import { useSocket } from '@/features/socket';
+import { useSocketContext } from '@/features/socket';
 
 export function useChatSocket() {
-  return useSocket();
+  return useSocketContext();
 }

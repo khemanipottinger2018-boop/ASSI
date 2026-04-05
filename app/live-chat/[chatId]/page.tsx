@@ -29,8 +29,9 @@ export default function ChatRoomPage({ params }: Props) {
   const { tier } = useFeatures();
   const router   = useRouter();
 
-  const [meta,    setMeta]    = useState<SessionMeta | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [meta,        setMeta]        = useState<SessionMeta | null>(null);
+  const [loading,     setLoading]     = useState(true);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   const isPlus = tier === 'early_bird' || tier === 'alpha';
 
@@ -43,9 +44,13 @@ export default function ChatRoomPage({ params }: Props) {
   useEffect(() => {
     if (!chatId || !user) return;
 
-    api.get<{ success: boolean; session?: Record<string, unknown> }>(`/api/live-chat/${chatId}`)
+    api.get<{ success: boolean; session?: Record<string, unknown>; error?: string }>(`/api/live-chat/${chatId}`)
       .then(d => {
-        if (d.success && d.session) {
+        if (!d.success) {
+          setAccessError((d.error) ?? 'Session not found or access denied.');
+          return;
+        }
+        if (d.session) {
           setMeta({
             sessionId:       chatId,
             type:            (d.session.type as SessionType) ?? 'instant',
@@ -53,25 +58,12 @@ export default function ChatRoomPage({ params }: Props) {
             hostId:          d.session.tutorId as string ?? d.session.hostId as string ?? '',
             subjectName:     d.session.subjectName as string ?? undefined,
             maxParticipants: d.session.maxParticipants as number ?? (isPlus ? 6 : 3),
-          });
-        } else {
-          setMeta({
-            sessionId:       chatId,
-            type:            'instant',
-            speakMode:       'request',
-            hostId:          '',
-            maxParticipants: 2,
+            isPublic:        d.session.isPublic as boolean ?? false,
           });
         }
       })
       .catch(() => {
-        setMeta({
-          sessionId:       chatId,
-          type:            'instant',
-          speakMode:       'request',
-          hostId:          '',
-          maxParticipants: 2,
-        });
+        setAccessError('Could not load session. You may not have access.');
       })
       .finally(() => setLoading(false));
   }, [chatId, user, isPlus]);
@@ -92,6 +84,23 @@ export default function ChatRoomPage({ params }: Props) {
       <Loader2 size={20} className="text-white/30 animate-spin" />
     </div>
   );
+
+  /* ── Access error (e.g. private conference, not invited) ── */
+  if (accessError) {
+    return (
+      <div className="h-full flex items-center justify-center px-4">
+        <div className="glass rounded-2xl px-10 py-12 text-center max-w-sm space-y-3">
+          <p className="text-white/50 text-sm">{accessError}</p>
+          <button
+            onClick={() => router.push('/browse')}
+            className="text-xs text-white/30 hover:text-white/60 transition underline underline-offset-2"
+          >
+            Back to browse
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   /* ── Admin: monitor view for 1:1 and group sessions ── */
   if (user.role === 'admin' && meta?.type !== 'conference') {

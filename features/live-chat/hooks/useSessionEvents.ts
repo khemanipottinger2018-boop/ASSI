@@ -30,9 +30,9 @@ export function useSessionEvents(sessionId: string) {
   const setEndReason = useSessionStore(s => s.setEndReason);
   const mergeMeta    = useSessionStore(s => s.mergeMeta);
 
-  // ⚠️ DEV ONLY — logs every socket event to the console for debugging.
-  // Remove this block (or guard with process.env.NODE_ENV) before production.
+  // Dev-only: log every socket event for debugging.
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
     if (!socket) return;
     const logAll = (event: string, ...args: unknown[]) => {
       console.debug('[socket:event]', event, args);
@@ -64,16 +64,24 @@ export function useSessionEvents(sessionId: string) {
       mergeMeta(meta);
     };
 
+    // session:meta — full meta snapshot from backend; merge into store
+    const onMeta = (meta: SessionMeta) => {
+      if (meta.sessionId !== sessionId) return;
+      mergeMeta(meta);
+    };
+
     on('session:started', onStarted);
     on('session:paused',  onPaused);
     on('session:ended',   onEnded);
     on('session:updated', onUpdated);
+    on('session:meta',    onMeta);
 
     return () => {
       off('session:started', onStarted);
       off('session:paused',  onPaused);
       off('session:ended',   onEnded);
       off('session:updated', onUpdated);
+      off('session:meta',    onMeta);
     };
   }, [sessionId, isConnected, on, off, setStatus, setEndReason, mergeMeta]);
 }

@@ -12,7 +12,7 @@ import { motion, AnimatePresence }  from 'framer-motion';
 import {
   UserPlus, Users, X, Check, Loader2,
   Sparkles, Crown, Presentation, BookOpen,
-  Save, Download,
+  Save, Download, Settings, Globe, Lock, UserCheck,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
@@ -94,6 +94,19 @@ export function GroupStudyView({
   // Snapshot notebook + problems at end time for saving
   const notebookSnapshot = useRef('');
   const problemsSnapshot = useRef<Problem[]>([]);
+
+  // ── Settings panel (owner only) ──
+  const [showSettings,    setShowSettings]    = useState(false);
+  const [settingsMax,     setSettingsMax]     = useState(maxParticipants);
+  const [settingsPublic,  setSettingsPublic]  = useState(meta.isPublic ?? false);
+  const [settingsRoles,   setSettingsRoles]   = useState<'all' | 'student' | 'tutor'>('all');
+  const [savingSettings,  setSavingSettings]  = useState(false);
+  const [settingsError,   setSettingsError]   = useState<string | null>(null);
+  // Live maxParticipants — updated by settings_updated socket event
+  const [liveMax, setLiveMax] = useState(maxParticipants);
+
+  // ── Kick state ──
+  const [kickingId, setKickingId] = useState<string | null>(null);
 
   const joinedRef   = useRef(false);
   const endedRef    = useRef(false);
@@ -184,6 +197,13 @@ export function GroupStudyView({
     const onDrawStop   = () => {};
     const onProbPosted = ({ username }: { username: string }) => pushActivity({ label: `${username} sent a problem`, kind: 'problem' });
     const onJoined     = ({ username }: { username: string }) => pushActivity({ label: `${username} joined`, kind: 'joined' });
+    const onSettingsUpdated = (p: { sessionId: string; maxParticipants: number; isPublic: boolean; allowedRoles: string }) => {
+      if (p.sessionId !== sessionId) return;
+      setLiveMax(p.maxParticipants);
+      setSettingsMax(p.maxParticipants);
+      setSettingsPublic(p.isPublic);
+      setSettingsRoles((p.allowedRoles as 'all' | 'student' | 'tutor') ?? 'all');
+    };
 
     on('session:participants',        onParticipants);
     on('chat:invite_request',         onInviteReq);
@@ -195,6 +215,7 @@ export function GroupStudyView({
     on('study:drawing:stop',          onDrawStop);
     on('study:problem:posted',        onProbPosted);
     on('session:participant_joined',  onJoined);
+    on('session:settings_updated',    onSettingsUpdated);
 
     return () => {
       off('session:participants',       onParticipants);
@@ -207,6 +228,7 @@ export function GroupStudyView({
       off('study:drawing:stop',         onDrawStop);
       off('study:problem:posted',       onProbPosted);
       off('session:participant_joined', onJoined);
+      off('session:settings_updated',   onSettingsUpdated);
     };
   }, [sessionId, currentUserId, on, off, pushActivity]);
 
@@ -271,6 +293,45 @@ export function GroupStudyView({
     emit('study:role_assign', { sessionId, userId, role: 'presenter' });
   }, [studyRole, isReady, emit, sessionId]);
 
+  const handleSaveSettings = useCallback(async () => {
+    setSavingSettings(true);
+    setSettingsError(null);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_URL}/api/group-study/${sessionId}/settings`, {
+        method:      'PATCH',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({
+          maxParticipants: settingsMax,
+          isPublic:        settingsPublic,
+          allowedRoles:    settingsRoles,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Failed to save settings');
+      setShowSettings(false);
+    } catch (err: any) {
+      setSettingsError(err?.message || 'Could not save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  }, [sessionId, settingsMax, settingsPublic, settingsRoles]);
+
+  const handleKick = useCallback(async (targetUserId: string) => {
+    if (kickingId) return;
+    setKickingId(targetUserId);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      await fetch(`${API_URL}/api/group-study/${sessionId}/kick/${targetUserId}`, {
+        method:      'POST',
+        credentials: 'include',
+      });
+      setParticipants(prev => prev.filter(p => p.userId !== targetUserId));
+    } catch { /* silent — socket event will sync */ }
+    finally { setKickingId(null); }
+  }, [kickingId, sessionId]);
+
   // ── Save prompt handlers ──
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -294,8 +355,8 @@ export function GroupStudyView({
 
   // ── Derived ──
   const canDrive     = studyRole === 'owner' || studyRole === 'presenter';
-  const isAtCapacity = participants.length >= maxParticipants;
-  const spotsLeft    = maxParticipants - participants.length;
+  const isAtCapacity = participants.length >= liveMax;
+  const spotsLeft    = liveMax - participants.length;
   const tools        = studyRole === 'owner' ? OWNER_TOOLS
                      : studyRole === 'presenter' ? PRESENTER_TOOLS
                      : MEMBER_TOOLS;
@@ -357,7 +418,7 @@ export function GroupStudyView({
           connected={isConnected}
           participantCount={participants.length}
           startedAt={meta.startedAt}
-          onEnd={handleEnd}
+          onEnd={studyRole === 'owner' ? handleEnd : undefined}
           confirmingEnd={confirmingEnd}
           onCancelEnd={() => setConfirmingEnd(false)}
           onConfirmEnd={handleEnd}
@@ -386,7 +447,7 @@ export function GroupStudyView({
               >
                 <BookOpen size={11} /> Tools
               </button>
-              {!isAtCapacity && !invitePending && (
+              {studyRole === 'owner' && !isAtCapacity && !invitePending && (
                 <button onClick={() => setShowInvite(s => !s)}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] border transition ${
                     showInvite ? 'bg-white/10 border-white/20 text-white/70' : 'glass-soft border-transparent text-white/40 hover:text-white/70'
@@ -394,10 +455,18 @@ export function GroupStudyView({
                   <UserPlus size={11} /> Invite
                 </button>
               )}
-              {invitePending && (
+              {studyRole === 'owner' && invitePending && (
                 <span className="flex items-center gap-1 text-white/30 text-[11px]">
                   <Loader2 size={10} className="animate-spin" /> Pending…
                 </span>
+              )}
+              {studyRole === 'owner' && (
+                <button onClick={() => { setShowSettings(s => !s); setSettingsError(null); }}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] border transition ${
+                    showSettings ? 'bg-white/10 border-white/20 text-white/70' : 'glass-soft border-transparent text-white/40 hover:text-white/70'
+                  }`}>
+                  <Settings size={11} /> Settings
+                </button>
               )}
               <button onClick={() => setShowSidebar(s => !s)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] border transition ${
@@ -409,9 +478,9 @@ export function GroupStudyView({
           }
         />
 
-        {/* Invite bar */}
+        {/* Invite bar — owner only */}
         <AnimatePresence>
-          {showInvite && (
+          {studyRole === 'owner' && showInvite && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }}
               className="shrink-0 overflow-hidden border-b border-white/[0.07]">
@@ -454,6 +523,114 @@ export function GroupStudyView({
                     </button>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Settings panel (owner only) ── */}
+        <AnimatePresence>
+          {studyRole === 'owner' && showSettings && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.18 }}
+              className="shrink-0 overflow-hidden border-b border-white/[0.07]">
+              <div className="px-4 py-3 space-y-4">
+
+                {/* Max participants */}
+                <div className="space-y-1.5">
+                  <p className="text-white/40 text-[11px] font-medium uppercase tracking-wide">Max members</p>
+                  <div className="flex items-center gap-2">
+                    {[2, 3, ...(isPlus ? [4, 5, 6] : [])].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setSettingsMax(n)}
+                        disabled={n < participants.length}
+                        className={`w-9 h-9 rounded-xl text-xs font-semibold border transition ${
+                          settingsMax === n
+                            ? 'bg-blue-500/25 border-blue-500/35 text-blue-300'
+                            : 'glass-soft border-white/10 text-white/40 hover:border-white/20 hover:text-white/70 disabled:opacity-25 disabled:cursor-not-allowed'
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                    {!isPlus && (
+                      <span className="text-orange-400/50 text-[10px] ml-1">ASSI+ for 4–6</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Discoverability */}
+                <div className="space-y-1.5">
+                  <p className="text-white/40 text-[11px] font-medium uppercase tracking-wide">Discoverability</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSettingsPublic(true)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                        settingsPublic
+                          ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                          : 'glass-soft border-white/10 text-white/35 hover:border-white/20'
+                      }`}
+                    >
+                      <Globe size={11} /> Public
+                    </button>
+                    <button
+                      onClick={() => setSettingsPublic(false)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                        !settingsPublic
+                          ? 'bg-white/15 border-white/25 text-white/70'
+                          : 'glass-soft border-white/10 text-white/35 hover:border-white/20'
+                      }`}
+                    >
+                      <Lock size={11} /> Private
+                    </button>
+                  </div>
+                  <p className="text-white/20 text-[10px]">
+                    {settingsPublic ? 'Listed in discovery for eligible users' : 'Join by direct invite only'}
+                  </p>
+                </div>
+
+                {/* Allowed roles */}
+                <div className="space-y-1.5">
+                  <p className="text-white/40 text-[11px] font-medium uppercase tracking-wide">Who can join</p>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'all',     label: 'Everyone',      icon: Users      },
+                      { value: 'student', label: 'Students only', icon: BookOpen   },
+                      { value: 'tutor',   label: 'Tutors only',   icon: UserCheck  },
+                    ] as const).map(opt => {
+                      const Icon = opt.icon;
+                      return (
+                        <button key={opt.value}
+                          onClick={() => setSettingsRoles(opt.value)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                            settingsRoles === opt.value
+                              ? 'bg-blue-500/20 border-blue-500/30 text-blue-300'
+                              : 'glass-soft border-white/10 text-white/35 hover:border-white/20'
+                          }`}
+                        >
+                          <Icon size={11} /> {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {settingsError && (
+                  <p className="text-red-400/70 text-[10px]">{settingsError}</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button onClick={() => setShowSettings(false)}
+                    className="flex-1 py-2 rounded-xl glass-soft text-white/40 text-xs hover:text-white/60 transition">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveSettings} disabled={savingSettings}
+                    className="flex-1 py-2 rounded-xl bg-blue-500/20 border border-blue-500/25 text-blue-300 text-xs font-medium hover:bg-blue-500/30 disabled:opacity-50 transition flex items-center justify-center gap-1.5">
+                    {savingSettings ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                    Save
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -551,8 +728,9 @@ export function GroupStudyView({
           participants={participants}
           currentUserId={currentUserId}
           isHost={studyRole === 'owner'}
-          // Owner can assign presenter by granting floor
           onGrantFloor={studyRole === 'owner' ? handleAssignPresenter : undefined}
+          onKick={studyRole === 'owner' ? handleKick : undefined}
+          kickingId={kickingId}
         />
         {!isPlus && (
           <div className="mt-3 px-2">

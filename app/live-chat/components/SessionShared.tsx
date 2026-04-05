@@ -77,8 +77,9 @@ interface HeaderProps {
   startedAt?: number;
   timerMode?: 'elapsed' | 'countdown';
   timerLimitSecs?: number;
-  onEnd: () => void; confirmingEnd: boolean;
-  onCancelEnd: () => void; onConfirmEnd: () => void;
+  // onEnd is optional — omit to hide the end-session button (e.g. non-owners in group study)
+  onEnd?: () => void; confirmingEnd?: boolean;
+  onCancelEnd?: () => void; onConfirmEnd?: () => void;
   rightSlot?: React.ReactNode; badge?: React.ReactNode;
 }
 
@@ -113,32 +114,34 @@ export function SessionHeader({
       />
       {rightSlot}
 
-      <AnimatePresence mode="wait">
-        {confirmingEnd ? (
-          <motion.div key="confirm"
-            initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.15 }}
-            className="flex items-center gap-2">
-            <span className="text-white/30 text-[11px]">End?</span>
-            <button onClick={onConfirmEnd}
-              className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/25 text-red-400 text-[11px] font-medium hover:bg-red-500/30 transition">
-              End
-            </button>
-            <button onClick={onCancelEnd}
-              className="px-2.5 py-1 rounded-lg glass-soft text-white/30 text-[11px] hover:text-white/60 transition">
-              Cancel
-            </button>
-          </motion.div>
-        ) : (
-          <motion.button key="end-btn"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onEnd}
-            className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition"
-            title="End session">
-            <PhoneOff size={13} />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {onEnd && (
+        <AnimatePresence mode="wait">
+          {confirmingEnd ? (
+            <motion.div key="confirm"
+              initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.15 }}
+              className="flex items-center gap-2">
+              <span className="text-white/30 text-[11px]">End?</span>
+              <button onClick={onConfirmEnd}
+                className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/25 text-red-400 text-[11px] font-medium hover:bg-red-500/30 transition">
+                End
+              </button>
+              <button onClick={onCancelEnd}
+                className="px-2.5 py-1 rounded-lg glass-soft text-white/30 text-[11px] hover:text-white/60 transition">
+                Cancel
+              </button>
+            </motion.div>
+          ) : (
+            <motion.button key="end-btn"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={onEnd}
+              className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition"
+              title="End session">
+              <PhoneOff size={13} />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      )}
     </div>
   );
 }
@@ -387,10 +390,12 @@ export function SessionWaitingRoom({ title, subtitle, onCancel }: {
 }
 
 /* ── Participant List ── */
-export function ParticipantList({ participants, currentUserId, isHost, onMute, onGrantFloor }: {
+export function ParticipantList({ participants, currentUserId, isHost, onMute, onGrantFloor, onKick, kickingId }: {
   participants: Participant[]; currentUserId: string; isHost?: boolean;
   onMute?: (userId: string, muted: boolean) => void;
   onGrantFloor?: (userId: string) => void;
+  onKick?: (userId: string) => void;
+  kickingId?: string | null;
 }) {
   return (
     <div className="space-y-0.5">
@@ -425,6 +430,15 @@ export function ParticipantList({ participants, currentUserId, isHost, onMute, o
                   <button onClick={() => onMute(p.userId, !p.isMuted)}
                     className="px-1.5 py-0.5 rounded text-[9px] bg-white/5 text-white/30 hover:bg-white/10 hover:text-white/60 transition">
                     {p.isMuted ? 'Unmute' : 'Mute'}
+                  </button>
+                )}
+                {onKick && (
+                  <button
+                    onClick={() => onKick(p.userId)}
+                    disabled={kickingId === p.userId}
+                    className="px-1.5 py-0.5 rounded text-[9px] bg-red-500/10 text-red-400/70 border border-red-500/15 hover:bg-red-500/20 hover:text-red-300 disabled:opacity-40 transition"
+                  >
+                    {kickingId === p.userId ? '…' : 'Kick'}
                   </button>
                 )}
               </div>

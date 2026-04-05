@@ -27,15 +27,33 @@ import type { SessionMeta } from '../types/SocketEvents';
 // null = not yet hydrated (initial state before the first fetch resolves)
 export type StoreSessionStatus = 'waiting' | 'active' | 'paused' | 'ended' | null;
 
+export type PendingInvite = {
+  sessionId:    string;
+  fromUsername: string;
+  subjectName?: string;
+};
+
+export type UpcomingSession = {
+  sessionId:   string;
+  type:        'booked' | 'conference';
+  scheduledAt: string | null;
+};
+
 interface SessionStoreState {
   status:           StoreSessionStatus;
   endReason:        string;
   currentSessionId: string | null;
   sessionMeta:      Partial<SessionMeta>;
-  setStatus:        (s: StoreSessionStatus) => void;
-  setEndReason:     (r: string) => void;
-  mergeMeta:        (partial: Partial<SessionMeta> & { sessionId: string }) => void;
-  reset:            (sessionId?: string) => void;
+  // Global invite / upcoming-session notifications (read by SessionInviteBanner)
+  pendingInvite:    PendingInvite | null;
+  upcomingSession:  UpcomingSession | null;
+
+  setStatus:          (s: StoreSessionStatus) => void;
+  setEndReason:       (r: string) => void;
+  mergeMeta:          (partial: Partial<SessionMeta> & { sessionId: string }) => void;
+  reset:              (sessionId?: string) => void;
+  setPendingInvite:   (invite: PendingInvite | null) => void;
+  setUpcomingSession: (u: UpcomingSession | null) => void;
 }
 
 export const useSessionStore = create<SessionStoreState>((set) => ({
@@ -43,6 +61,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   endReason:        '',
   currentSessionId: null,
   sessionMeta:      {},
+  pendingInvite:    null,
+  upcomingSession:  null,
 
   // Idempotent: skip update if status is already the same value
   setStatus: (status) =>
@@ -50,8 +70,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
 
   setEndReason: (endReason) => set({ endReason }),
 
-  // Merge session:updated payload — only applies when sessionId matches,
-  // and never overwrites fields that are absent from the partial payload
+  // Merge session:updated / session:meta payload — only applies when sessionId
+  // matches, and never overwrites fields absent from the partial payload
   mergeMeta: (partial) =>
     set(state => {
       const { sessionId, ...rest } = partial;
@@ -72,4 +92,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         sessionMeta:      {},
       };
     }),
+
+  setPendingInvite:   (pendingInvite)   => set({ pendingInvite }),
+  setUpcomingSession: (upcomingSession) => set({ upcomingSession }),
 }));

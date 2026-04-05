@@ -40,6 +40,7 @@ export type SessionMeta = {
   subjectName?:    string;
   maxParticipants: number;
   startedAt?:      number;   // ms epoch — from backend Redis/DB, used for real timer
+  isPublic?:       boolean;  // conference only
 };
 
 export type ServerToClientEvents = {
@@ -73,6 +74,12 @@ export type ServerToClientEvents = {
   'conference:muted':         (p: { sessionId: string; userId: string }) => void;
   'conference:unmuted':       (p: { sessionId: string; userId: string }) => void;
   'conference:floor_granted': (p: { sessionId: string; userId: string }) => void;
+
+  'session:invited':  (p: { sessionId: string; fromUsername: string; subjectName?: string }) => void;
+  'session:upcoming': (p: { sessionId: string; type: 'booked' | 'conference'; scheduledAt: string | null }) => void;
+  // Emitted by backend when session meta changes (e.g. speakMode updated mid-conference).
+  // Not yet emitted — wired on the frontend so views can react when the backend adds it.
+  'session:updated':  (meta: Partial<SessionMeta> & { sessionId: string }) => void;
 };
 
 export type ClientToServerEvents = {

@@ -21,7 +21,8 @@ import { useRouter, useSearchParams }                from 'next/navigation';
 import { motion, AnimatePresence }                   from 'framer-motion';
 import {
   Loader2, ArrowLeft, X, WifiOff,
-  Zap, Users, Radio, ChevronRight,
+  Zap, Users, Radio, ChevronRight, Plus, Mic, MicOff,
+  Globe, Lock, BookOpen, UserCheck,
 } from 'lucide-react';
 import { useAuth }  from '@/features/auth';
 import { useTheme } from '@/features/themes/core/ThemeProvider';
@@ -44,7 +45,17 @@ interface AvailableTutor {
   subjects:        { id: string; name: string; category: string | null }[];
 }
 
-type Step = 'mode' | 'subject' | 'tutors' | 'creating' | 'error';
+type Step = 'mode' | 'subject' | 'tutors' | 'discover' | 'creating' | 'error';
+
+type AvailableRoom = {
+  id:               string;
+  status:           string;
+  subjectName:      string | null;
+  maxParticipants:  number;
+  speakMode:        string;
+  participantCount: number;
+  allowedRoles?:    string;
+};
 
 /* ── Session mode definitions ── */
 interface SessionMode {
@@ -55,7 +66,7 @@ interface SessionMode {
   color:       string;
   border:      string;
   textColor:   string;
-  forRoles:    ('student' | 'tutor')[];
+  forRoles:    ('student' | 'tutor' | 'admin')[];
   requiresPlus: boolean;
   capacity:    string;
 }
@@ -93,9 +104,9 @@ const SESSION_MODES: SessionMode[] = [
     color:        'bg-orange-500/12',
     border:       'border-orange-500/25',
     textColor:    'text-orange-300',
-    forRoles:     ['tutor'],
+    forRoles:     ['tutor', 'admin'],
     requiresPlus: false,
-    capacity:     'Tutors only · Unlimited attendees',
+    capacity:     'Tutors/Admin · 6 default, 10 with ASSI+',
   },
 ];
 
@@ -121,7 +132,7 @@ export default function LiveChatPage() {
   const searchParams                      = useSearchParams();
   const { setSubjectOverride }            = useTheme();
 
-  const role   = user?.role === 'tutor' ? 'tutor' : 'student';
+  const role   = user?.role === 'tutor' ? 'tutor' : user?.role === 'admin' ? 'admin' : 'student';
 
   /* ── URL params from service selector / booking flow ── */
   const paramMode      = (searchParams.get('mode') as SessionType | null)      || null;
@@ -149,6 +160,22 @@ export default function LiveChatPage() {
   const [loadingTutors, setLoadingTutors] = useState(false);
   const [requestingId,  setRequestingId]  = useState<string | null>(null);
   const [error,         setError]         = useState<string | null>(null);
+  const [isPublic,      setIsPublic]      = useState(false);
+
+  // Group study discovery
+  const [availableRooms,    setAvailableRooms]    = useState<AvailableRoom[]>([]);
+  const [loadingRooms,      setLoadingRooms]      = useState(false);
+  const [joiningId,         setJoiningId]         = useState<string | null>(null);
+  // Inline create-room options (shown in the discover step)
+  const [showCreateOptions, setShowCreateOptions] = useState(false);
+  const [createPublic,      setCreatePublic]      = useState(false);
+  const [createRoles,       setCreateRoles]       = useState<'all' | 'student' | 'tutor'>('all');
+
+  // Tutor-registered subjects — fetched once when tutor enters the subject step
+  // for conference or group_study creation (not instant, which is student-only).
+  type TutorSubject = { id: string; name: string; category: string | null };
+  const [tutorSubjects,        setTutorSubjects]        = useState<TutorSubject[]>([]);
+  const [tutorSubjectsLoading, setTutorSubjectsLoading] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
 
@@ -208,6 +235,62 @@ export default function LiveChatPage() {
     }
   }, [subjectId, mode, step, fetchTutors]);
 
+  /* ── Fetch open group study rooms ── */
+  const fetchAvailableRooms = useCallback(async (_forSubjectName: string | null) => {
+    setLoadingRooms(true);
+    setAvailableRooms([]);
+    setShowCreateOptions(false);
+    setStep('discover');
+    try {
+      const res  = await fetch(`${API_URL}/api/group-study/available`, { credentials: 'include' });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Could not load rooms');
+      // Backend already filters by role — show all rooms the caller is eligible to join
+      setAvailableRooms(data.sessions ?? []);
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong');
+      setStep('error');
+    } finally {
+      setLoadingRooms(false);
+    }
+  }, []);
+
+  /* ── Join an existing group study room ── */
+  const handleJoinRoom = useCallback(async (roomId: string) => {
+    if (joiningId) return;
+    setJoiningId(roomId);
+    setError(null);
+    try {
+      const res  = await fetch(`${API_URL}/api/group-study/${roomId}/join`, {
+        method:      'POST',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Could not join room');
+      router.replace(`/live-chat/${roomId}`);
+    } catch (err: any) {
+      setError(err?.message || 'Something went wrong');
+      setStep('error');
+    } finally {
+      setJoiningId(null);
+    }
+  }, [joiningId, router]);
+
+  // Fetch tutor's registered subjects when a tutor/admin enters the subject step
+  // for conference or group_study. Falls back to the public SubjectDropdown if
+  // the fetch fails or returns no subjects.
+  useEffect(() => {
+    if (step !== 'subject') return;
+    if (role !== 'tutor' && role !== 'admin') return;
+    if (mode === 'instant') return; // instant is student-only; tutors never see this step
+    setTutorSubjectsLoading(true);
+    fetch(`${API_URL}/api/tutors/my-subjects`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => { if (d.success && Array.isArray(d.subjects)) setTutorSubjects(d.subjects); })
+      .catch(() => { /* silent — fallback to SubjectDropdown when tutorSubjects is empty */ })
+      .finally(() => setTutorSubjectsLoading(false));
+  }, [step, role, mode]);
+
   useEffect(() => () => { abortRef.current?.abort(); }, []);
 
   /* ── Create any session type ── */
@@ -215,7 +298,16 @@ export default function LiveChatPage() {
     sessionType: SessionType,
     sid: string,
     tutorId: string | null,
+    isPublicParam = false,
+    allowedRolesParam: 'all' | 'student' | 'tutor' = 'all',
   ) => {
+    // Frontend guard: students cannot create conferences (backend also enforces)
+    if (sessionType === 'conference' && role !== 'tutor' && role !== 'admin') {
+      setError('Conferences can only be created by tutors.');
+      setStep('error');
+      return;
+    }
+
     setRequestingId(tutorId ?? 'creating');
     setError(null);
     setStep('creating');
@@ -232,9 +324,11 @@ export default function LiveChatPage() {
         credentials: 'include',
         headers:     { 'Content-Type': 'application/json' },
         body:        JSON.stringify({
-          type:      sessionType,
-          subjectId: sid,
-          tutorId:   tutorId ?? undefined,
+          type:         sessionType,
+          subjectId:    sid,
+          tutorId:      tutorId ?? undefined,
+          isPublic:     sessionType !== 'instant' ? isPublicParam : undefined,
+          allowedRoles: sessionType === 'group_study' ? allowedRolesParam : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -265,9 +359,12 @@ export default function LiveChatPage() {
     setSubjectName(subject.name);
     if (mode === 'instant') {
       setStep('tutors');
+    } else if (mode === 'group_study') {
+      // Show discovery list before creating — user can join an existing room
+      fetchAvailableRooms(subject.name);
     } else {
-      // group/conference — create immediately with subject
-      createSession(mode, subject.id, null);
+      // conference — create immediately
+      createSession(mode, subject.id, null, isPublic);
     }
   };
 
@@ -298,8 +395,9 @@ export default function LiveChatPage() {
         {/* ── Back button ── */}
         <button
           onClick={() => {
-            if (step === 'subject') setStep('mode');
-            else if (step === 'tutors') setStep(mode === 'instant' ? 'subject' : 'mode');
+            if (step === 'subject')  setStep('mode');
+            else if (step === 'tutors')   setStep('subject');
+            else if (step === 'discover') setStep('subject');
             else router.back();
           }}
           className="flex items-center gap-2 text-white/35 text-sm hover:text-white/65 transition"
@@ -397,7 +495,50 @@ export default function LiveChatPage() {
                 </p>
               </div>
 
-              <SubjectDropdown selected={null} onSelect={handleSubjectSelect} />
+              {/* Tutors/admins creating a conference or group_study see only their
+                  registered subjects. Falls back to the full public dropdown if
+                  my-subjects is empty or still loading. */}
+              {(role === 'tutor' || role === 'admin') && mode !== 'instant' && tutorSubjects.length > 0 ? (
+                <div className="space-y-1.5">
+                  {tutorSubjectsLoading ? (
+                    <div className="glass rounded-2xl px-4 py-6 flex items-center justify-center">
+                      <Loader2 size={16} className="text-white/30 animate-spin" />
+                    </div>
+                  ) : (
+                    tutorSubjects.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleSubjectSelect({ id: s.id, name: s.name, category: s.category ?? '', tutorCount: 0 })}
+                        className="w-full text-left glass rounded-xl px-4 py-3 border border-white/[0.07] hover:bg-white/[0.05] hover:border-white/15 transition-all"
+                      >
+                        <p className="text-white/80 text-sm">{s.name}</p>
+                        {s.category && <p className="text-white/30 text-xs mt-0.5">{s.category}</p>}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <SubjectDropdown selected={null} onSelect={handleSubjectSelect} />
+              )}
+
+              {/* Public conference toggle — tutor/admin only */}
+              {mode === 'conference' && (role === 'tutor' || role === 'admin') && (
+                <label className="flex items-center gap-3 glass-soft rounded-xl px-4 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={e => setIsPublic(e.target.checked)}
+                    className="sr-only"
+                  />
+                  <div className={`w-4 h-4 rounded border transition flex items-center justify-center flex-shrink-0 ${isPublic ? 'bg-orange-500/40 border-orange-500/60' : 'border-white/20'}`}>
+                    {isPublic && <span className="text-orange-300 text-[10px]">✓</span>}
+                  </div>
+                  <div>
+                    <p className="text-white/70 text-sm">Public conference</p>
+                    <p className="text-white/30 text-xs">Anyone can browse and join without an invite</p>
+                  </div>
+                </label>
+              )}
             </motion.div>
           )}
 
@@ -539,6 +680,237 @@ export default function LiveChatPage() {
                   })}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* ══════════════════════════════════════════
+              STEP: discover (group study rooms)
+              ══════════════════════════════════════════ */}
+          {step === 'discover' && (
+            <motion.div key="discover"
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-5"
+            >
+              {/* Mode badge */}
+              <ModeBadge mode="group_study" />
+
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-white font-semibold text-xl tracking-tight">Group Study</h1>
+                  <p className="text-white/40 text-sm mt-1">
+                    {loadingRooms
+                      ? 'Finding open rooms…'
+                      : availableRooms.length > 0
+                        ? `${availableRooms.length} open room${availableRooms.length !== 1 ? 's' : ''} available to join`
+                        : 'No open rooms right now'
+                    }
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setStep('subject'); setSubjectId(null); setSubjectName(null); }}
+                  className="text-xs text-white/30 hover:text-white/60 transition underline underline-offset-2 flex-shrink-0 mt-1"
+                >
+                  Change subject
+                </button>
+              </div>
+              {/* Subject tag */}
+              {subjectName && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-white/30">Subject:</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300/70 text-[10px] font-medium">
+                    <BookOpen size={9} /> {subjectName}
+                  </span>
+                </div>
+              )}
+
+              {/* Skeleton */}
+              {loadingRooms && (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <div key={i} className="glass rounded-2xl p-4 animate-pulse flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-white/8 flex-shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 w-28 bg-white/8 rounded" />
+                        <div className="h-2 w-36 bg-white/5 rounded" />
+                      </div>
+                      <div className="w-16 h-8 bg-white/5 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Room cards */}
+              {!loadingRooms && availableRooms.length > 0 && (
+                <div className="space-y-2.5">
+                  {availableRooms.map((room, i) => {
+                    const isThisOne  = joiningId === room.id;
+                    const isDisabled = !!joiningId && !isThisOne;
+                    const spotsLeft  = room.maxParticipants - room.participantCount;
+                    const isOpen     = room.speakMode === 'open';
+
+                    return (
+                      <motion.div key={room.id} layout
+                        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.04, duration: 0.25 }}
+                        className={`glass rounded-2xl p-4 transition-opacity ${isDisabled ? 'opacity-40' : ''}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* Icon */}
+                          <div className="relative flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl glass-soft border border-blue-500/20 flex items-center justify-center">
+                              <Users size={16} className="text-blue-300" />
+                            </div>
+                            {room.status === 'active' && (
+                              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black/30" />
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white/85 text-sm font-medium">
+                                {room.subjectName ?? 'Study Room'}
+                              </p>
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${
+                                isOpen
+                                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                  : 'bg-white/5 border-white/10 text-white/35'
+                              }`}>
+                                {isOpen
+                                  ? <><Mic size={8} />Open mic</>
+                                  : <><MicOff size={8} />Raise hand</>
+                                }
+                              </span>
+                              {room.allowedRoles && room.allowedRoles !== 'all' && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] border bg-white/5 border-white/10 text-white/35">
+                                  {room.allowedRoles === 'tutor'
+                                    ? <><UserCheck size={8} />Tutors</>
+                                    : <><BookOpen size={8} />Students</>
+                                  }
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-white/30 text-xs mt-0.5">
+                              {room.participantCount} / {room.maxParticipants} joined
+                              {spotsLeft === 1 && <span className="text-amber-400/70"> · 1 spot left</span>}
+                            </p>
+                          </div>
+
+                          {/* Join button */}
+                          <button
+                            onClick={() => handleJoinRoom(room.id)}
+                            disabled={!!joiningId}
+                            className={`
+                              flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium border transition-all duration-200
+                              ${isThisOne
+                                ? 'bg-blue-500/20 border-blue-500/30 text-blue-300'
+                                : 'bg-blue-500/12 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 hover:border-blue-500/35'
+                              }
+                              disabled:cursor-not-allowed
+                            `}
+                          >
+                            {isThisOne
+                              ? <><Loader2 size={12} className="animate-spin" /> Joining…</>
+                              : <><Users size={12} /> Join</>
+                            }
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Create new room — expandable with settings */}
+              <div className="glass rounded-2xl border border-dashed border-blue-500/20 overflow-hidden">
+                {!showCreateOptions ? (
+                  <button
+                    onClick={() => setShowCreateOptions(true)}
+                    disabled={!!joiningId || !subjectId}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 text-blue-400/70 text-sm hover:bg-blue-500/8 hover:text-blue-300 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={14} />
+                    {availableRooms.length === 0 ? 'Create a new room' : 'Or create your own room'}
+                  </button>
+                ) : (
+                  <div className="px-4 py-4 space-y-4">
+                    <p className="text-white/60 text-sm font-medium">New Study Room</p>
+
+                    {/* Discoverability */}
+                    <div className="space-y-1.5">
+                      <p className="text-white/35 text-[11px] font-medium uppercase tracking-wide">Discoverability</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setCreatePublic(true)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                            createPublic
+                              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                              : 'bg-white/4 border-white/10 text-white/35 hover:border-white/20'
+                          }`}
+                        >
+                          <Globe size={11} /> Public
+                        </button>
+                        <button
+                          onClick={() => setCreatePublic(false)}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                            !createPublic
+                              ? 'bg-white/15 border-white/25 text-white/70'
+                              : 'bg-white/4 border-white/10 text-white/35 hover:border-white/20'
+                          }`}
+                        >
+                          <Lock size={11} /> Private
+                        </button>
+                      </div>
+                      <p className="text-white/20 text-[10px]">
+                        {createPublic ? 'Listed in discovery for eligible users' : 'Only joinable via direct invite'}
+                      </p>
+                    </div>
+
+                    {/* Who can join */}
+                    <div className="space-y-1.5">
+                      <p className="text-white/35 text-[11px] font-medium uppercase tracking-wide">Who can join</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {([
+                          { value: 'all',     label: 'Everyone',  icon: Users      },
+                          { value: 'student', label: 'Students',  icon: BookOpen   },
+                          { value: 'tutor',   label: 'Tutors',    icon: UserCheck  },
+                        ] as const).map(opt => {
+                          const Icon = opt.icon;
+                          return (
+                            <button key={opt.value}
+                              onClick={() => setCreateRoles(opt.value)}
+                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs border transition ${
+                                createRoles === opt.value
+                                  ? 'bg-blue-500/20 border-blue-500/30 text-blue-300'
+                                  : 'bg-white/4 border-white/10 text-white/35 hover:border-white/20'
+                              }`}
+                            >
+                              <Icon size={11} /> {opt.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => setShowCreateOptions(false)}
+                        className="flex-1 py-2 rounded-xl bg-white/5 text-white/40 text-xs hover:text-white/60 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => subjectId && createSession('group_study', subjectId, null, createPublic, createRoles)}
+                        disabled={!subjectId}
+                        className="flex-1 py-2 rounded-xl bg-blue-500/20 border border-blue-500/25 text-blue-300 text-xs font-medium hover:bg-blue-500/30 disabled:opacity-50 transition flex items-center justify-center gap-1.5"
+                      >
+                        <Users size={12} /> Create Room
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
