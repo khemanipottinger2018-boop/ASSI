@@ -14,6 +14,7 @@ import {
 import { useAuth }            from '@/features/auth';
 import { useNotifications }   from '@/features/notifications';
 import { usePresenceDisplay, PresenceDot, PRESENCE_LABEL_COLOR } from '@/features/presence';
+import { useSocketContext }   from '@/features/socket';
 import AvailabilityModal      from '@/features/presence/AvailabilityModal';
 import type { UserFeatures }  from '@/lib/api/user';
 
@@ -181,11 +182,12 @@ interface SidebarProps {
 export default function Sidebar({
   collapsed, onToggle, undercoverRole, features, tier,
 }: SidebarProps) {
-  const { user }        = useAuth();
-  const pathname        = usePathname();
-  const searchParams    = useSearchParams();
-  const router          = useRouter();
-  const { unreadCount } = useNotifications();
+  const { user }          = useAuth();
+  const pathname          = usePathname();
+  const searchParams      = useSearchParams();
+  const router            = useRouter();
+  const { unreadCount }   = useNotifications();
+  const { isConnected }   = useSocketContext();
 
   const effectiveRole = undercoverRole ?? user?.role;
   const isTutor       = effectiveRole === 'tutor';
@@ -504,11 +506,13 @@ export default function Sidebar({
                         {user.username[0]?.toUpperCase()}
                       </span>
                     </div>
-                    {isTutor && !isUndercover && (
+                    {isTutor && !isUndercover ? (
                       <PresenceDot
                         display={presenceDisplay}
                         className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[color:var(--sidebar-bg,#111)]"
                       />
+                    ) : !isUndercover && (
+                      <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[color:var(--sidebar-bg,#111)] ${isConnected ? 'bg-emerald-400' : 'bg-white/20'}`} />
                     )}
                   </div>
 
@@ -549,11 +553,13 @@ export default function Sidebar({
                     {user.username[0]?.toUpperCase()}
                   </span>
                 </div>
-                {isTutor && !isUndercover && (
+                {isTutor && !isUndercover ? (
                   <PresenceDot
                     display={presenceDisplay}
                     className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-[color:var(--sidebar-bg,#111)]"
                   />
+                ) : !isUndercover && (
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[color:var(--sidebar-bg,#111)] ${isConnected ? 'bg-emerald-400' : 'bg-white/20'}`} />
                 )}
               </div>
             </button>

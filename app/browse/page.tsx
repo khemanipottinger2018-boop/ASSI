@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, Loader2, X, ChevronDown } from 'lucide-react';
 import AvailableTutorCard from '@/features/browse/AvailableTutorCard';
@@ -48,18 +48,32 @@ export default function BrowsePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [filters,     setFilters]     = useState<ActiveFilters>(DEFAULT_FILTERS);
 
-  useEffect(() => {
-    tutorsApi.browse()
-      .then(d => { if (d.success) setTutors(d.tutors ?? []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-
+  const refreshOnlineIds = useCallback(() => {
     tutorsApi.getAvailable()
       .then(d => {
         if (d.success) setOnlineIds(new Set((d.tutors ?? []).map(t => t.userId)));
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    tutorsApi.browse()
+      .then(d => { if (d.success) setTutors(d.tutors ?? []); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+
+    refreshOnlineIds();
+  }, [refreshOnlineIds]);
+
+  // Re-fetch online status when the user returns to the tab so presence dots
+  // stay current without a full page reload.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) refreshOnlineIds();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refreshOnlineIds]);
 
   const allSubjects = useMemo<SubjectSummary[]>(() => {
     const seen = new Map<string, SubjectSummary>();

@@ -54,6 +54,15 @@ export default function SessionsPage() {
   // Student alert when tutor joins
   const [readyAlert, setReadyAlert] = useState<string | null>(null);
 
+  type UpcomingConference = {
+    id:              string;
+    subjectName:     string | null;
+    maxParticipants: number;
+    isPublic:        boolean;
+    status:          string;
+  };
+  const [upcomingConferences, setUpcomingConferences] = useState<UpcomingConference[]>([]);
+
   const fetchSessions = useCallback(() => {
     sessionsApi.getChatSessions()
       .then(d => {
@@ -105,6 +114,33 @@ export default function SessionsPage() {
       if (!isTutor) setReadyAlert(sessionId);
     });
   }, [subscribe, isTutor]);
+
+  // Booked session confirmed → re-fetch so the new entry appears in Upcoming
+  useEffect(() => {
+    return subscribe('session:upcoming', () => { fetchSessions(); });
+  }, [subscribe, fetchSessions]);
+
+  // Tutor: fetch active/upcoming conferences from the upcoming endpoint
+  useEffect(() => {
+    if (!isTutor) return;
+    api.get<{ success: boolean; sessions?: { id: string; type: string; status: string; subjectName: string | null; maxParticipants?: number; isPublic?: boolean }[] }>('/api/live-chat/upcoming')
+      .then(d => {
+        if (d.success && d.sessions) {
+          setUpcomingConferences(
+            d.sessions
+              .filter(s => s.type === 'conference')
+              .map(s => ({
+                id:              s.id,
+                subjectName:     s.subjectName,
+                maxParticipants: s.maxParticipants ?? 6,
+                isPublic:        s.isPublic ?? false,
+                status:          s.status,
+              })),
+          );
+        }
+      })
+      .catch(() => {});
+  }, [isTutor]);
 
   // ── Modal helpers ──────────────────────────────────────────────
 
@@ -302,6 +338,44 @@ export default function SessionsPage() {
             );
           })}
         </div>
+      )}
+
+      {/* ── Upcoming Conferences (tutor only) ── */}
+      {tab === 'upcoming' && isTutor && upcomingConferences.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }} className="space-y-2">
+          <p className="text-white/30 text-xs px-1 font-medium uppercase tracking-wide">Your Conferences</p>
+          {upcomingConferences.map(conf => (
+            <motion.button
+              key={conf.id}
+              layout
+              onClick={() => router.push(`/live-chat/${conf.id}`)}
+              className="w-full text-left glass rounded-2xl p-4 border border-orange-500/15 hover:bg-white/[0.04] transition group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500/12 border border-orange-500/25 flex items-center justify-center flex-shrink-0">
+                  <span className="text-orange-300 text-xs">
+                    {conf.isPublic ? '🌐' : '🔒'}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white/80 text-sm font-medium">
+                    {conf.subjectName ?? 'Conference'}
+                  </p>
+                  <p className="text-white/30 text-xs mt-0.5">
+                    {conf.isPublic ? 'Public' : 'Private'} · up to {conf.maxParticipants} participants
+                  </p>
+                </div>
+                <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${
+                  conf.status === 'active' ? 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' : 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'
+                }`}>
+                  {conf.status === 'active' ? 'Live' : 'Open'}
+                </span>
+                <ChevronRight size={14} className="text-white/20 group-hover:text-white/50 transition flex-shrink-0" />
+              </div>
+            </motion.button>
+          ))}
+        </motion.div>
       )}
 
       {/* ── Session action modal ── */}

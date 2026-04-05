@@ -54,7 +54,6 @@ export default function AssiChatBot({ onClose, isGuest = false }: Props) {
 
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLInputElement>(null);
-  const msgCount   = useRef(0);
   const guestCount = useRef(0);
   const GUEST_LIMIT = 3;
 
@@ -75,9 +74,8 @@ export default function AssiChatBot({ onClose, isGuest = false }: Props) {
     setInput('');
     setLoading(true);
     setIsTyping(true);
-    msgCount.current += 1;
 
-    if (!isGuest && (msgCount.current >= DEEP_SESSION_THRESHOLD || isDeepQuery(trimmed))) {
+    if (!isGuest && (messages.length >= DEEP_SESSION_THRESHOLD + 1 || isDeepQuery(trimmed))) {
       setShowNudge(true);
     }
 
@@ -101,7 +99,7 @@ export default function AssiChatBot({ onClose, isGuest = false }: Props) {
           role:    'assistant',
           content: isGuest
             ? "You've reached the guest limit. Sign up free to keep chatting."
-            : "You've hit the limit for now. Upgrade to ASSI+ for more.",
+            : "You've used your 20 daily messages. Resets at midnight — or upgrade to ASSI+ for unlimited.",
         }]);
         return;
       }

@@ -8,6 +8,8 @@ import { useFeatures }    from '@/features/platform';
 import { useSocketContext } from '@/features/socket';
 import { PresenceProvider } from '@/features/presence';
 import { useViewContext, ViewContextBanner } from '@/features/admin';
+import { useSessionStore } from '@/features/live-chat/store/useSessionStore';
+import { SessionInviteBanner } from '@/app/live-chat/components/SessionInviteBanner';
 
 import Sidebar               from './Sidebar';
 import MobileNav             from './MobileNav';
@@ -40,6 +42,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { viewContext, isElevated }                    = useViewContext();
   const pathname                                       = usePathname();
 
+  const setPendingInvite   = useSessionStore(s => s.setPendingInvite);
+  const setUpcomingSession = useSessionStore(s => s.setUpcomingSession);
+
   const [collapsed,      setCollapsed]     = useState(false);
   const [mounted,        setMounted]       = useState(false);
   const [globalRequest,  setGlobalRequest] = useState<GlobalRequest | null>(null);
@@ -67,6 +72,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       });
     });
   }, [user?.role, pathname, subscribe]);
+
+  // Global session:invited and session:upcoming — fire for all authenticated
+  // users regardless of which route they're on. These were previously handled
+  // only inside useSessionEvents (which required being inside a session view).
+  // By subscribing here, the SessionInviteBanner shows across the entire app.
+  useEffect(() => {
+    if (!user) return;
+    const unsubInvited  = subscribe('session:invited',  (p: any) => setPendingInvite(p));
+    const unsubUpcoming = subscribe('session:upcoming', (p: any) => setUpcomingSession(p));
+    return () => { unsubInvited(); unsubUpcoming(); };
+  }, [user, subscribe, setPendingInvite, setUpcomingSession]);
 
   const handleToggle = useCallback(() => {
     setCollapsed((prev) => {
@@ -163,6 +179,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onDecline={() => setGlobalRequest(null)}
         />
       )}
+
+      {/* Global invite / upcoming-session banner — visible on all routes */}
+      <SessionInviteBanner />
     </PresenceProvider>
   );
 }

@@ -10,7 +10,7 @@
  * Only fetches when authenticated.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/features/auth';
 import { userApi } from '@/lib/api';
 import type { UserStreak } from '@/lib/api/user';
@@ -28,21 +28,38 @@ export function useStreak() {
   const [isLoading, setIsLoading] = useState(true);
   const [error,     setError]     = useState<string | null>(null);
 
+  const refresh = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setIsLoading(true);
+    try {
+      const data = await userApi.getStreak();
+      if (data.success) setStreak(data.streak);
+    } catch {
+      setError('Could not load streak');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Initial fetch — runs on mount and when auth state changes.
   useEffect(() => {
     if (!isAuthenticated) {
       setStreak(DEFAULT_STREAK);
       setIsLoading(false);
       return;
     }
+    refresh();
+  }, [isAuthenticated, refresh]);
 
-    setIsLoading(true);
-    userApi.getStreak()
-      .then(data => {
-        if (data.success) setStreak(data.streak);
-      })
-      .catch(() => setError('Could not load streak'))
-      .finally(() => setIsLoading(false));
-  }, [isAuthenticated]);
+  // Re-fetch when the user returns to the tab so the streak count is always
+  // current (backend updates on each daily login, frontend might be stale).
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [refresh]);
 
-  return { streak, isLoading, error };
+  return { streak, isLoading, error, refresh };
 }

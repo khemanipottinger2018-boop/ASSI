@@ -85,9 +85,9 @@ export const sessionsApi = {
       session: {
         sessionId:   string;
         status:      SessionStatus;
-        tutorName:   string;
+        partnerName: string;
         subjectName: string;
-        startedAt:   string; // ISO
+        startedAt:   string | null; // ISO
       } | null;
     }>('/api/live-chat/active'),
 };

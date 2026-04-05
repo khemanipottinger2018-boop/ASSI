@@ -147,9 +147,9 @@ export default function TutorDashboard() {
         const s = activeData.session;
         setActiveSessions([{
           sessionId:   s.sessionId,
-          studentName: s.tutorName,
+          studentName: s.partnerName,
           subjectName: s.subjectName,
-          startedAt:   new Date(s.startedAt).getTime(),
+          startedAt:   s.startedAt ? new Date(s.startedAt).getTime() : Date.now(),
           status:      'active',
         }]);
       }

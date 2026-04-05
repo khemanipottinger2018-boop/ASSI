@@ -23,6 +23,7 @@ import QuickActionButton  from '@/features/dashboard/student/QuickActionButton';
 import RecentSessionRow   from '@/features/sessions/RecentSessionRow';
 import AvailableTutorCard from '@/features/browse/AvailableTutorCard';
 import StatCard           from '@/features/dashboard/student/StatCard';
+import StreakCard, { StreakCardSkeleton } from '@/features/dashboard/student/StreakCard';
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -45,14 +46,14 @@ export default function StudentDashboard() {
 
   const { unreadCount: notifUnread } = useNotifications();
   const { unreadCount: msgUnread }   = useMessages();
-  const { streak }                   = useStreak();
+  const { streak, isLoading: streakLoading } = useStreak();
 
   const [sessions,      setSessions]      = useState<ChatSession[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [tutors,        setTutors]        = useState<TutorSummary[]>([]);
   const [dailyTasks,    setDailyTasks]    = useState<DailyTask[]>([]);
   const [activeSession, setActiveSession] = useState<{
-    sessionId: string; tutorName: string; subjectName: string;
+    sessionId: string; partnerName: string; subjectName: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +72,7 @@ export default function StudentDashboard() {
       if (active.success && active.session) {
         setActiveSession({
           sessionId:   active.session.sessionId,
-          tutorName:   active.session.tutorName,
+          partnerName: active.session.partnerName,
           subjectName: active.session.subjectName,
         });
       }
@@ -150,7 +151,7 @@ export default function StudentDashboard() {
             <div className="flex-1 min-w-0">
               <p className="text-emerald-400 text-xs font-semibold">Ongoing Session</p>
               <p className="text-white/40 text-xs truncate">
-                {activeSession.subjectName} · with {activeSession.tutorName}
+                {activeSession.subjectName} · with {activeSession.partnerName}
               </p>
             </div>
             <ChevronRight size={14} className="text-emerald-400/50 flex-shrink-0" />
@@ -179,9 +180,17 @@ export default function StudentDashboard() {
         />
       </motion.div>
 
+      {/* ── Streak ── */}
+      <motion.div custom={3} variants={fade} initial="initial" animate="animate">
+        {streakLoading
+          ? <StreakCardSkeleton />
+          : <StreakCard streak={streak} />
+        }
+      </motion.div>
+
       {/* ── Daily tasks ── */}
       {(loading || dailyTasks.length > 0) && (
-        <motion.div custom={3} variants={fade} initial="initial" animate="animate">
+        <motion.div custom={4} variants={fade} initial="initial" animate="animate">
           <DashboardSection
             title={`Daily Tasks${tasksTotal > 0 ? ` (${tasksCompleted}/${tasksTotal})` : ''}`}
             icon={CheckCircle2}
@@ -216,7 +225,7 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Upcoming sessions ── */}
-      <motion.div custom={4} variants={fade} initial="initial" animate="animate">
+      <motion.div custom={5} variants={fade} initial="initial" animate="animate">
         <DashboardSection title="Upcoming Sessions" icon={Calendar} onSeeAll={() => router.push('/sessions')}>
           {loading ? (
             <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-14 animate-pulse" />)}</>
@@ -245,7 +254,7 @@ export default function StudentDashboard() {
 
       {/* ── Available tutors ── */}
       {(loading || tutors.length > 0) && (
-        <motion.div custom={5} variants={fade} initial="initial" animate="animate">
+        <motion.div custom={6} variants={fade} initial="initial" animate="animate">
           <DashboardSection title="Available Now" icon={Search} onSeeAll={() => router.push('/browse')}>
             {loading ? (
               <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-20 animate-pulse" />)}</>
@@ -267,7 +276,7 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Notifications ── */}
-      <motion.div custom={6} variants={fade} initial="initial" animate="animate">
+      <motion.div custom={7} variants={fade} initial="initial" animate="animate">
         <DashboardSection title="Notifications" icon={Bell} onSeeAll={() => router.push('/notifications')}>
           {loading ? (
             <>{[0, 1, 2].map(i => <div key={i} className="glass-soft rounded-2xl h-12 animate-pulse" />)}</>

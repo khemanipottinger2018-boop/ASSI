@@ -1,10 +1,5 @@
 'use client';
 
-// features/assi/AssiFloatingLauncher.tsx
-// Draggable orb launcher.
-// — Panel is always anchored to a safe corner, never clips off screen
-// — Depth-of-field backdrop dims + blurs the animated background when open
-
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import AssiChatBot from './AssiChatBot';

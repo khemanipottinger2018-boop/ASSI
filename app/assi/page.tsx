@@ -58,11 +58,16 @@ type Message = {
   attachments?: { name: string; kind: 'image' | 'doc'; preview: string | null }[];
 };
 
-// Limits: free vs ASSI+ (messages per session, file size MB, max files)
-const LIMITS = {
-  free:  { msgs: 20, fileMB: 5,  maxFiles: 2 },
-  plus:  { msgs: 120, fileMB: 20, maxFiles: 5 },
+// File attachment limits by tier (message limits are now backend-enforced daily per subject)
+const FILE_LIMITS = {
+  free:  { fileMB: 5,  maxFiles: 2 },
+  plus:  { fileMB: 20, maxFiles: 5 },
 };
+
+// Sanitize a subject name into a safe Redis key segment — must match backend tutor.ts
+function subjectKey(name: string): string {
+  return 'ai_tutor_' + name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
 
 // ── Subject picker ────────────────────────────────────────────────
 function SubjectPicker({
@@ -351,17 +356,18 @@ function ChatView({
   const config  = useMemo(() => subjectToModel(subject.name, subject.category), [subject]);
   const SubIcon = subject.id === 'casual' ? MessageSquare : config.icon;
 
-  const limits = isPlus ? LIMITS.plus : LIMITS.free;
+  const fileLimits = isPlus ? FILE_LIMITS.plus : FILE_LIMITS.free;
 
-  const [messages,  setMessages]  = useState<Message[]>([
+  const [messages,    setMessages]    = useState<Message[]>([
     { role: 'assistant', content: getGreeting(subject, username) },
   ]);
-  const [input,     setInput]     = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [isTyping,  setIsTyping]  = useState(false);
-  const [locked,    setLocked]    = useState(false);
-  const [msgCount,  setMsgCount]  = useState(0);
-  const [files,     setFiles]     = useState<AttachedFile[]>([]);
+  const [input,       setInput]       = useState('');
+  const [loading,     setLoading]     = useState(false);
+  const [isTyping,    setIsTyping]    = useState(false);
+  const [locked,      setLocked]      = useState(false);
+  const [quotaUsed,   setQuotaUsed]   = useState(0);
+  const [quotaLimit,  setQuotaLimit]  = useState<number | null>(20);
+  const [files,       setFiles]       = useState<AttachedFile[]>([]);
   const [recording, setRecording] = useState(false);
   const [recError,  setRecError]  = useState<string | null>(null);
 
@@ -374,14 +380,31 @@ function ChatView({
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping]);
   useEffect(() => { inputRef.current?.focus(); }, []);
 
+  // Fetch per-subject daily quota from backend whenever the subject changes
+  useEffect(() => {
+    const key = subjectKey(subject.name);
+    fetch(`${API_URL}/api/ai/tutor/usage?subjects=${key}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          const used = data.usage[key] ?? 0;
+          setQuotaUsed(used);
+          setQuotaLimit(data.limit ?? null);
+          if (data.limit !== null && used >= data.limit) setLocked(true);
+          else setLocked(false);
+        }
+      })
+      .catch(() => { /* fail open — don't block the UI */ });
+  }, [subject]);
+
   // ── File attachment ──────────────────────────────────────
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = '';
-    const remaining = limits.maxFiles - files.length;
+    const remaining = fileLimits.maxFiles - files.length;
     const toAdd = picked.slice(0, remaining);
     toAdd.forEach(file => {
-      if (file.size > limits.fileMB * 1024 * 1024) return; // silently skip oversized
+      if (file.size > fileLimits.fileMB * 1024 * 1024) return; // silently skip oversized
       const kind: 'image' | 'doc' = file.type.startsWith('image/') ? 'image' : 'doc';
       const id = crypto.randomUUID();
       if (kind === 'image') {
@@ -453,10 +476,6 @@ function ChatView({
     const trimmed = input.trim();
     if ((!trimmed && files.length === 0) || loading || locked) return;
 
-    const newCount = msgCount + 1;
-    setMsgCount(newCount);
-    if (newCount >= limits.msgs) setLocked(true);
-
     const attachments = files.map(f => ({ name: f.file.name, kind: f.kind, preview: f.preview }));
     const userMsg: Message = { role: 'user', content: trimmed || '(attached files)', attachments };
 
@@ -469,7 +488,7 @@ function ChatView({
     setIsTyping(true);
 
     try {
-      const res = await fetch(`${API_URL}/api/ai/assist`, {
+      const res = await fetch(`${API_URL}/api/ai/tutor`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({
           message:   trimmed,
@@ -484,20 +503,29 @@ function ChatView({
 
       if (res.status === 429) {
         setLocked(true);
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Message limit reached. Upgrade to ASSI+ to continue.' }]);
+        setQuotaUsed(quotaLimit ?? 20);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `You've used your 20 daily messages for ${subject.name}. Resets at midnight — or upgrade to ASSI+ for unlimited.`,
+        }]);
         return;
       }
 
       const data = await res.json();
       if (!res.ok || !data?.reply) throw new Error();
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply, modelDisplay: config.display }]);
+      setQuotaUsed(prev => {
+        const next = prev + 1;
+        if (quotaLimit !== null && next >= quotaLimit) setLocked(true);
+        return next;
+      });
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection dropped — try sending that again.' }]);
     } finally {
       setIsTyping(false);
       setLoading(false);
     }
-  }, [input, files, loading, locked, msgCount, messages, subject, config, limits]);
+  }, [input, files, loading, locked, quotaUsed, quotaLimit, messages, subject, config]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -510,9 +538,9 @@ function ChatView({
   }
 
   const colorClass   = subject.id === 'casual' ? 'text-orange-400' : config.color;
-  const msgsLeft     = limits.msgs - msgCount;
-  const showMsgWarn  = msgsLeft <= 5 && msgsLeft > 0;
-  const canAttach    = files.length < limits.maxFiles;
+  const msgsLeft     = quotaLimit !== null ? Math.max(0, quotaLimit - quotaUsed) : null;
+  const showMsgWarn  = msgsLeft !== null && msgsLeft <= 5 && msgsLeft > 0;
+  const canAttach    = files.length < fileLimits.maxFiles;
 
   return (
     // overflow-hidden is critical — prevents the AppShell scroll from
@@ -547,7 +575,10 @@ function ChatView({
               <span className={`text-[10px] font-medium ${colorClass}`}>{config.display}</span>
               <span className="text-white/18 text-[10px]">model</span>
               <span className="text-white/15 text-[10px]">·</span>
-              <span className="text-white/22 text-[10px]">{msgsLeft} msg{msgsLeft !== 1 ? 's' : ''} left</span>
+              {msgsLeft !== null
+                ? <span className="text-white/22 text-[10px]">{msgsLeft} msg{msgsLeft !== 1 ? 's' : ''} left today</span>
+                : <span className="text-white/22 text-[10px]">Unlimited</span>
+              }
             </div>
           </div>
         </div>
@@ -610,7 +641,7 @@ function ChatView({
             style={{ background: locked ? 'rgba(249,115,22,0.06)' : 'rgba(255,255,255,0.02)' }}>
             {recError && <span className="text-red-400 text-xs flex items-center gap-1.5"><MicOff size={11} /> {recError}</span>}
             {showMsgWarn && !locked && (
-              <span className="text-white/35 text-xs">{msgsLeft} message{msgsLeft !== 1 ? 's' : ''} left in free tier</span>
+              <span className="text-white/35 text-xs">{msgsLeft} message{msgsLeft !== 1 ? 's' : ''} left today for {subject.name}</span>
             )}
             {locked && (
               <>
@@ -662,7 +693,7 @@ function ChatView({
             <button
               onClick={() => canAttach && fileRef.current?.click()}
               disabled={locked || !canAttach}
-              title={canAttach ? 'Attach file or image' : `Max ${limits.maxFiles} files`}
+              title={canAttach ? 'Attach file or image' : `Max ${fileLimits.maxFiles} files`}
               className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-white/28 hover:text-white/65 hover:bg-white/6 transition disabled:opacity-30 mb-0.5"
             >
               <Paperclip size={15} />
@@ -718,7 +749,7 @@ function ChatView({
           <div className="flex items-center justify-between mt-1.5 px-1">
             <p className="text-white/14 text-[10px]">Shift + Enter for new line</p>
             <p className="text-white/14 text-[10px]">
-              Max {limits.fileMB}MB per file · {limits.maxFiles} files · {limits.msgs} messages
+              Max {fileLimits.fileMB}MB per file · {fileLimits.maxFiles} files · {quotaLimit !== null ? `${quotaLimit} messages/day` : 'Unlimited messages'}
               {!isPlus && <span className="text-orange-400/50"> — ASSI+ removes limits</span>}
             </p>
           </div>

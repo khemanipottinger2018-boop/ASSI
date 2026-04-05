@@ -29,7 +29,7 @@ type ActiveSession = {
   sessionId:   string;
   partnerName: string;
   subjectName: string;
-  startedAt:   string;
+  startedAt:   string | null;
 };
 
 function elapsed(ts: number) {
@@ -69,7 +69,7 @@ export default function TutorHomeSelector() {
         const s = activeData.value.session;
         setActiveSession({
           sessionId:   s.sessionId,
-          partnerName: s.tutorName,
+          partnerName: s.partnerName,
           subjectName: s.subjectName,
           startedAt:   s.startedAt,
         });
