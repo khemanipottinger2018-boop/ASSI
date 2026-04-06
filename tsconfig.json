@@ -65,7 +65,8 @@
     "hooks/**/*",
     "lib/**/*",
     "types/**/*",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    "globals.d.ts"
   ],
   "exclude": [
     "node_modules",
