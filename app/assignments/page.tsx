@@ -96,7 +96,8 @@ function DropZone({ files, onAdd, onRemove, accent = 'orange' }: {
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); setDrag(false);
+    e.preventDefault(); 
+    setDrag(false);
     const dropped = Array.from(e.dataTransfer.files);
     if (dropped.length) onAdd(dropped);
   }, [onAdd]);
@@ -112,8 +113,16 @@ function DropZone({ files, onAdd, onRemove, accent = 'orange' }: {
           drag ? colors[accent] : 'border-white/10 hover:border-white/18 hover:bg-white/2'
         }`}
       >
-        <input ref={inputRef} type="file" multiple accept={ACCEPTED} className="hidden"
-          onChange={e => { if (e.target.files) onAdd(Array.from(e.target.files)); }} />
+        <input 
+          ref={inputRef} 
+          type="file" 
+          multiple 
+          accept={ACCEPTED} 
+          className="hidden"
+          onChange={e => { 
+            if (e.target.files) onAdd(Array.from(e.target.files)); 
+          }} 
+        />
         <Upload size={20} className="text-white/20 mx-auto mb-2.5" />
         <p className="text-white/45 text-sm font-medium">Drop files or click to browse</p>
         <p className="text-white/22 text-xs mt-1">PDF, Word, images supported</p>
@@ -126,7 +135,10 @@ function DropZone({ files, onAdd, onRemove, accent = 'orange' }: {
             <p className="text-white/65 text-xs font-medium truncate">{f.file.name}</p>
             <p className="text-white/22 text-[10px]">{(f.file.size / 1024).toFixed(0)} KB</p>
           </div>
-          <button onClick={() => onRemove(f.id)} className="text-white/22 hover:text-red-400 transition">
+          <button 
+            onClick={() => onRemove(f.id)} 
+            className="text-white/22 hover:text-red-400 transition"
+          >
             <X size={12} />
           </button>
         </div>
@@ -151,8 +163,10 @@ function SectionLabel({ icon: Icon, label, color }: {
 
 function BackBtn({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
   return (
-    <button onClick={onClick}
-      className="flex items-center gap-1.5 text-white/30 hover:text-white/60 text-xs transition mb-2">
+    <button 
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-white/30 hover:text-white/60 text-xs transition mb-2"
+    >
       <ArrowLeft size={12} /> {label}
     </button>
   );
@@ -238,16 +252,32 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
       <div className="glass rounded-3xl p-5 space-y-4">
         <SectionLabel icon={Zap} label="Assignment details" color="text-orange-400" />
         <div className="space-y-2.5">
-          <input value={subject} onChange={e => setSubject(e.target.value)}
+          <input 
+            value={subject} 
+            onChange={e => setSubject(e.target.value)}
             placeholder="Subject (e.g. Mathematics, Chemistry)"
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-orange-400/25 transition" />
-          <textarea value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="Instructions or context for the tutor…" rows={3}
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-orange-400/25 transition resize-none" />
-          <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)}
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white/55 outline-none focus:ring-1 focus:ring-orange-400/25 transition" />
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-orange-400/25 transition" 
+          />
+          <textarea 
+            value={notes} 
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Instructions or context for the tutor…" 
+            rows={3}
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-orange-400/25 transition resize-none" 
+          />
+          <input 
+            type="datetime-local" 
+            value={deadline} 
+            onChange={e => setDeadline(e.target.value)}
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white/55 outline-none focus:ring-1 focus:ring-orange-400/25 transition" 
+          />
         </div>
-        <DropZone files={files} onAdd={addFiles} onRemove={id => setFiles(p => p.filter(f => f.id !== id))} accent="orange" />
+        <DropZone 
+          files={files} 
+          onAdd={addFiles} 
+          onRemove={id => setFiles(p => p.filter(f => f.id !== id))} 
+          accent="orange" 
+        />
       </div>
 
       <div className="glass rounded-3xl p-4">
@@ -257,10 +287,13 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
             { id: 'auto',   label: 'Automatic',    sub: 'Best match selected for you' },
             { id: 'manual', label: 'I will choose', sub: 'Pick from a recommended list' },
           ] as const).map(opt => (
-            <button key={opt.id} onClick={() => setMatching(opt.id)}
+            <button 
+              key={opt.id} 
+              onClick={() => setMatching(opt.id)}
               className={`rounded-2xl p-3 text-left border transition ${
                 matching === opt.id ? 'bg-orange-400/8 border-orange-400/25' : 'glass-soft border-white/6 hover:border-white/12'
-              }`}>
+              }`}
+            >
               <p className={`text-sm font-medium ${matching === opt.id ? 'text-orange-400' : 'text-white/50'}`}>{opt.label}</p>
               <p className="text-white/28 text-[11px] mt-0.5">{opt.sub}</p>
             </button>
@@ -268,8 +301,11 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
         </div>
       </div>
 
-      <button onClick={handleSubmit} disabled={loading || !subject.trim() || files.length === 0}
-        className="w-full py-3.5 rounded-2xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 disabled:opacity-35 transition flex items-center justify-center gap-2 shadow-lg shadow-black/20">
+      <button 
+        onClick={handleSubmit} 
+        disabled={loading || !subject.trim() || files.length === 0}
+        className="w-full py-3.5 rounded-2xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 disabled:opacity-35 transition flex items-center justify-center gap-2 shadow-lg shadow-black/20"
+      >
         {loading
           ? <><Loader2 size={14} className="animate-spin" /> Finding tutors…</>
           : <>Submit assignment <ChevronRight size={14} /></>
@@ -316,14 +352,26 @@ function ModeGuide({ onBack, initialSubject }: { onBack: () => void; initialSubj
         </div>
 
         <div className="space-y-2.5">
-          <input value={subject} onChange={e => setSubject(e.target.value)}
+          <input 
+            value={subject} 
+            onChange={e => setSubject(e.target.value)}
             placeholder="Subject or topic"
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-emerald-400/25 transition" />
-          <textarea value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="What do you need help with specifically?" rows={3}
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-emerald-400/25 transition resize-none" />
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-emerald-400/25 transition" 
+          />
+          <textarea 
+            value={notes} 
+            onChange={e => setNotes(e.target.value)}
+            placeholder="What do you need help with specifically?" 
+            rows={3}
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/22 outline-none focus:ring-1 focus:ring-emerald-400/25 transition resize-none" 
+          />
         </div>
-        <DropZone files={files} onAdd={addFiles} onRemove={id => setFiles(p => p.filter(f => f.id !== id))} accent="emerald" />
+        <DropZone 
+          files={files} 
+          onAdd={addFiles} 
+          onRemove={id => setFiles(p => p.filter(f => f.id !== id))} 
+          accent="emerald" 
+        />
       </div>
 
       <div className="glass rounded-3xl p-4 space-y-3">
@@ -343,8 +391,11 @@ function ModeGuide({ onBack, initialSubject }: { onBack: () => void; initialSubj
         ))}
       </div>
 
-      <button onClick={handleStart} disabled={loading || !subject.trim()}
-        className="w-full py-3.5 rounded-2xl font-semibold text-sm disabled:opacity-35 transition flex items-center justify-center gap-2 bg-emerald-500/12 border border-emerald-500/22 text-emerald-400 hover:bg-emerald-500/20">
+      <button 
+        onClick={handleStart} 
+        disabled={loading || !subject.trim()}
+        className="w-full py-3.5 rounded-2xl font-semibold text-sm disabled:opacity-35 transition flex items-center justify-center gap-2 bg-emerald-500/12 border border-emerald-500/22 text-emerald-400 hover:bg-emerald-500/20"
+      >
         {loading
           ? <><Loader2 size={14} className="animate-spin" /> Finding a tutor…</>
           : <>Start guided session <ChevronRight size={14} /></>
@@ -405,9 +456,12 @@ function LikelihoodBar({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-1 rounded-full bg-white/8 overflow-hidden">
-        <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+        <motion.div 
+          initial={{ width: 0 }} 
+          animate={{ width: `${pct}%` }}
           transition={{ duration: 0.55, ease: 'easeOut' }}
-          className={`h-full rounded-full ${col}`} />
+          className={`h-full rounded-full ${col}`} 
+        />
       </div>
       <span className={`text-[11px] font-semibold w-7 text-right ${text}`}>{pct}%</span>
     </div>
@@ -448,9 +502,12 @@ function ModeReview({ onBack }: { onBack: () => void }) {
         </div>
         <div className="flex gap-1.5">
           {[0, 1, 2].map(i => (
-            <motion.div key={i} animate={{ opacity: [0.25, 1, 0.25] }}
+            <motion.div 
+              key={i} 
+              animate={{ opacity: [0.25, 1, 0.25] }}
               transition={{ duration: 0.9, delay: i * 0.2, repeat: Infinity }}
-              className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+              className="w-1.5 h-1.5 rounded-full bg-purple-400" 
+            />
           ))}
         </div>
       </motion.div>
@@ -494,10 +551,13 @@ function ModeReview({ onBack }: { onBack: () => void }) {
             const iconCl   = isHigh ? 'text-red-400' : isMed ? 'text-yellow-400' : 'text-emerald-400';
 
             return (
-              <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              <motion.div 
+                key={i} 
+                initial={{ opacity: 0, y: 8 }} 
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
-                className={`glass rounded-2xl border overflow-hidden ${borderCl}`}>
-
+                className={`glass rounded-2xl border overflow-hidden ${borderCl}`}
+              >
                 <div className={`px-4 py-3 ${bgTop}`}>
                   <div className="flex items-start gap-2 mb-2">
                     <StatusIcon size={12} className={`${iconCl} flex-shrink-0 mt-0.5`} />
@@ -548,27 +608,41 @@ function ModeReview({ onBack }: { onBack: () => void }) {
 
         <div className="flex items-center gap-1 glass-soft rounded-xl p-1 w-fit">
           {(['paste', 'upload'] as const).map(m => (
-            <button key={m} onClick={() => setMode(m)}
+            <button 
+              key={m} 
+              onClick={() => setMode(m)}
               className={`px-4 py-1.5 rounded-lg text-xs font-medium transition ${
                 mode === m ? 'bg-white/10 text-white' : 'text-white/32 hover:text-white/55'
-              }`}>
+              }`}
+            >
               {m === 'paste' ? 'Paste text' : 'Upload file'}
             </button>
           ))}
         </div>
 
         {mode === 'paste' ? (
-          <textarea value={text} onChange={e => setText(e.target.value)}
-            placeholder="Paste your essay, report, or assignment here…" rows={8}
-            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/18 outline-none focus:ring-1 focus:ring-purple-400/25 transition resize-none leading-relaxed" />
+          <textarea 
+            value={text} 
+            onChange={e => setText(e.target.value)}
+            placeholder="Paste your essay, report, or assignment here…" 
+            rows={8}
+            className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/18 outline-none focus:ring-1 focus:ring-purple-400/25 transition resize-none leading-relaxed" 
+          />
         ) : (
-          <DropZone files={files} onAdd={addFiles} onRemove={id => setFiles(p => p.filter(f => f.id !== id))} accent="purple" />
+          <DropZone 
+            files={files} 
+            onAdd={addFiles} 
+            onRemove={id => setFiles(p => p.filter(f => f.id !== id))} 
+            accent="purple" 
+          />
         )}
       </div>
 
-      <button onClick={handleScan}
+      <button 
+        onClick={handleScan}
         disabled={mode === 'paste' ? text.trim().length < 20 : files.length === 0}
-        className="w-full py-3.5 rounded-2xl font-semibold text-sm disabled:opacity-35 transition flex items-center justify-center gap-2 bg-purple-500/12 border border-purple-500/22 text-purple-300 hover:bg-purple-500/20">
+        className="w-full py-3.5 rounded-2xl font-semibold text-sm disabled:opacity-35 transition flex items-center justify-center gap-2 bg-purple-500/12 border border-purple-500/22 text-purple-300 hover:bg-purple-500/20"
+      >
         <Sparkles size={14} /> Analyse my work
       </button>
     </motion.div>
@@ -582,9 +656,14 @@ function ModeSelector({ subject, onSelect }: {
   subject?: string; onSelect: (m: Exclude<Mode, 'select'>) => void;
 }) {
   return (
-    <motion.div key="selector" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.26 }} className="space-y-3">
-
+    <motion.div 
+      key="selector" 
+      initial={{ opacity: 0, y: 10 }} 
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }} 
+      transition={{ duration: 0.26 }} 
+      className="space-y-3"
+    >
       <div className="px-1 mb-5">
         <h1 className="text-white font-semibold text-xl tracking-tight">Assignments</h1>
         <p className="text-white/35 text-sm mt-1">
@@ -593,11 +672,15 @@ function ModeSelector({ subject, onSelect }: {
       </div>
 
       {MODES.map((m, i) => (
-        <motion.button key={m.id} onClick={() => onSelect(m.id)}
-          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+        <motion.button 
+          key={m.id} 
+          onClick={() => onSelect(m.id)}
+          initial={{ opacity: 0, y: 10 }} 
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.07, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           whileTap={{ scale: 0.985 }}
-          className={`w-full glass rounded-3xl p-5 text-left hover:bg-white/4 transition group border ${m.border}`}>
+          className={`w-full glass rounded-3xl p-5 text-left hover:bg-white/4 transition group border ${m.border}`}
+        >
           <div className="flex items-center gap-4">
             <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center flex-shrink-0 ${m.iconBg}`}>
               <m.icon size={19} className={m.iconCl} />
@@ -615,10 +698,10 @@ function ModeSelector({ subject, onSelect }: {
 }
 
 // ─────────────────────────────────────────────
-// Inner — reads search params
+// Content Component (Uses useSearchParams safely)
 // ─────────────────────────────────────────────
-function AssignmentsInner() {
-  const searchParams   = useSearchParams();
+function AssignmentsContent() {
+  const searchParams = useSearchParams();
   const initialSubject = searchParams.get('subject') ?? undefined;
   const [mode, setMode] = useState<Mode>('select');
 
@@ -642,14 +725,21 @@ function AssignmentsInner() {
   );
 }
 
+// ─────────────────────────────────────────────
+// Main Page (with proper Suspense boundary)
+// ─────────────────────────────────────────────
 export default function AssignmentsPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <span className="text-white/30 text-xs tracking-widest uppercase animate-pulse">Loading…</span>
-      </div>
-    }>
-      <AssignmentsInner />
+    <Suspense 
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <span className="text-white/30 text-xs tracking-widest uppercase animate-pulse">
+            Loading assignments...
+          </span>
+        </div>
+      }
+    >
+      <AssignmentsContent />
     </Suspense>
   );
 }
