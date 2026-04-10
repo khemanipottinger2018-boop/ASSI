@@ -46,7 +46,7 @@ export default function StatusIndicator({ loading, error, totalTutors, hasSelect
           <Users size={13} className="flex-shrink-0 text-white/80" />
           <span>
             <span className="font-bold">{totalTutors}</span>
-            {' '}tutor{totalTutors !== 1 ? 's' : ''} registered —{' '}
+            {' '}tutor{totalTutors !== 1 ? 's' : ''} registered,{' '}
             <span className="text-white/70">pick Live Tutor to see who's available</span>
           </span>
         </motion.div>
@@ -59,7 +59,7 @@ export default function StatusIndicator({ loading, error, totalTutors, hasSelect
           style={{ background: '#ea6000', boxShadow: '0 4px 16px rgba(234,96,0,0.35)' }}
         >
           <BookOpen size={13} className="flex-shrink-0 text-white/80" />
-          <span>No tutors yet — <span className="text-white/70">try AI Assistant or submit an assignment</span></span>
+          <span>Sorry, there are no tutors available yet, <span className="text-white/70">try AI Assistant or submit an assignment</span></span>
         </motion.div>
       )}
     </AnimatePresence>

@@ -43,7 +43,7 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
       : window.dispatchEvent(new Event('assi:open-login'));
   }, [onOpenLogin]);
 
-  // AI → /assi with subject pre-selected
+  // AI > /assi with subject pre-selected
   const handleAI = useCallback(() => {
     if (!user) return requireAuth();
     const params = selectedSubject
@@ -52,14 +52,14 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
     router.push(`/assi${params}`);
   }, [user, router, selectedSubject, requireAuth]);
 
-  // Live tutor — unchanged
+  // Live tutor, unchanged
   const handleLiveTutor = useCallback(() => {
     if (!user) return requireAuth();
     if (!selectedSubject) return;
     router.push(`/live-chat?subject=${selectedSubject.name}&subjectId=${selectedSubject.id}`);
   }, [user, router, selectedSubject, requireAuth]);
 
-  // Assignment → /assignments with subject param
+  // Assignment -> /assignments with subject param
   const handleAssignment = useCallback(() => {
     if (!user) return requireAuth();
     const params = selectedSubject
@@ -86,20 +86,9 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-30 w-full max-w-lg mx-auto"
-        style={{
-          background:           'rgba(255,255,255,0.10)',
-          border:               '1px solid rgba(255,255,255,0.20)',
-          borderRadius:         28,
-          boxShadow:            '0 8px 32px rgba(0,0,0,0.25), 0 32px 80px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.25)',
-          backdropFilter:       'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          padding:              28,
-        }}
+        className="glass relative z-30 w-full max-w-lg mx-auto"
+        style={{ borderRadius: 28, padding: 28 }}
       >
-        <div className="absolute inset-x-8 top-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent)' }}
-        />
 
         <div className="mb-6">
           <p className="text-white/40 text-xs font-semibold tracking-[0.18em] uppercase mb-1">
@@ -128,7 +117,7 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
           totalTutors={selectedSubject?.tutorCount ?? 0}
         />
 
-        <div className="my-4 border-t border-white/10" />
+        <div className="my-4 glass-divider" />
 
         <div className={!selectedSubject ? 'opacity-40 pointer-events-none select-none' : ''}>
           <ServiceButtons
