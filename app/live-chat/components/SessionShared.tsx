@@ -11,32 +11,48 @@ import {
 import type { ChatMessage, Participant, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 
 /* ── Timer ── */
+/**
+ * SessionTimer
+ *
+ * When `endsAt` (ms epoch) is provided, derives remaining time as
+ * (endsAt - Date.now()) at render time — no drift, always fresh.
+ * Falls back to startedAt-based elapsed/countdown for legacy callers.
+ *
+ * The setInterval here is only a render trigger; the actual time value
+ * is computed fresh on every render, not accumulated.
+ */
 export function SessionTimer({
   className = '',
   startedAt,
   mode = 'elapsed',
   limitSecs,
+  endsAt,
 }: {
   className?: string;
   startedAt?: number;
   mode?: 'elapsed' | 'countdown';
   limitSecs?: number;
+  endsAt?: number;  // backend epoch — when provided, drives countdown with no drift
 }) {
-  const [s, setS] = useState(() =>
-    startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0
-  );
+  const [, setTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setS(n => n + 1), 1000);
+    const t = setInterval(() => setTick(n => n + 1), 1000);
     return () => clearInterval(t);
   }, []);
 
   let display: number;
   let warning = false;
-  if (mode === 'countdown' && limitSecs !== undefined) {
-    display  = Math.max(0, limitSecs - s);
-    warning  = display <= 300; // amber under 5 min
+
+  if (endsAt !== undefined) {
+    // Backend-authoritative countdown — derive from epoch, never accumulate
+    display = Math.max(0, Math.floor((endsAt - Date.now()) / 1000));
+    warning = display <= 300;
+  } else if (mode === 'countdown' && limitSecs !== undefined && startedAt !== undefined) {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    display = Math.max(0, limitSecs - elapsed);
+    warning = display <= 300;
   } else {
-    display = s;
+    display = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
   }
 
   const mm  = Math.floor(display / 60);
@@ -47,6 +63,59 @@ export function SessionTimer({
     <span className={`font-mono tabular-nums text-xs ${col}`}>
       {mm}:{ss}
     </span>
+  );
+}
+
+/* ── Grace State Banner ── */
+/**
+ * GraceStateBanner
+ *
+ * Shown when session status is 'host_left_grace'. Countdown derives
+ * from graceExpiresAt (ms epoch) — computed fresh each render, no drift.
+ * Offers two actions: leave immediately or wait for the host to return.
+ */
+export function GraceStateBanner({
+  graceExpiresAt,
+  onLeave,
+  onWait,
+}: {
+  graceExpiresAt: number;
+  onLeave: () => void;
+  onWait?: () => void;
+}) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const remainingSec = Math.max(0, Math.floor((graceExpiresAt - Date.now()) / 1000));
+  const mm = Math.floor(remainingSec / 60);
+  const ss = String(remainingSec % 60).padStart(2, '0');
+
+  return (
+    <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 bg-amber-500/8 border-b border-amber-500/15">
+      <div className="flex items-center gap-2">
+        <span className="text-amber-400/80 text-[11px]">Host has left — session ends in</span>
+        <span className="font-mono text-amber-300 text-[11px] tabular-nums">{mm}:{ss}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {onWait && (
+          <button
+            onClick={onWait}
+            className="px-2.5 py-1 rounded-lg glass-soft text-white/45 text-[11px] hover:text-white/70 transition"
+          >
+            Wait for Host
+          </button>
+        )}
+        <button
+          onClick={onLeave}
+          className="px-2.5 py-1 rounded-lg bg-red-500/15 border border-red-500/20 text-red-400 text-[11px] hover:bg-red-500/25 transition"
+        >
+          Leave Session
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -77,6 +146,7 @@ interface HeaderProps {
   startedAt?: number;
   timerMode?: 'elapsed' | 'countdown';
   timerLimitSecs?: number;
+  endsAt?: number;   // backend epoch — drives drift-free countdown when provided
   // onEnd is optional — omit to hide the end-session button (e.g. non-owners in group study)
   onEnd?: () => void; confirmingEnd?: boolean;
   onCancelEnd?: () => void; onConfirmEnd?: () => void;
@@ -85,7 +155,7 @@ interface HeaderProps {
 
 export function SessionHeader({
   title, subtitle, connected, participantCount,
-  startedAt, timerMode = 'elapsed', timerLimitSecs,
+  startedAt, timerMode = 'elapsed', timerLimitSecs, endsAt,
   onEnd, confirmingEnd, onCancelEnd, onConfirmEnd, rightSlot, badge,
 }: HeaderProps) {
   return (
@@ -111,6 +181,7 @@ export function SessionHeader({
         startedAt={startedAt}
         mode={timerMode}
         limitSecs={timerLimitSecs}
+        endsAt={endsAt}
       />
       {rightSlot}
 

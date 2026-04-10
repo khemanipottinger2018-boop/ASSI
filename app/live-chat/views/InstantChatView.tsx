@@ -28,13 +28,13 @@ import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
 import { useChatRoom }      from '@/features/live-chat/hooks/useChatRoom';
 import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
 import { useTyping }        from '@/features/live-chat/hooks/useTyping';
-import { useSessionEvents } from '@/features/live-chat/hooks/useSessionEvents';
+import { useLiveSession }   from '@/features/live-chat/hooks/useLiveSession';
 import { useSessionStore }  from '@/features/live-chat/store/useSessionStore';
 import InviteModal          from '../components/InviteModal';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, SessionWaitingRoom, PausedBanner,
-  ActivityFeed, useActivityEvents,
+  GraceStateBanner, ActivityFeed, useActivityEvents,
 } from '../components/SessionShared';
 import type { SessionMeta, InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
@@ -72,14 +72,13 @@ export function InstantChatView({
   const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
   const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
-  // ── Centralized session lifecycle — single .on() binding per event ──
-  useSessionEvents(sessionId);
-  const { status, endReason, setStatus, setEndReason, reset } = useSessionStore();
-  const sessionEnded  = status === 'ended';
-  const sessionPaused = status === 'paused';
-
-  // Session-aware reset: only clears state when sessionId changes (not same-session re-renders)
-  useEffect(() => { reset(sessionId); }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Backend-authoritative session state — all transitions via useLiveSession ──
+  const { hydrating, status, endReason, endsAt, graceExpiresAt } = useLiveSession(sessionId);
+  // Optimistic updates (handleEnd) still need direct store access
+  const { setStatus, setEndReason } = useSessionStore();
+  const sessionEnded      = status === 'ended';
+  const sessionPaused     = status === 'paused';
+  const sessionGrace      = status === 'host_left_grace';
 
   /* ── Tutor: needs to accept before joining the room ── */
   const [accepted,      setAccepted]      = useState(role === 'student');
@@ -89,7 +88,6 @@ export function InstantChatView({
   const [input,         setInput]         = useState('');
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [pendingInvite, setPendingInvite] = useState<InviteRequest | null>(null);
-  const [hydrating,     setHydrating]     = useState(true);
 
   const [showTools,    setShowTools]    = useState(false);
   const joinedRef      = useRef(false);
@@ -113,38 +111,17 @@ export function InstantChatView({
     clearActivityInterval();
   }, []);
 
-  /* ── Hydrate: resolve session state on mount ── */
+  /* ── Seed peer/accept state from hydrated session status ── */
+  // useLiveSession fetches the session; once hydrated, derive UI-local state
+  // from the store status (peerJoined, accepted). This is the only place
+  // local UI state is derived from session status — status itself is NOT set here.
   useEffect(() => {
-    if (!sessionId) return;
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-
-    let cancelled = false;
-    fetch(`${API_URL}/api/live-chat/${sessionId}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        if (cancelled || !d.success || !d.session) return;
-        const { status, tutorId, endedReason } = d.session;
-
-        if (status === 'ended') {
-          setEndReason(endedReason ?? '');
-          setStatus('ended');
-        } else if (status === 'paused') {
-          setStatus('paused');
-          if (tutorId) setPeerJoined(true);
-          if (role === 'tutor' && tutorId === currentUserId) setAccepted(true);
-        } else if (status === 'active' && tutorId) {
-          setStatus('active');
-          setPeerJoined(true);
-          if (role === 'tutor' && tutorId === currentUserId) setAccepted(true);
-        } else if (status === 'waiting') {
-          setStatus('waiting');
-        }
-      })
-      .catch(() => {}) // hydration failure is non-fatal — socket will catch up
-      .finally(() => { if (!cancelled) setHydrating(false); });
-
-    return () => { cancelled = true; };
-  }, [sessionId, currentUserId, role]);
+    if (hydrating || status === null) return;
+    if (status === 'active' || status === 'paused' || status === 'host_left_grace') {
+      setPeerJoined(true);
+      if (role === 'tutor') setAccepted(true);
+    }
+  }, [hydrating, status, role]);
 
   /* ── Join room once hydrated + accepted + socket ready ── */
   useEffect(() => {
@@ -264,6 +241,13 @@ export function InstantChatView({
     setStatus('ended');
   }, [status, confirmingEnd, role, emit, sessionId, setEndReason, setStatus]);
 
+  // Grace state: tutor/student can leave immediately — no confirmation required.
+  // Emits chat:leave so the backend logs the departure, then navigates out.
+  const handleLeaveGrace = useCallback(() => {
+    emit('chat:leave', sessionId);
+    router.push('/browse');
+  }, [emit, sessionId, router]);
+
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
@@ -381,8 +365,8 @@ export function InstantChatView({
           connected={isConnected}
           participantCount={presence.count}
           startedAt={meta.startedAt}
-          timerMode="countdown"
-          timerLimitSecs={30 * 60}
+          timerLimitSecs={endsAt ? undefined : 30 * 60}
+          endsAt={endsAt ?? undefined}
           onEnd={handleEnd}
           confirmingEnd={confirmingEnd}
           onCancelEnd={() => setConfirmingEnd(false)}
@@ -404,6 +388,12 @@ export function InstantChatView({
         />
 
         {sessionPaused && <PausedBanner />}
+        {sessionGrace && graceExpiresAt && (
+          <GraceStateBanner
+            graceExpiresAt={graceExpiresAt}
+            onLeave={handleLeaveGrace}
+          />
+        )}
 
         <MessageFeed
           messages={messages}

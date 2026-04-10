@@ -1,6 +1,6 @@
 export type SessionType   = 'instant' | 'group_study' | 'conference' | 'admin_broadcast';
 export type SpeakMode     = 'request' | 'open';
-export type SessionStatus = 'waiting' | 'active' | 'paused' | 'ended';
+export type SessionStatus = 'waiting' | 'active' | 'paused' | 'ended' | 'host_left_grace';
 
 export type Participant = {
   userId:     string;
@@ -33,14 +33,16 @@ export type InviteRequest = {
 };
 
 export type SessionMeta = {
-  sessionId:       string;
-  type:            SessionType;
-  speakMode:       SpeakMode;
-  hostId:          string;
-  subjectName?:    string;
-  maxParticipants: number;
-  startedAt?:      number;   // ms epoch — from backend Redis/DB, used for real timer
-  isPublic?:       boolean;  // conference only
+  sessionId:        string;
+  type:             SessionType;
+  speakMode:        SpeakMode;
+  hostId:           string;
+  subjectName?:     string;
+  maxParticipants:  number;
+  startedAt?:       number;        // ms epoch — from backend Redis/DB
+  isPublic?:        boolean;       // conference only
+  endsAt?:          number;        // ms epoch — hard session end time from backend
+  graceExpiresAt?:  number;        // ms epoch — host-left grace period expiry
 };
 
 export type ServerToClientEvents = {
@@ -65,8 +67,12 @@ export type ServerToClientEvents = {
   'session:ready':         (p: { sessionId: string }) => void;
   'session:started':       (p: { sessionId: string }) => void;
   'session:paused':        (p: { reason: string }) => void;
-  'session:ended':         (p: { reason: string }) => void;
+  'session:ended':         (p: { sessionId: string; reason: string }) => void;
+  'session:host_left':     (p: { sessionId: string; graceExpiresAt: number }) => void;
+  'session:resumed':       (p: { sessionId: string }) => void;
   'session:participants':  (p: { sessionId: string; participants: Participant[] }) => void;
+
+  'chat:system_message':   (p: { sessionId: string; content: string; timestamp: number }) => void;
 
   'conference:hand_raised':   (p: { sessionId: string; userId: string; username: string }) => void;
   'conference:hand_lowered':  (p: { sessionId: string; userId: string }) => void;

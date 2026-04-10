@@ -22,10 +22,16 @@
  */
 
 import { create } from 'zustand';
-import type { SessionMeta } from '../types/SocketEvents';
+import type { Participant, SessionMeta } from '../types/SocketEvents';
 
 // null = not yet hydrated (initial state before the first fetch resolves)
-export type StoreSessionStatus = 'waiting' | 'active' | 'paused' | 'ended' | null;
+export type StoreSessionStatus = 'waiting' | 'active' | 'paused' | 'ended' | 'host_left_grace' | null;
+
+export type SystemMessage = {
+  id:        string;
+  content:   string;
+  timestamp: number;
+};
 
 export type PendingInvite = {
   sessionId:    string;
@@ -44,16 +50,27 @@ interface SessionStoreState {
   endReason:        string;
   currentSessionId: string | null;
   sessionMeta:      Partial<SessionMeta>;
+  // Backend-authoritative time fields (ms epoch, from Redis)
+  endsAt:           number | null;
+  graceExpiresAt:   number | null;
+  // Live participant list (seeded from API, updated via socket)
+  participants:     Participant[];
+  // System messages injected by chat:system_message events
+  systemMessages:   SystemMessage[];
   // Global invite / upcoming-session notifications (read by SessionInviteBanner)
   pendingInvite:    PendingInvite | null;
   upcomingSession:  UpcomingSession | null;
 
-  setStatus:          (s: StoreSessionStatus) => void;
-  setEndReason:       (r: string) => void;
-  mergeMeta:          (partial: Partial<SessionMeta> & { sessionId: string }) => void;
-  reset:              (sessionId?: string) => void;
-  setPendingInvite:   (invite: PendingInvite | null) => void;
-  setUpcomingSession: (u: UpcomingSession | null) => void;
+  setStatus:             (s: StoreSessionStatus) => void;
+  setEndReason:          (r: string) => void;
+  setEndsAt:             (t: number | null) => void;
+  setGraceExpiresAt:     (t: number | null) => void;
+  setParticipants:       (ps: Participant[]) => void;
+  appendSystemMessage:   (msg: Omit<SystemMessage, 'id'>) => void;
+  mergeMeta:             (partial: Partial<SessionMeta> & { sessionId: string }) => void;
+  reset:                 (sessionId?: string) => void;
+  setPendingInvite:      (invite: PendingInvite | null) => void;
+  setUpcomingSession:    (u: UpcomingSession | null) => void;
 }
 
 export const useSessionStore = create<SessionStoreState>((set) => ({
@@ -61,6 +78,10 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   endReason:        '',
   currentSessionId: null,
   sessionMeta:      {},
+  endsAt:           null,
+  graceExpiresAt:   null,
+  participants:     [],
+  systemMessages:   [],
   pendingInvite:    null,
   upcomingSession:  null,
 
@@ -70,13 +91,32 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
 
   setEndReason: (endReason) => set({ endReason }),
 
+  setEndsAt: (endsAt) => set({ endsAt }),
+
+  setGraceExpiresAt: (graceExpiresAt) => set({ graceExpiresAt }),
+
+  setParticipants: (participants) => set({ participants }),
+
+  appendSystemMessage: (msg) =>
+    set(state => ({
+      systemMessages: [
+        ...state.systemMessages,
+        { ...msg, id: `sys-${msg.timestamp}-${Math.random().toString(36).slice(2)}` },
+      ],
+    })),
+
   // Merge session:updated / session:meta payload — only applies when sessionId
-  // matches, and never overwrites fields absent from the partial payload
+  // matches, and never overwrites fields absent from the partial payload.
+  // Also picks up endsAt and graceExpiresAt when present.
   mergeMeta: (partial) =>
     set(state => {
-      const { sessionId, ...rest } = partial;
+      const { sessionId, endsAt, graceExpiresAt, ...rest } = partial as Partial<SessionMeta> & { sessionId: string; endsAt?: number; graceExpiresAt?: number };
       if (sessionId !== state.currentSessionId) return state;
-      return { sessionMeta: { ...state.sessionMeta, ...rest } };
+      return {
+        sessionMeta:    { ...state.sessionMeta, ...rest },
+        ...(endsAt        != null ? { endsAt }        : {}),
+        ...(graceExpiresAt != null ? { graceExpiresAt } : {}),
+      };
     }),
 
   // Session-aware reset: only clears if the incoming sessionId differs
@@ -90,6 +130,10 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         endReason:        '',
         currentSessionId: sessionId ?? null,
         sessionMeta:      {},
+        endsAt:           null,
+        graceExpiresAt:   null,
+        participants:     [],
+        systemMessages:   [],
       };
     }),
 
