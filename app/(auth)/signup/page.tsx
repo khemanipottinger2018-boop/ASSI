@@ -172,7 +172,7 @@ export default function SignUp() {
   const isBusy = loading || demoLoading;
 
   return (
-    <main className="app-background min-h-screen flex items-center justify-center px-4 py-8">
+    <main className="min-h-screen flex items-center justify-center px-4 py-8">
       <div className="animate-blob fixed top-[-10%] left-[-10%] w-96 h-96 bg-white/5 blur-3xl pointer-events-none" />
       <div className="animate-blob-reverse fixed bottom-[-10%] right-[-10%] w-80 h-80 bg-white/5 blur-3xl pointer-events-none" />
 

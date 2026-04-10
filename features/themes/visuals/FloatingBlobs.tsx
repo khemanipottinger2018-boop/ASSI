@@ -298,9 +298,9 @@ export default function FloatingBlobs() {
   const weatherScale = weatherAuto ? (WEATHER_BLOB_SCALE[currentWeather] ?? 1.0) : 1.0;
   const opacity = getBlobOpacity(timeOfDay, nightIntensity) * weatherScale;
 
-  /* ---------- DARK / LIGHT MODE ---------- */
-  // Clean flat backgrounds — no blobs, no effects
-  if (colorMode === 'dark' || colorMode === 'light') return null;
+  /* ---------- LIGHT MODE ---------- */
+  // Flat light background — no blobs needed
+  if (colorMode === 'light') return null;
 
   /* ---------- SPACE ---------- */
   if (themeGroup === 'space') {

@@ -91,17 +91,6 @@ export default function AnimatedGradient() {
     );
   }
 
-  if (colorMode === 'dark') {
-    return (
-      <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none" style={{ backgroundColor: '#080808' }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(ellipse at 15% 85%, rgba(255,112,60,0.07) 0%, transparent 50%), radial-gradient(ellipse at 85% 15%, rgba(255,202,79,0.05) 0%, transparent 50%)',
-        }} />
-      </div>
-    );
-  }
-
   const baseGradient  = resolveGradient(themeGroup, themeVariant as string);
   const atmosphereKey = `${themeGroup}_${themeVariant}`;
   const atmosphere    = ATMOSPHERE[atmosphereKey] ?? '';
@@ -158,6 +147,11 @@ export default function AnimatedGradient() {
           transition: 'background 4s ease',
           pointerEvents: 'none',
         }} />
+      )}
+
+      {/* Dark color mode: extra overlay so panels still feel dark against the gradient */}
+      {colorMode === 'dark' && (
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.28)', pointerEvents: 'none' }} />
       )}
 
       {/* Space / cyberpunk: extra deep darkness */}
