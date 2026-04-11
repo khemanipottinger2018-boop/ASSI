@@ -11,12 +11,12 @@
   --assi-bg:
     radial-gradient(
       1200px 700px at 50% 15%,
-      rgba(255, 140, 90, 0.45),
+      rgba(255, 140, 90, 0.28),
       transparent 60%
     ),
     radial-gradient(
       900px 600px at 10% 90%,
-      rgba(255, 80, 80, 0.35),
+      rgba(255, 80, 80, 0.18),
       transparent 65%
     ),
     linear-gradient(135deg, #ff2d2d, #ff5a1f, #ff7a18);
@@ -312,6 +312,31 @@ body {
    ===================================================== */
 .app-background {
   background: var(--assi-bg);
+}
+
+/* ── Workspace: neutral focused canvas ──────────────────────────
+   Applied to /live-chat and any learning surface. Suppresses the
+   theme gradient bleed so students work in a calm, readable space.
+   The ASSI theme still lives behind it — dims to near-neutral.
+───────────────────────────────────────────────────────────────── */
+[data-layout="workspace"] {
+  background: rgba(7, 7, 13, 0.74);
+}
+
+[data-color-mode="light"] [data-layout="workspace"] {
+  background: rgba(248, 248, 252, 0.90);
+}
+
+/* ── ASSI orb idle breathing ─────────────────────────────────
+   Gentle glow pulse to signal AI presence without distracting.
+───────────────────────────────────────────────────────────── */
+@keyframes orb-breathe {
+  0%,  100% { box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 0 rgba(255,120,60,0.0), inset 0 0 0 1.5px rgba(255,255,255,0.22); }
+  50%       { box-shadow: 0 8px 24px rgba(0,0,0,0.4), 0 0 0 6px rgba(255,120,60,0.18), inset 0 0 0 1.5px rgba(255,255,255,0.22); }
+}
+
+.assi-orb-idle {
+  animation: orb-breathe 3.6s ease-in-out infinite;
 }
 
 .app-vignette {

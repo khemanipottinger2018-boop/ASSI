@@ -3,10 +3,11 @@
 // app/live-chat/components/SessionShared.tsx
 
 import { useEffect, useRef, useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, PhoneOff, Users, PauseCircle,
-  Hand, Mic, MicOff, Settings, ChevronDown,
+  Hand, Mic, MicOff, Settings, ChevronDown, Wifi, LogOut,
 } from 'lucide-react';
 import type { ChatMessage, Participant, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 
@@ -140,80 +141,186 @@ export function LiveBadge() {
 }
 
 /* ── Session Header ── */
+
+/** Single user pill used in the dual-user header layout. */
+function UserPill({
+  name, isMe, inRoom, side,
+}: {
+  name: string;
+  isMe: boolean;
+  inRoom: boolean;
+  side: 'left' | 'right';
+}) {
+  const initial = (name?.[0] ?? '?').toUpperCase();
+  return (
+    <div className={`flex items-center gap-1.5 min-w-0 ${side === 'right' ? 'flex-row-reverse' : ''}`}>
+      {/* Avatar */}
+      <div className="relative flex-shrink-0">
+        <div
+          className={`w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-bold ${
+            isMe
+              ? 'bg-orange-500/20 border border-orange-500/30 text-orange-300'
+              : 'bg-white/8 border border-white/12 text-white/60'
+          }`}
+        >
+          {initial}
+        </div>
+        {/* In-room presence dot */}
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[--panel-bg] ${
+            inRoom ? 'bg-emerald-400' : 'bg-white/15'
+          }`}
+        />
+      </div>
+      {/* Name */}
+      <div className={`min-w-0 ${side === 'right' ? 'text-right' : ''}`}>
+        <p className="text-white/70 text-[11px] font-medium truncate max-w-[80px]">{name}</p>
+        <p className={`text-[9px] font-medium ${isMe ? 'text-orange-400/60' : inRoom ? 'text-emerald-400/70' : 'text-white/25'}`}>
+          {isMe ? 'You' : inRoom ? 'In session' : 'Joining…'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 interface HeaderProps {
   title: string; subtitle?: string; connected: boolean;
   participantCount?: number;
   startedAt?: number;
   timerMode?: 'elapsed' | 'countdown';
   timerLimitSecs?: number;
-  endsAt?: number;   // backend epoch — drives drift-free countdown when provided
-  // onEnd is optional — omit to hide the end-session button (e.g. non-owners in group study)
-  onEnd?: () => void; confirmingEnd?: boolean;
-  onCancelEnd?: () => void; onConfirmEnd?: () => void;
+  endsAt?: number;
+  // Student-only: triggers the confirm-end banner (no in-header confirm)
+  onEnd?: () => void;
+  // Tutor-only: leave without ending — triggers grace period
+  onLeave?: () => void;
   rightSlot?: React.ReactNode; badge?: React.ReactNode;
+  // Dual-user layout: when provided, replaces the plain title with two user pills
+  currentUser?: { name: string; inRoom?: boolean };
+  peerUser?:    { name: string; inRoom: boolean };
 }
 
 export function SessionHeader({
   title, subtitle, connected, participantCount,
   startedAt, timerMode = 'elapsed', timerLimitSecs, endsAt,
-  onEnd, confirmingEnd, onCancelEnd, onConfirmEnd, rightSlot, badge,
+  onEnd, onLeave, rightSlot, badge,
+  currentUser, peerUser,
 }: HeaderProps) {
+  const isDual = !!(currentUser && peerUser);
+
   return (
-    <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/[0.07]" style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}>
-      <ConnDot connected={connected} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-white/85 text-sm font-medium tracking-tight truncate">{title}</p>
-          {badge}
-        </div>
-        {subtitle && <p className="text-white/30 text-[10px] mt-0.5 truncate">{subtitle}</p>}
-      </div>
+    <div
+      className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07]"
+      style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}
+    >
+      {isDual ? (
+        /* ── Dual-user layout ── */
+        <>
+          {/* Peer — left */}
+          <UserPill name={peerUser!.name} isMe={false} inRoom={peerUser!.inRoom} side="left" />
 
-      {participantCount !== undefined && participantCount > 1 && (
-        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/8">
-          <Users size={10} className="text-white/30" />
-          <span className="text-white/35 text-[10px]">{participantCount}</span>
-        </div>
-      )}
+          {/* Center: subject + timer */}
+          <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0 px-1">
+            {subtitle && (
+              <p className="text-white/35 text-[10px] font-medium truncate">{subtitle}</p>
+            )}
+            <SessionTimer
+              className="text-white/50 tabular-nums"
+              startedAt={startedAt}
+              mode={timerMode}
+              limitSecs={timerLimitSecs}
+              endsAt={endsAt}
+            />
+          </div>
 
-      <SessionTimer
-        className="text-white/20"
-        startedAt={startedAt}
-        mode={timerMode}
-        limitSecs={timerLimitSecs}
-        endsAt={endsAt}
-      />
-      {rightSlot}
+          {/* Me — right */}
+          <UserPill name={currentUser!.name} isMe inRoom={currentUser?.inRoom ?? true} side="right" />
+        </>
+      ) : (
+        /* ── Legacy single-title layout (group study, conference) ── */
+        <>
+          <ConnDot connected={connected} />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-white/85 text-sm font-medium tracking-tight truncate">{title}</p>
+              {badge}
+            </div>
+            {subtitle && <p className="text-white/30 text-[10px] mt-0.5 truncate">{subtitle}</p>}
+          </div>
 
-      {onEnd && (
-        <AnimatePresence mode="wait">
-          {confirmingEnd ? (
-            <motion.div key="confirm"
-              initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.15 }}
-              className="flex items-center gap-2">
-              <span className="text-white/30 text-[11px]">End?</span>
-              <button onClick={onConfirmEnd}
-                className="px-2.5 py-1 rounded-lg bg-red-500/20 border border-red-500/25 text-red-400 text-[11px] font-medium hover:bg-red-500/30 transition">
-                End
-              </button>
-              <button onClick={onCancelEnd}
-                className="px-2.5 py-1 rounded-lg glass-soft text-white/30 text-[11px] hover:text-white/60 transition">
-                Cancel
-              </button>
-            </motion.div>
-          ) : (
-            <motion.button key="end-btn"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={onEnd}
-              className="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition"
-              title="End session">
-              <PhoneOff size={13} />
-            </motion.button>
+          {participantCount !== undefined && participantCount > 1 && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/8">
+              <Users size={10} className="text-white/30" />
+              <span className="text-white/35 text-[10px]">{participantCount}</span>
+            </div>
           )}
-        </AnimatePresence>
+
+          <SessionTimer
+            className="text-white/20"
+            startedAt={startedAt}
+            mode={timerMode}
+            limitSecs={timerLimitSecs}
+            endsAt={endsAt}
+          />
+          {rightSlot}
+        </>
       )}
+
+      {/* Tutor: Leave button (no confirmation — tutor steps away, session stays open) */}
+      {onLeave && (
+        <button
+          onClick={onLeave}
+          className="ml-1 p-1.5 rounded-lg text-white/25 hover:text-orange-300 hover:bg-orange-500/10 transition"
+          title="Leave session"
+        >
+          <LogOut size={13} />
+        </button>
+      )}
+
+      {/* Student: End button — clicking opens the ConfirmEndBanner below the header */}
+      {onEnd && (
+        <button
+          onClick={onEnd}
+          className="ml-1 p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition"
+          title="End session"
+        >
+          <PhoneOff size={13} />
+        </button>
+      )}
+
+      {/* rightSlot shown after action buttons in dual mode (e.g. Tools toggle) */}
+      {isDual && rightSlot}
     </div>
+  );
+}
+
+/* ── Student end-session confirmation banner ── */
+export function ConfirmEndBanner({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.15 }}
+      className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 border-b border-red-500/15 bg-red-500/6"
+    >
+      <div className="min-w-0">
+        <p className="text-white/70 text-xs font-medium">End session?</p>
+        <p className="text-white/35 text-[10px] mt-0.5">This ends the session for both you and your tutor.</p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={onCancel}
+          className="px-3 py-1.5 rounded-lg glass-soft text-white/40 text-xs hover:text-white/70 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium hover:bg-red-500/30 transition"
+        >
+          Yes, end
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -398,7 +505,10 @@ const END_REASONS: Record<string, string> = {
   time_limit_reached: 'Your 30-minute session has ended.',
 };
 
-export function SessionEndedScreen({ reason, onDismiss }: { reason: string; onDismiss?: () => void }) {
+export function SessionEndedScreen({ reason, role }: { reason: string; role?: 'student' | 'tutor' | 'attendee' | 'admin' }) {
+  const router = useRouter();
+  const isTutor = role === 'tutor' || role === 'admin';
+
   return (
     <div className="h-full flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -411,10 +521,28 @@ export function SessionEndedScreen({ reason, onDismiss }: { reason: string; onDi
           <p className="text-white/80 font-semibold text-base tracking-tight">Session ended</p>
           <p className="text-white/35 text-sm leading-relaxed">{END_REASONS[reason] ?? reason ?? 'The session has ended.'}</p>
         </div>
-        {onDismiss && (
-          <button onClick={onDismiss} className="glass-soft px-6 py-2.5 rounded-xl text-white/45 text-sm hover:text-white/70 transition">
-            Back to browse
+        {isTutor ? (
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="glass-soft px-6 py-2.5 rounded-xl text-white/45 text-sm hover:text-white/70 transition"
+          >
+            Back to dashboard
           </button>
+        ) : (
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => router.push('/')}
+              className="glass-soft px-5 py-2.5 rounded-xl text-white/45 text-sm hover:text-white/70 transition"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => router.push('/browse')}
+              className="glass-soft px-5 py-2.5 rounded-xl text-white/45 text-sm hover:text-white/70 transition"
+            >
+              Back to browse
+            </button>
+          </div>
         )}
       </motion.div>
     </div>
@@ -422,8 +550,8 @@ export function SessionEndedScreen({ reason, onDismiss }: { reason: string; onDi
 }
 
 /* ── Waiting Room ── */
-export function SessionWaitingRoom({ title, subtitle, onCancel }: {
-  title: string; subtitle: string; onCancel?: () => void;
+export function SessionWaitingRoom({ title, subtitle, onJoinNow, onCancel }: {
+  title: string; subtitle: string; onJoinNow?: () => void; onCancel?: () => void;
 }) {
   return (
     <div className="h-full flex items-center justify-center px-4">
@@ -452,9 +580,22 @@ export function SessionWaitingRoom({ title, subtitle, onCancel }: {
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.3 }} />
           ))}
         </div>
-        {onCancel && (
-          <button onClick={onCancel} className="text-white/20 text-xs hover:text-white/45 transition">Cancel</button>
-        )}
+        {/* Action row */}
+        <div className="flex items-center justify-center gap-3">
+          {onJoinNow && (
+            <button
+              onClick={onJoinNow}
+              className="glass-soft px-5 py-2 rounded-xl text-white/55 text-xs font-medium hover:text-white/80 transition border border-white/10"
+            >
+              Join now
+            </button>
+          )}
+          {onCancel && (
+            <button onClick={onCancel} className="text-white/20 text-xs hover:text-white/45 transition">
+              Cancel
+            </button>
+          )}
+        </div>
       </motion.div>
     </div>
   );

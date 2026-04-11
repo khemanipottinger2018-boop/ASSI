@@ -32,8 +32,9 @@ type LiveSessionApiResponse = {
   session?: {
     status:          string;
     endedReason?:    string;
-    endsAt?:         number;
-    graceExpiresAt?: number;
+    startedAt?:      number | null;
+    endsAt?:         number | null;
+    graceExpiresAt?: number | null;
     participants?:   Participant[];
   } | null;
 };
@@ -44,12 +45,14 @@ export function useLiveSession(sessionId: string) {
   const {
     status,
     endReason,
+    startedAt,
     endsAt,
     graceExpiresAt,
     participants,
     systemMessages,
     setStatus,
     setEndReason,
+    setStartedAt,
     setEndsAt,
     setGraceExpiresAt,
     setParticipants,
@@ -72,7 +75,7 @@ export function useLiveSession(sessionId: string) {
     api.get<LiveSessionApiResponse>(`/api/live-chat/${sessionId}`)
       .then(d => {
         if (cancelled || !d.success || !d.session) return;
-        const { status: s, endedReason, endsAt: ea, graceExpiresAt: gea, participants: ps } = d.session;
+        const { status: s, endedReason, startedAt: sa, endsAt: ea, graceExpiresAt: gea, participants: ps } = d.session;
 
         // Let the backend status drive the store — no local inference.
         const mapped = s as StoreSessionStatus;
@@ -80,6 +83,7 @@ export function useLiveSession(sessionId: string) {
           setEndReason(endedReason ?? '');
         }
         setStatus(mapped);
+        if (sa  != null) setStartedAt(sa);
         if (ea  != null) setEndsAt(ea);
         if (gea != null) setGraceExpiresAt(gea);
         if (ps  != null) setParticipants(ps);
@@ -99,6 +103,7 @@ export function useLiveSession(sessionId: string) {
     hydrating,
     status,
     endReason,
+    startedAt,
     endsAt,
     graceExpiresAt,
     participants,

@@ -50,7 +50,8 @@ interface SessionStoreState {
   endReason:        string;
   currentSessionId: string | null;
   sessionMeta:      Partial<SessionMeta>;
-  // Backend-authoritative time fields (ms epoch, from Redis)
+  // Backend-authoritative time fields (ms epoch, from Redis / Prisma)
+  startedAt:        number | null;
   endsAt:           number | null;
   graceExpiresAt:   number | null;
   // Live participant list (seeded from API, updated via socket)
@@ -63,6 +64,7 @@ interface SessionStoreState {
 
   setStatus:             (s: StoreSessionStatus) => void;
   setEndReason:          (r: string) => void;
+  setStartedAt:          (t: number | null) => void;
   setEndsAt:             (t: number | null) => void;
   setGraceExpiresAt:     (t: number | null) => void;
   setParticipants:       (ps: Participant[]) => void;
@@ -78,6 +80,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   endReason:        '',
   currentSessionId: null,
   sessionMeta:      {},
+  startedAt:        null,
   endsAt:           null,
   graceExpiresAt:   null,
   participants:     [],
@@ -90,6 +93,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
     set(state => state.status === status ? state : { status }),
 
   setEndReason: (endReason) => set({ endReason }),
+
+  setStartedAt: (startedAt) => set({ startedAt }),
 
   setEndsAt: (endsAt) => set({ endsAt }),
 
@@ -130,6 +135,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         endReason:        '',
         currentSessionId: sessionId ?? null,
         sessionMeta:      {},
+        startedAt:        null,
         endsAt:           null,
         graceExpiresAt:   null,
         participants:     [],

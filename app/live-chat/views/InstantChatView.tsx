@@ -19,7 +19,7 @@
 //   - input trimmed before sendMessage (server max 4000 chars)
 
 import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Loader2, BookOpen } from 'lucide-react';
 import { StudyPanel } from '../components/StudyPanel';
 import type { StudyTool } from '../components/StudyPanel';
@@ -34,7 +34,7 @@ import InviteModal          from '../components/InviteModal';
 import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, SessionWaitingRoom, PausedBanner,
-  GraceStateBanner, ActivityFeed, useActivityEvents,
+  GraceStateBanner, ActivityFeed, useActivityEvents, ConfirmEndBanner,
 } from '../components/SessionShared';
 import type { SessionMeta, InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
@@ -73,7 +73,7 @@ export function InstantChatView({
   const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
   // ── Backend-authoritative session state — all transitions via useLiveSession ──
-  const { hydrating, status, endReason, endsAt, graceExpiresAt } = useLiveSession(sessionId);
+  const { hydrating, status, endReason, startedAt, endsAt, graceExpiresAt } = useLiveSession(sessionId);
   // Optimistic updates (handleEnd) still need direct store access
   const { setStatus, setEndReason } = useSessionStore();
   const sessionEnded      = status === 'ended';
@@ -85,7 +85,10 @@ export function InstantChatView({
   const [accepting,     setAccepting]     = useState(false);
 
   const [peerJoined,    setPeerJoined]    = useState(false);
+  // Student can "Join now" to skip the waiting room and see the chat UI immediately
+  const [skipWaiting,   setSkipWaiting]   = useState(false);
   const [input,         setInput]         = useState('');
+  // Student-only: show the confirmation banner when they click End
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [pendingInvite, setPendingInvite] = useState<InviteRequest | null>(null);
 
@@ -225,28 +228,33 @@ export function InstantChatView({
     }
   }, [accepting, isReady, sessionId]);
 
-  const handleEnd = useCallback(() => {
-    // Prevent duplicate ended transitions — guards both local double-click
-    // and the case where the backend already ended the session via socket
+  // Student only: opens the ConfirmEndBanner; confirmed → ends session for both
+  const handleEndRequest = useCallback(() => {
     if (endedRef.current || status === 'ended') return;
-    if (!confirmingEnd) {
-      setConfirmingEnd(true);
-      return;
-    }
-    endedRef.current = true;
-    const reason = role === 'tutor' ? 'ended_by_tutor' : 'ended_by_student';
-    emit('session:end', { sessionId, reason });
-    clearActivityInterval();
-    setEndReason(reason);  // optimistic store update
-    setStatus('ended');
-  }, [status, confirmingEnd, role, emit, sessionId, setEndReason, setStatus]);
+    setConfirmingEnd(true);
+  }, [status]);
 
-  // Grace state: tutor/student can leave immediately — no confirmation required.
-  // Emits chat:leave so the backend logs the departure, then navigates out.
+  const handleEndConfirm = useCallback(() => {
+    if (endedRef.current || status === 'ended') return;
+    endedRef.current = true;
+    setConfirmingEnd(false);
+    emit('session:end', { sessionId, reason: 'ended_by_student' });
+    clearActivityInterval();
+    setEndReason('ended_by_student');
+    setStatus('ended');
+  }, [status, emit, sessionId, setEndReason, setStatus]);
+
+  // Tutor only: step away without ending — triggers 2-min grace period on backend
+  const handleLeave = useCallback(() => {
+    emit('session:host_leave', { sessionId });
+    router.push('/dashboard');
+  }, [emit, sessionId, router]);
+
+  // Both roles: leave during grace period (session already in host_left_grace state)
   const handleLeaveGrace = useCallback(() => {
     emit('chat:leave', sessionId);
-    router.push('/browse');
-  }, [emit, sessionId, router]);
+    router.push(role === 'tutor' ? '/dashboard' : '/browse');
+  }, [emit, sessionId, router, role]);
 
   const handleSubmit = useCallback((e: FormEvent) => {
     e.preventDefault();
@@ -283,7 +291,7 @@ export function InstantChatView({
     return (
       <SessionEndedScreen
         reason={friendlyEnd(endReason, role)}
-        onDismiss={() => router.push('/browse')}
+        role={role}
       />
     );
   }
@@ -329,11 +337,12 @@ export function InstantChatView({
   }
 
   /* ── Student: waiting for tutor ── */
-  if (role === 'student' && !peerJoined) {
+  if (role === 'student' && !peerJoined && !skipWaiting) {
     return (
       <SessionWaitingRoom
         title="Waiting for your tutor…"
         subtitle="Hang tight — a tutor will join shortly. Free for up to 60 minutes."
+        onJoinNow={() => setSkipWaiting(true)}
         onCancel={() => {
           emit('session:end', { sessionId, reason: 'ended_by_student' });
           router.push('/browse');
@@ -356,21 +365,25 @@ export function InstantChatView({
       <div className="flex h-full">
       <div className="flex-1 flex flex-col min-w-0">
         <SessionHeader
-          title={
-            peerJoined
-              ? (role === 'student' ? 'Tutor connected' : 'Session active')
-              : 'Connecting…'
-          }
+          title={meta.subjectName ?? 'Session'}
           subtitle={meta.subjectName}
           connected={isConnected}
           participantCount={presence.count}
-          startedAt={meta.startedAt}
-          timerLimitSecs={endsAt ? undefined : 30 * 60}
+          startedAt={startedAt ?? undefined}
+          timerMode="elapsed"
           endsAt={endsAt ?? undefined}
-          onEnd={handleEnd}
-          confirmingEnd={confirmingEnd}
-          onCancelEnd={() => setConfirmingEnd(false)}
-          onConfirmEnd={handleEnd}
+          onEnd={role === 'student' ? handleEndRequest : undefined}
+          onLeave={role === 'tutor' ? handleLeave : undefined}
+          currentUser={{
+            name:   currentUsername,
+            inRoom: presence.participants.includes(currentUserId),
+          }}
+          peerUser={{
+            name:   role === 'student'
+              ? (meta.tutorName ?? 'Tutor')
+              : (meta.studentName ?? 'Student'),
+            inRoom: peerJoined,
+          }}
           rightSlot={
             peerJoined ? (
               <button
@@ -387,6 +400,27 @@ export function InstantChatView({
           }
         />
 
+        {/* Student end-session confirmation — slides in below header */}
+        <AnimatePresence>
+          {confirmingEnd && (
+            <ConfirmEndBanner
+              onConfirm={handleEndConfirm}
+              onCancel={() => setConfirmingEnd(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Banner shown when student skipped the waiting room but tutor hasn't joined yet */}
+        {role === 'student' && skipWaiting && !peerJoined && (
+          <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-orange-500/6 border-b border-orange-500/12">
+            <motion.span
+              className="w-1.5 h-1.5 rounded-full bg-orange-400 flex-shrink-0"
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity }}
+            />
+            <span className="text-orange-300/70 text-[11px]">Waiting for your tutor to join…</span>
+          </div>
+        )}
         {sessionPaused && <PausedBanner />}
         {sessionGrace && graceExpiresAt && (
           <GraceStateBanner

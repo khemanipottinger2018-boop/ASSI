@@ -1,11 +1,14 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { MessageCircle, ChevronRight } from 'lucide-react';
 
-import { useAuth }  from '@/features/auth';
-import { useTheme } from '@/features/themes/core/ThemeProvider';
+import { useAuth }          from '@/features/auth';
+import { useTheme }         from '@/features/themes/core/ThemeProvider';
+import { useSocketContext }  from '@/features/socket';
+import { sessionsApi }       from '@/lib/api';
 
 import SubjectDropdown, { Subject } from './SubjectDropdown';
 import ServiceButtons               from './ServiceButtons';
@@ -16,14 +19,43 @@ interface Props {
   onOpenSignup?: () => void;
 }
 
+type ActiveSession = { sessionId: string; partnerName: string; subjectName: string };
+
 export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
   const router                 = useRouter();
   const { user }               = useAuth();
   const { setSubjectOverride } = useTheme();
+  const { subscribe }          = useSocketContext();
 
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [dropdownOpen,    setDropdownOpen]     = useState(false);
   const [loadingSubjects, setLoadingSubjects]  = useState(true);
+  const [activeSession,   setActiveSession]    = useState<ActiveSession | null>(null);
+
+  // Fetch active session from server on mount (not local state — server is authoritative)
+  useEffect(() => {
+    if (!user) return;
+    sessionsApi.getActiveSession().then(d => {
+      if (d.success && d.session) {
+        setActiveSession({
+          sessionId:   d.session.sessionId,
+          partnerName: d.session.partnerName,
+          subjectName: d.session.subjectName,
+        });
+      }
+    }).catch(() => {});
+  }, [user]);
+
+  // Clear active session card when the backend signals it ended
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribe('session:ended', (payload: { sessionId?: string }) => {
+      setActiveSession(prev =>
+        !payload.sessionId || prev?.sessionId === payload.sessionId ? null : prev
+      );
+    });
+    return unsub;
+  }, [user, subscribe]);
 
   const handleSubjectSelect = useCallback((subject: Subject) => {
     setSelectedSubject(subject);
@@ -101,6 +133,32 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
             Choose a subject, then pick how you want help.
           </p>
         </div>
+
+        {/* Active session rejoin banner — server-authoritative, clears on session:ended */}
+        <AnimatePresence>
+          {activeSession && (
+            <motion.button
+              key="active-session"
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => router.push(`/live-chat/${activeSession.sessionId}`)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl mb-4 text-left transition hover:opacity-90"
+              style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)' }}
+            >
+              <div className="relative flex-shrink-0">
+                <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
+                <MessageCircle size={15} className="text-emerald-400 relative" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-emerald-400 text-xs font-semibold">Ongoing Session</p>
+                <p className="text-white/40 text-xs truncate">
+                  {activeSession.subjectName} · with {activeSession.partnerName}
+                </p>
+              </div>
+              <ChevronRight size={13} className="text-emerald-400/50 flex-shrink-0" />
+            </motion.button>
+          )}
+        </AnimatePresence>
 
         <SubjectDropdown
           selected={selectedSubject}

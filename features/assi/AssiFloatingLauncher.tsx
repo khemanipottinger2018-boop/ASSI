@@ -152,24 +152,26 @@ export default function AssiFloatingLauncher({ enabled = true, isGuest = false }
         onClick={onClick}
         animate={pos}
         transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+        className={open ? undefined : 'assi-orb-idle'}
         style={{
           position:     'fixed',
           width:        ORB,
           height:       ORB,
           borderRadius: 999,
+          /* ASSI brand: warm gold → coral orange → rose — matches logo */
           background:   open
-            ? 'radial-gradient(circle at 30% 30%, #ffb3bb, #c96bff)'
-            : 'radial-gradient(circle at 30% 30%, #ff9aa2, #b84cff)',
+            ? 'radial-gradient(circle at 32% 28%, #ffe08a, #ff6840, #f04870)'
+            : 'radial-gradient(circle at 32% 28%, #ffd070, #ff5830, #e83258)',
           boxShadow: open
-            ? '0 0 0 3px rgba(184,76,255,0.45), 0 16px 40px rgba(0,0,0,0.5)'
-            : '0 8px 24px rgba(0,0,0,0.4), inset 0 0 0 1.5px rgba(255,255,255,0.22)',
+            ? '0 0 0 3px rgba(255,110,55,0.45), 0 0 18px rgba(255,90,40,0.30), 0 16px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.30)'
+            : undefined, /* idle shadow handled by .assi-orb-idle keyframe */
           border:     'none',
           cursor:     'grab',
           zIndex:     9999,
           display:    'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transition: 'background 0.2s ease, box-shadow 0.2s ease',
+          transition: 'background 0.25s ease',
         }}
         whileTap={{ scale: 0.92 }}
         aria-label="Open ASSI"
@@ -177,7 +179,14 @@ export default function AssiFloatingLauncher({ enabled = true, isGuest = false }
         <motion.span
           animate={{ rotate: open ? 45 : 0 }}
           transition={{ duration: 0.2 }}
-          style={{ color: 'white', fontSize: 22, fontWeight: 700, lineHeight: 1 }}
+          style={{
+            color:      'rgba(255,255,255,0.92)',
+            fontSize:   open ? 22 : 18,
+            fontWeight: 700,
+            lineHeight: 1,
+            letterSpacing: open ? undefined : '0.02em',
+            textShadow: '0 1px 4px rgba(0,0,0,0.35)',
+          }}
         >
           {open ? '+' : 'A'}
         </motion.span>

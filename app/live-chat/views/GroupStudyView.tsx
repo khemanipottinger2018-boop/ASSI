@@ -14,7 +14,6 @@ import {
   Sparkles, Crown, Presentation, BookOpen,
   Save, Download, Settings, Globe, Lock, UserCheck,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
 import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
 import { useTyping }        from '@/features/live-chat/hooks/useTyping';
@@ -25,7 +24,7 @@ import { api }             from '@/lib/api';
 import type { StudyTool, Problem } from '../components/StudyPanel';
 import {
   SessionHeader, MessageFeed, ChatInput,
-  SessionEndedScreen, PausedBanner,
+  SessionEndedScreen, PausedBanner, ConfirmEndBanner,
   ParticipantList, ParticipantSidebar,
   ActivityFeed, useActivityEvents,
 } from '../components/SessionShared';
@@ -51,9 +50,8 @@ interface Props {
 }
 
 export function GroupStudyView({
-  sessionId, currentUserId, currentUsername, meta, isPlus, maxParticipants,
+  sessionId, currentUserId, currentUsername, meta, isPlus, maxParticipants, role,
 }: Props) {
-  const router = useRouter();
   const { emit, on, off, isConnected, isReady } = useChatSocket();
   const { messages, sendMessage }               = useChatMessages(sessionId, { id: currentUserId, name: currentUsername });
   const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
@@ -233,18 +231,21 @@ export function GroupStudyView({
   }, [sessionId, currentUserId, on, off, pushActivity]);
 
   // ── Handlers ──
-  const handleEnd = useCallback(() => {
-    // Prevent duplicate ended transitions — guards both local double-click
-    // and the case where the backend already ended the session via socket
+  const handleEndRequest = useCallback(() => {
     if (endedRef.current || status === 'ended') return;
-    if (!confirmingEnd) { setConfirmingEnd(true); return; }
+    setConfirmingEnd(true);
+  }, [status]);
+
+  const handleEndConfirm = useCallback(() => {
+    if (endedRef.current || status === 'ended') return;
     endedRef.current = true;
+    setConfirmingEnd(false);
     emit('session:end', { sessionId, reason: 'ended_by_host' });
     clearActivity();
-    setEndReason('ended_by_host');  // optimistic store update
+    setEndReason('ended_by_host');
     setStatus('ended');
     setShowSavePrompt(true);
-  }, [status, confirmingEnd, emit, sessionId, setEndReason, setStatus]);
+  }, [status, emit, sessionId, setEndReason, setStatus]);
 
   const handleLookupUser = useCallback(async () => {
     const username = inviteInput.trim();
@@ -402,7 +403,7 @@ export function GroupStudyView({
   );
 
   if (sessionEnded) return (
-    <SessionEndedScreen reason={endReason} onDismiss={() => router.push('/browse')} />
+    <SessionEndedScreen reason={endReason} role={role} />
   );
 
   // ── Render ──
@@ -418,10 +419,7 @@ export function GroupStudyView({
           connected={isConnected}
           participantCount={participants.length}
           startedAt={meta.startedAt}
-          onEnd={studyRole === 'owner' ? handleEnd : undefined}
-          confirmingEnd={confirmingEnd}
-          onCancelEnd={() => setConfirmingEnd(false)}
-          onConfirmEnd={handleEnd}
+          onEnd={studyRole === 'owner' ? handleEndRequest : undefined}
           badge={
             studyRole === 'owner' ? (
               <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/20">
@@ -665,6 +663,15 @@ export function GroupStudyView({
             <span className="text-orange-400/60 text-[11px]">Room is full. Upgrade to ASSI+ for 6 members.</span>
           </div>
         )}
+
+        <AnimatePresence>
+          {confirmingEnd && (
+            <ConfirmEndBanner
+              onConfirm={handleEndConfirm}
+              onCancel={() => setConfirmingEnd(false)}
+            />
+          )}
+        </AnimatePresence>
 
         {sessionPaused && <PausedBanner />}
 

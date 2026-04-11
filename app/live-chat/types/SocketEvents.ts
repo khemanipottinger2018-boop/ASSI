@@ -41,6 +41,15 @@ export type SessionMeta = {
   hostId:          string;
   subjectName?:    string;
   maxParticipants: number;
+  isPublic?:       boolean;
+  // Server-authoritative time fields (ms epoch)
+  startedAt?:      number;
+  endsAt?:         number;
+  // Participant display names resolved server-side
+  tutorName?:      string;
+  studentName?:    string;
+  tutorId?:        string;
+  studentId?:      string;
 };
 
 export type ServerToClientEvents = {
@@ -60,8 +69,12 @@ export type ServerToClientEvents = {
   'session:ready':         (p: { sessionId: string }) => void;
   'session:started':       (p: { sessionId: string }) => void;
   'session:paused':        (p: { reason: string }) => void;
-  'session:ended':         (p: { reason: string }) => void;
+  'session:ended':         (p: { sessionId?: string; reason: string }) => void;
+  'session:host_left':     (p: { sessionId: string; graceExpiresAt: number }) => void;
+  'session:resumed':       (p: { sessionId: string }) => void;
+  'session:updated':       (p: Partial<SessionMeta> & { sessionId: string }) => void;
   'session:participants':  (p: { sessionId: string; participants: Participant[] }) => void;
+  'chat:system_message':   (p: { sessionId: string; content: string; timestamp: number }) => void;
 
   'conference:hand_raised':   (p: { sessionId: string; userId: string; username: string }) => void;
   'conference:hand_lowered':  (p: { sessionId: string; userId: string }) => void;
@@ -72,9 +85,11 @@ export type ServerToClientEvents = {
 };
 
 export type ClientToServerEvents = {
-  'session:join':   (p: { sessionId: string }) => void;
-  'session:accept': (p: { sessionId: string }) => void;
-  'session:end':    (p: { sessionId: string; reason: string }) => void;
+  'session:join':       (p: { sessionId: string }) => void;
+  'session:accept':     (p: { sessionId: string }) => void;
+  'session:end':        (p: { sessionId: string; reason: string }) => void;
+  // Tutor intentionally steps away without ending — triggers 2-min grace period
+  'session:host_leave': (p: { sessionId: string }) => void;
 
   'chat:join':  (sessionId: string) => void;
   'chat:leave': (sessionId: string) => void;

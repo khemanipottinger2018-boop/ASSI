@@ -59,6 +59,13 @@ export default function ChatRoomPage({ params }: Props) {
             subjectName:     d.session.subjectName as string ?? undefined,
             maxParticipants: d.session.maxParticipants as number ?? (isPlus ? 6 : 3),
             isPublic:        d.session.isPublic as boolean ?? false,
+            // Server-authoritative time + participant name fields
+            startedAt:       d.session.startedAt as number ?? undefined,
+            endsAt:          d.session.endsAt as number ?? undefined,
+            tutorId:         d.session.tutorId as string ?? undefined,
+            studentId:       d.session.studentId as string ?? undefined,
+            tutorName:       d.session.tutorName as string ?? undefined,
+            studentName:     d.session.studentName as string ?? undefined,
           });
         }
       })

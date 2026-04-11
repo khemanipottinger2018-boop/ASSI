@@ -19,7 +19,6 @@
 import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Users, Radio, Shield, MicOff, Megaphone, BookOpen } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useChatSocket }    from '@/features/live-chat/hooks/useChatSocket';
 import { useChatMessages }  from '@/features/live-chat/hooks/useChatMessages';
 import { useTyping }        from '@/features/live-chat/hooks/useTyping';
@@ -27,7 +26,7 @@ import { useSessionEvents } from '@/features/live-chat/hooks/useSessionEvents';
 import { useSessionStore }  from '@/features/live-chat/store/useSessionStore';
 import {
   SessionHeader, MessageFeed, ChatInput,
-  SessionEndedScreen, PausedBanner, LiveBadge,
+  SessionEndedScreen, PausedBanner, LiveBadge, ConfirmEndBanner,
   ParticipantList, ParticipantSidebar,
   SpeakModeToggle, HandRaiseButton,
   ActivityFeed, useActivityEvents,
@@ -75,7 +74,6 @@ function getCapabilities(role: ConferenceRole): Capabilities {
 export function ConferenceView({
   sessionId, currentUserId, currentUsername, meta, viewerRole,
 }: Props) {
-  const router = useRouter();
   const { emit, on, off, isConnected, isReady } = useChatSocket();
   const { messages, sendMessage } = useChatMessages(sessionId, { id: currentUserId, name: currentUsername });
   const { onKeystroke, stopTyping, typingUsernames } = useTyping(sessionId);
@@ -238,18 +236,29 @@ export function ConferenceView({
 
   // ── Handlers — shared ─────────────────────────────────────────────────────
 
-  const handleEnd = useCallback(() => {
-    // Prevent duplicate ended transitions — guards both local double-click
-    // and the case where the backend already ended the session via socket
+  const handleEndRequest = useCallback(() => {
     if (endedRef.current || status === 'ended') return;
-    // Admin force-ends without confirm prompt
-    if (!cap.canAdminForce && !confirmingEnd) { setConfirmingEnd(true); return; }
+    // Admin can force-end without confirmation
+    if (cap.canAdminForce) {
+      endedRef.current = true;
+      emit('session:end', { sessionId, reason: 'ended_by_host' });
+      clearActivity();
+      setEndReason('ended_by_host');
+      setStatus('ended');
+    } else {
+      setConfirmingEnd(true);
+    }
+  }, [status, cap.canAdminForce, emit, sessionId, setEndReason, setStatus]);
+
+  const handleEndConfirm = useCallback(() => {
+    if (endedRef.current || status === 'ended') return;
     endedRef.current = true;
+    setConfirmingEnd(false);
     emit('session:end', { sessionId, reason: 'ended_by_host' });
     clearActivity();
-    setEndReason('ended_by_host');  // optimistic store update
+    setEndReason('ended_by_host');
     setStatus('ended');
-  }, [status, cap.canAdminForce, confirmingEnd, emit, sessionId, setEndReason, setStatus]);
+  }, [status, emit, sessionId, setEndReason, setStatus]);
 
   const handleSpeakModeChange = useCallback((mode: SpeakMode) => {
     if (!cap.canHost || !isReady) return;
@@ -330,7 +339,7 @@ export function ConferenceView({
   }
 
   if (sessionEnded) {
-    return <SessionEndedScreen reason={endReason} onDismiss={() => router.push('/browse')} />;
+    return <SessionEndedScreen reason={endReason} role={viewerRole} />;
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -346,10 +355,7 @@ export function ConferenceView({
           connected={isConnected}
           participantCount={participants.length}
           startedAt={meta.startedAt}
-          onEnd={handleEnd}
-          confirmingEnd={confirmingEnd}
-          onCancelEnd={() => setConfirmingEnd(false)}
-          onConfirmEnd={handleEnd}
+          onEnd={handleEndRequest}
           badge={
             viewerRole === 'admin'
               ? <AdminBadge />
@@ -499,6 +505,15 @@ export function ConferenceView({
             )}
           </div>
         )}
+
+        <AnimatePresence>
+          {confirmingEnd && (
+            <ConfirmEndBanner
+              onConfirm={handleEndConfirm}
+              onCancel={() => setConfirmingEnd(false)}
+            />
+          )}
+        </AnimatePresence>
 
         {sessionPaused && <PausedBanner />}
 

@@ -406,7 +406,7 @@ export default function SettingsPage() {
       >
         <SectionHeader icon={Flame} title="Streak" />
         <ToggleRow label="Daily login streak"
-          description="Track consecutive login days — reach 365 to earn ASSI+ for a full year"
+          description="Track consecutive login days (Reach 365 to earn ASSI+ for a full year)"
           value={settings.streakEnabled}
           onChange={(v) => handleUpdate({ streakEnabled: v })} />
         <ToggleRow label="Streak reminders"
