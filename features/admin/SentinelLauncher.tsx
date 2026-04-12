@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Shield, X, EyeOff, Eye, LayoutDashboard, Users,
   BookOpen, Activity, AlertTriangle, BarChart2, Cpu,
-  RefreshCw, Clock, Wifi, GraduationCap, MessageCircle,
+  RefreshCw, Clock, Wifi, WifiOff, GraduationCap, MessageCircle,
   XCircle, Loader2, ChevronRight, Send, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/features/auth';
@@ -343,7 +343,8 @@ export default function SentinelLauncher() {
                   >
                     {activeTab === 'sentinel-ai' && <SentinelChatPanel />}
                     {activeTab === 'overview'     && <OverviewPanel />}
-                    {activeTab !== 'sentinel-ai' && activeTab !== 'overview' && (
+                    {activeTab === 'sessions'     && <SessionsPanel />}
+                    {activeTab !== 'sentinel-ai' && activeTab !== 'overview' && activeTab !== 'sessions' && (
                       <GenericPanel tab={activeTab} />
                     )}
                   </motion.div>
@@ -363,16 +364,25 @@ export default function SentinelLauncher() {
    ══════════════════════════════════════════════════════ */
 
 type Stats = { totalUsers: number; tutors: number; students: number; onlineUsers: number };
-type LiveSession = {
-  sessionId: string; status: 'waiting' | 'active' | 'paused' | 'ended';
-  studentId: string; tutorId: string | null; startedAt: number; participantCount: number;
+type LiveSessionCompact = {
+  sessionId:       string;
+  status:          'waiting' | 'active' | 'paused' | 'host_left_grace' | 'ended';
+  type:            string;
+  studentId:       string;
+  studentUsername: string;
+  tutorId:         string | null;
+  tutorUsername:   string | null;
+  subjectName:     string | null;
+  startedAt:       number;
+  participantCount: number;
 };
 
-const statusStyle = {
-  waiting: { dot: '#facc15', label: 'rgba(250,204,21,0.8)' },
-  active:  { dot: '#34d399', label: 'rgba(52,211,153,0.8)' },
-  paused:  { dot: '#fb923c', label: 'rgba(251,146,60,0.8)' },
-  ended:   { dot: 'rgba(255,255,255,0.15)', label: 'rgba(255,255,255,0.2)' },
+const statusStyle: Record<string, { dot: string; label: string; glow: boolean }> = {
+  waiting:         { dot: '#facc15', label: 'rgba(250,204,21,0.85)',  glow: false },
+  active:          { dot: '#34d399', label: 'rgba(52,211,153,0.85)',  glow: true  },
+  paused:          { dot: '#fb923c', label: 'rgba(251,146,60,0.85)',  glow: false },
+  host_left_grace: { dot: '#a78bfa', label: 'rgba(167,139,250,0.85)', glow: false },
+  ended:           { dot: 'rgba(255,255,255,0.12)', label: 'rgba(255,255,255,0.2)', glow: false },
 };
 
 function elapsed(startedAt: number) {
@@ -381,22 +391,29 @@ function elapsed(startedAt: number) {
 }
 
 function OverviewPanel() {
-  const [stats, setStats]       = useState<Stats | null>(null);
-  const [sessions, setSessions] = useState<LiveSession[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const router = useRouter();
+  const [stats,    setStats]    = useState<Stats | null>(null);
+  const [sessions, setSessions] = useState<LiveSessionCompact[]>([]);
+  const [metrics,  setMetrics]  = useState<{ activeSessions: number; totalSessions: number } | null>(null);
+  const [loading,  setLoading]  = useState(true);
   const [endingId, setEndingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [sRes, ssRes] = await Promise.all([
+      const [sRes, ssRes, mRes] = await Promise.all([
         fetch(`${API_URL}/api/admin/dashboard/stats`, { credentials: 'include' }),
         fetch(`${API_URL}/api/admin/sessions/live`,   { credentials: 'include' }),
+        fetch(`${API_URL}/api/admin/metrics`,         { credentials: 'include' }),
       ]);
-      const [sData, ssData] = await Promise.all([sRes.json(), ssRes.json()]);
+      const [sData, ssData, mData] = await Promise.all([sRes.json(), ssRes.json(), mRes.json()]);
       if (sData.success)  setStats(sData.stats);
-      if (ssData.success) setSessions((ssData.sessions as LiveSession[])
-        .sort((a, b) => (['active','waiting','paused','ended'].indexOf(a.status)) - (['active','waiting','paused','ended'].indexOf(b.status))));
+      if (ssData.success) setSessions(
+        (ssData.sessions as LiveSessionCompact[])
+          .filter(s => s.status !== 'ended')
+          .sort((a, b) => (['active','host_left_grace','paused','waiting'].indexOf(a.status)) - (['active','host_left_grace','paused','waiting'].indexOf(b.status)))
+      );
+      if (mData.success) setMetrics({ activeSessions: mData.metrics.activeSessions, totalSessions: mData.metrics.totalSessions });
     } catch (err) {
       console.error('[Sentinel] Overview fetch failed:', err);
     } finally { setLoading(false); }
@@ -414,86 +431,120 @@ function OverviewPanel() {
     } finally { setEndingId(null); }
   }
 
-  const hudStat = (label: string, value: number | undefined, color: string) => (
-    <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(0,10,22,0.8)', border: `1px solid ${color}30`, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${color}60, transparent)` }} />
-      <p style={{ color: 'rgba(255,255,255,0.28)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase' }}>{label}</p>
-      {value === undefined
-        ? <div style={{ marginTop: 8, height: 24, width: 60, borderRadius: 4, background: 'rgba(255,255,255,0.05)' }} />
-        : <p style={{ marginTop: 8, fontSize: 26, fontWeight: 700, color, letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 20px ${color}50` }}>{value.toLocaleString()}</p>
-      }
-    </div>
-  );
+  const statCells = [
+    { label: 'Users',    value: stats?.totalUsers,    color: '#00b4ff' },
+    { label: 'Tutors',   value: stats?.tutors,        color: '#ff9f0a' },
+    { label: 'Students', value: stats?.students,      color: '#a78bfa' },
+    { label: 'Online',   value: stats?.onlineUsers,   color: '#00ff96' },
+    { label: 'Active',   value: metrics?.activeSessions, color: '#34d399' },
+    { label: 'Sessions', value: metrics?.totalSessions,  color: 'rgba(255,255,255,0.35)' },
+  ];
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20,
+    <div style={{ height: '100%', overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 18,
       scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,180,255,0.15) transparent' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 3, height: 14, borderRadius: 2, background: '#00b4ff', boxShadow: '0 0 8px #00b4ff' }} />
-          <p style={{ color: 'rgba(0,180,255,0.5)', fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase' }}>System Overview // Live</p>
+          <p style={{ color: 'rgba(0,180,255,0.5)', fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase' }}>Control Overview // Live</p>
         </div>
-        <button onClick={refresh} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
-          background: 'rgba(0,180,255,0.06)', border: '1px solid rgba(0,180,255,0.15)', color: 'rgba(0,180,255,0.5)', fontSize: 10 }}>
-          <RefreshCw size={10} />
+        <button onClick={refresh} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+          background: 'rgba(0,180,255,0.06)', border: '1px solid rgba(0,180,255,0.15)', color: 'rgba(0,180,255,0.5)', fontSize: 10, opacity: loading ? 0.5 : 1 }}>
+          <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />
           Refresh
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-        {hudStat('Total Users', stats?.totalUsers, '#00b4ff')}
-        {hudStat('Tutors',      stats?.tutors,     '#ff9f0a')}
-        {hudStat('Students',    stats?.students,   '#a78bfa')}
-        {hudStat('Online',      stats?.onlineUsers,'#00ff96')}
+      {/* Stat grid — 6 cells, 3 col */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {statCells.map(({ label, value, color }) => (
+          <div key={label} style={{ padding: '11px 14px', borderRadius: 9, background: 'rgba(0,10,22,0.8)', border: `1px solid ${color}28`, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${color}55, transparent)` }} />
+            <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase' }}>{label}</p>
+            {value === undefined
+              ? <div style={{ marginTop: 6, height: 20, width: 48, borderRadius: 3, background: 'rgba(255,255,255,0.05)' }} />
+              : <p style={{ marginTop: 6, fontSize: 22, fontWeight: 700, color, lineHeight: 1, textShadow: `0 0 16px ${color}45` }}>{value.toLocaleString()}</p>
+            }
+          </div>
+        ))}
+      </div>
+
+      {/* Quick nav strip */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        {[
+          { label: 'Users',   href: '/admin/users',              color: '#60a5fa' },
+          { label: 'Apps',    href: '/admin/tutor-applications', color: '#a78bfa' },
+          { label: 'Errors',  href: '/admin/errors',             color: '#f87171' },
+          { label: 'Metrics', href: '/admin/metrics',            color: '#fb923c' },
+        ].map(({ label, href, color }) => (
+          <button key={href} onClick={() => { router.push(href); }} style={{
+            padding: '7px 10px', borderRadius: 7, cursor: 'pointer',
+            background: `${color}0a`, border: `1px solid ${color}20`,
+            color, fontSize: 10, letterSpacing: '0.05em', fontFamily: 'inherit',
+            transition: 'all 0.15s ease',
+          }}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* Live sessions */}
-      <div>
-        <p style={{ color: 'rgba(0,180,255,0.35)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: 10 }}>Live Sessions</p>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <p style={{ color: 'rgba(0,180,255,0.35)', fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            Live Sessions {sessions.length > 0 && <span style={{ color: '#34d399' }}>· {sessions.length}</span>}
+          </p>
+          <button onClick={() => router.push('/admin/sessions')} style={{ color: 'rgba(0,180,255,0.3)', fontSize: 9, cursor: 'pointer', background: 'none', border: 'none', letterSpacing: '0.08em', fontFamily: 'inherit' }}>
+            Full view →
+          </button>
+        </div>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
-            <Loader2 size={16} style={{ color: 'rgba(0,180,255,0.3)', animation: 'spin 1s linear infinite' }} />
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+            <Loader2 size={16} style={{ color: 'rgba(0,180,255,0.3)' }} className="animate-spin" />
           </div>
         ) : sessions.length === 0 ? (
-          <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: 12, textAlign: 'center', padding: '32px 0' }}>No live sessions</p>
+          <p style={{ color: 'rgba(255,255,255,0.12)', fontSize: 11, textAlign: 'center', padding: '24px 0' }}>No active sessions</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {sessions.map((s) => {
-              const st = statusStyle[s.status];
+              const st = statusStyle[s.status] ?? statusStyle.waiting;
               return (
                 <div key={s.sessionId} style={{
-                  display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', borderRadius: 8,
-                  background: 'rgba(0,10,22,0.7)', border: '1px solid rgba(0,180,255,0.08)',
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8,
+                  background: 'rgba(0,10,22,0.7)', border: `1px solid ${st.dot}18`,
                 }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', background: st.dot, flexShrink: 0,
-                    boxShadow: s.status === 'active' ? `0 0 8px ${st.dot}` : 'none' }} />
-                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, minWidth: 0 }}>
-                    {[
-                      ['Session', s.sessionId.slice(0,8) + '…'],
-                      ['Status',  s.status],
-                      ['Users',   `${s.participantCount}/2`],
-                      ['Elapsed', elapsed(s.startedAt)],
-                    ].map(([label, val]) => (
-                      <div key={label}>
-                        <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 8, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>{label}</p>
-                        <p style={{ fontSize: 11, color: label === 'Status' ? st.label : 'rgba(200,230,255,0.6)', fontFamily: 'inherit' }}>{val}</p>
-                      </div>
-                    ))}
+                    boxShadow: st.glow ? `0 0 7px ${st.dot}` : 'none' }} />
+                  <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 70px', gap: 6, minWidth: 0 }}>
+                    <div>
+                      <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>Student</p>
+                      <p style={{ fontSize: 10, color: 'rgba(200,200,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.studentUsername}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>Tutor</p>
+                      <p style={{ fontSize: 10, color: s.tutorUsername ? 'rgba(200,240,220,0.75)' : 'rgba(255,255,255,0.2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.tutorUsername ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>Subject</p>
+                      <p style={{ fontSize: 10, color: 'rgba(200,230,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.subjectName ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 1 }}>Elapsed</p>
+                      <p style={{ fontSize: 10, color: st.label, fontVariantNumeric: 'tabular-nums' }}>{elapsed(s.startedAt)}</p>
+                    </div>
                   </div>
-                  {s.status !== 'ended' && (
-                    <button onClick={() => forceEnd(s.sessionId)} disabled={endingId === s.sessionId} style={{
-                      width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.15)', cursor: 'pointer',
-                    }}>
-                      {endingId === s.sessionId
-                        ? <Loader2 size={12} style={{ color: '#ff453a' }} />
-                        : <XCircle size={12} style={{ color: 'rgba(255,69,58,0.5)' }} />
-                      }
-                    </button>
-                  )}
+                  <button onClick={() => forceEnd(s.sessionId)} disabled={endingId === s.sessionId} style={{
+                    width: 26, height: 26, borderRadius: 5, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.15)', cursor: 'pointer',
+                    opacity: endingId && endingId !== s.sessionId ? 0.3 : 1,
+                  }}>
+                    {endingId === s.sessionId
+                      ? <Loader2 size={11} className="animate-spin" style={{ color: '#ff453a' }} />
+                      : <XCircle size={11} style={{ color: 'rgba(255,69,58,0.55)' }} />
+                    }
+                  </button>
                 </div>
               );
             })}
@@ -505,7 +556,197 @@ function OverviewPanel() {
 }
 
 /* ══════════════════════════════════════════════════════
-   GENERIC PANEL (Users / Apps / Sessions / Errors / Metrics)
+   SESSIONS PANEL — live session monitor inside the launcher
+   ══════════════════════════════════════════════════════ */
+
+type SessionRow = {
+  sessionId:       string;
+  status:          'waiting' | 'active' | 'paused' | 'host_left_grace';
+  type:            string;
+  studentUsername: string;
+  tutorUsername:   string | null;
+  subjectName:     string | null;
+  startedAt:       number;
+  participantCount: number;
+};
+
+const SESSION_STATUS_CFG: Record<string, { dot: string; label: string; glow: boolean }> = {
+  waiting:         { dot: '#facc15', label: 'WAITING',    glow: false },
+  active:          { dot: '#34d399', label: 'ACTIVE',     glow: true  },
+  paused:          { dot: '#fb923c', label: 'PAUSED',     glow: false },
+  host_left_grace: { dot: '#a78bfa', label: 'GRACE',      glow: false },
+};
+
+function SessionsPanel() {
+  const [sessions,    setSessions]    = useState<SessionRow[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState(false);
+  const [endingId,    setEndingId]    = useState<string | null>(null);
+  const [lastSync,    setLastSync]    = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/sessions/live`, { credentials: 'include' });
+      const d   = await res.json();
+      if (d.success) {
+        setSessions(
+          (d.sessions as SessionRow[])
+            .sort((a, b) => (['active','host_left_grace','paused','waiting'].indexOf(a.status)) - (['active','host_left_grace','paused','waiting'].indexOf(b.status)))
+        );
+      } else { setError(true); }
+    } catch { setError(true); }
+    finally { setLoading(false); setLastSync(new Date()); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (autoRefresh) timerRef.current = setInterval(load, 10_000);
+    else if (timerRef.current) clearInterval(timerRef.current);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [autoRefresh, load]);
+
+  async function forceEnd(sessionId: string) {
+    if (endingId) return;
+    if (!confirm('Force-end this session?')) return;
+    setEndingId(sessionId);
+    try {
+      await fetch(`${API_URL}/api/admin/sessions/${sessionId}/end`, { method: 'POST', credentials: 'include' });
+      await load();
+    } finally { setEndingId(null); }
+  }
+
+  const counts = {
+    active:  sessions.filter(s => s.status === 'active').length,
+    waiting: sessions.filter(s => s.status === 'waiting').length,
+    paused:  sessions.filter(s => s.status === 'paused').length,
+  };
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 14,
+      scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,180,255,0.15) transparent' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 3, height: 14, borderRadius: 2, background: '#34d399', boxShadow: '0 0 8px #34d399' }} />
+          <p style={{ color: 'rgba(52,211,153,0.5)', fontSize: 9, letterSpacing: '0.22em', textTransform: 'uppercase' }}>Session Monitor // Live</p>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => setAutoRefresh(v => !v)} style={{
+            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+            background: autoRefresh ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.04)',
+            border: `1px solid ${autoRefresh ? 'rgba(52,211,153,0.3)' : 'rgba(255,255,255,0.08)'}`,
+            color: autoRefresh ? 'rgba(52,211,153,0.8)' : 'rgba(255,255,255,0.3)',
+            fontSize: 9, letterSpacing: '0.08em', fontFamily: 'inherit',
+          }}>
+            {autoRefresh ? <Wifi size={10} /> : <WifiOff size={10} />}
+            {autoRefresh ? 'LIVE' : 'PAUSED'}
+          </button>
+          <button onClick={load} disabled={loading} style={{
+            display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+            background: 'rgba(0,180,255,0.06)', border: '1px solid rgba(0,180,255,0.15)',
+            color: 'rgba(0,180,255,0.5)', fontSize: 9, opacity: loading ? 0.5 : 1, fontFamily: 'inherit',
+          }}>
+            <RefreshCw size={10} className={loading ? 'animate-spin' : ''} />
+            SYNC
+          </button>
+        </div>
+      </div>
+
+      {/* Stat chips */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+        {[
+          { l: 'Active',  n: counts.active,  c: '#34d399' },
+          { l: 'Waiting', n: counts.waiting, c: '#facc15' },
+          { l: 'Paused',  n: counts.paused,  c: '#fb923c' },
+          { l: 'Total',   n: sessions.length, c: '#00b4ff' },
+        ].map(({ l, n, c }) => (
+          <div key={l} style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(0,10,22,0.75)', border: `1px solid ${c}20` }}>
+            <p style={{ color: 'rgba(255,255,255,0.22)', fontSize: 8, letterSpacing: '0.18em', textTransform: 'uppercase' }}>{l}</p>
+            <p style={{ marginTop: 6, fontSize: 20, fontWeight: 700, color: c, lineHeight: 1, textShadow: `0 0 14px ${c}45` }}>
+              {loading ? '—' : n}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Sync time */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <span style={{ color: 'rgba(255,255,255,0.12)', fontSize: 8, letterSpacing: '0.12em' }}>
+          SYNC {lastSync.toLocaleTimeString('en-US', { hour12: false })}
+        </span>
+      </div>
+
+      {/* Session list */}
+      {error ? (
+        <p style={{ color: 'rgba(255,69,58,0.5)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>Failed to load sessions</p>
+      ) : loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+          <Loader2 size={16} className="animate-spin" style={{ color: 'rgba(52,211,153,0.35)' }} />
+        </div>
+      ) : sessions.length === 0 ? (
+        <p style={{ color: 'rgba(255,255,255,0.12)', fontSize: 12, textAlign: 'center', padding: '32px 0' }}>No active sessions</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {sessions.map((s) => {
+            const cfg = SESSION_STATUS_CFG[s.status] ?? SESSION_STATUS_CFG.waiting;
+            return (
+              <div key={s.sessionId} style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8,
+                background: 'rgba(0,10,22,0.7)', border: `1px solid ${cfg.dot}18`,
+              }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: cfg.dot,
+                  boxShadow: cfg.glow ? `0 0 7px ${cfg.dot}` : 'none' }} />
+
+                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 60px 55px', gap: 6, minWidth: 0 }}>
+                  <div>
+                    <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Student</p>
+                    <p style={{ fontSize: 10, color: 'rgba(200,200,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.studentUsername}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Tutor</p>
+                    <p style={{ fontSize: 10, color: s.tutorUsername ? 'rgba(200,240,220,0.8)' : 'rgba(255,255,255,0.2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.tutorUsername ?? 'Waiting…'}
+                    </p>
+                  </div>
+                  <div>
+                    <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Subject</p>
+                    <p style={{ fontSize: 10, color: 'rgba(200,230,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.subjectName ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Status</p>
+                    <p style={{ fontSize: 10, color: cfg.dot, fontWeight: 600 }}>{cfg.label}</p>
+                  </div>
+                  <div>
+                    <p style={{ color: 'rgba(0,180,255,0.25)', fontSize: 7, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>Time</p>
+                    <p style={{ fontSize: 10, color: 'rgba(200,230,255,0.55)', fontVariantNumeric: 'tabular-nums' }}>{elapsed(s.startedAt)}</p>
+                  </div>
+                </div>
+
+                <button onClick={() => forceEnd(s.sessionId)} disabled={!!endingId} style={{
+                  width: 26, height: 26, borderRadius: 5, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,69,58,0.06)', border: '1px solid rgba(255,69,58,0.15)', cursor: endingId ? 'default' : 'pointer',
+                  opacity: endingId && endingId !== s.sessionId ? 0.25 : 1, transition: 'all 0.15s ease',
+                }}>
+                  {endingId === s.sessionId
+                    ? <Loader2 size={11} className="animate-spin" style={{ color: '#ff453a' }} />
+                    : <XCircle size={11} style={{ color: 'rgba(255,69,58,0.55)' }} />
+                  }
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   GENERIC PANEL (Users / Apps / Errors / Metrics)
    — renders a live data frame for each section
    ══════════════════════════════════════════════════════ */
 

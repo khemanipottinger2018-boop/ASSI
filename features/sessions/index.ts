@@ -1,5 +1,5 @@
-// features/sessions/index.ts
-export { sessionsApi }  from './sessionsApi';
+export { sessionsApi } from './sessionsApi';
+
 export type {
   BookedSession,
   ChatSession,
@@ -7,4 +7,5 @@ export type {
 } from './sessionsApi';
 
 export { default as RecentSessionRow } from './RecentSessionRow';
+export { default as OngoingSessionCard } from './OngoingSessionCard';
 export { useActiveSession } from './useActiveSession';

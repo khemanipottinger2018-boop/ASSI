@@ -5,12 +5,13 @@ import { useRouter }             from 'next/navigation';
 import { motion }                from 'framer-motion';
 import {
   Search, Cpu, Calendar, Bell, BookOpen, Inbox,
-  Flame, CheckCircle2, Circle, MessageCircle, ChevronRight,
+  Flame, CheckCircle2, Circle,
 } from 'lucide-react';
 import { useAuth }          from '@/features/auth';
 import { useNotifications } from '@/features/notifications';
 import { useMessages }      from '@/features/live-chat';
 import { useStreak }        from '@/features/platform';
+import { useSocketContext }  from '@/features/socket';
 import { sessionsApi, tutorsApi, notificationsApi, userApi } from '@/lib/api';
 import { filterActive } from '@/features/types/notification';
 import type { ChatSession }  from '@/lib/api';
@@ -21,6 +22,7 @@ import type { DailyTask }    from '@/lib/api';
 import DashboardSection   from '@/features/dashboard/student/DashboardSection';
 import QuickActionButton  from '@/features/dashboard/student/QuickActionButton';
 import RecentSessionRow   from '@/features/sessions/RecentSessionRow';
+import OngoingSessionCard from '@/features/sessions/OngoingSessionCard';
 import AvailableTutorCard from '@/features/browse/AvailableTutorCard';
 import StatCard           from '@/features/dashboard/student/StatCard';
 import StreakCard, { StreakCardSkeleton } from '@/features/dashboard/student/StreakCard';
@@ -47,6 +49,7 @@ export default function StudentDashboard() {
   const { unreadCount: notifUnread } = useNotifications();
   const { unreadCount: msgUnread }   = useMessages();
   const { streak, isLoading: streakLoading } = useStreak();
+  const { subscribe, isConnected } = useSocketContext();
 
   const [sessions,      setSessions]      = useState<ChatSession[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -78,6 +81,16 @@ export default function StudentDashboard() {
       }
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Clear the active session card immediately when the server signals it ended
+  useEffect(() => {
+    if (!user) return;
+    return subscribe('session:ended', (payload: { sessionId?: string }) => {
+      setActiveSession(prev =>
+        !payload.sessionId || prev?.sessionId === payload.sessionId ? null : prev
+      );
+    });
+  }, [user?.id, subscribe, isConnected]);
 
   const upcoming  = sessions.filter(s =>
     ['pending', 'confirmed', 'in_progress', 'active', 'waiting'].includes(s.status)
@@ -136,26 +149,13 @@ export default function StudentDashboard() {
       {/* ── Active session rejoin ── */}
       {activeSession && (
         <motion.div custom={0.5} variants={fade} initial="initial" animate="animate">
-          <button
-            onClick={() => router.push(`/live-chat/${activeSession.sessionId}`)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition hover:opacity-90"
-            style={{
-              background: 'rgba(52,211,153,0.08)',
-              border: '1px solid rgba(52,211,153,0.22)',
-            }}
-          >
-            <div className="relative flex-shrink-0">
-              <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
-              <MessageCircle size={16} className="text-emerald-400 relative" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-emerald-400 text-xs font-semibold">Ongoing Session</p>
-              <p className="text-white/40 text-xs truncate">
-                {activeSession.subjectName} · with {activeSession.partnerName}
-              </p>
-            </div>
-            <ChevronRight size={14} className="text-emerald-400/50 flex-shrink-0" />
-          </button>
+          <OngoingSessionCard
+            sessionId={activeSession.sessionId}
+            partnerName={activeSession.partnerName}
+            subjectName={activeSession.subjectName}
+            role="student"
+            onCleared={() => setActiveSession(null)}
+          />
         </motion.div>
       )}
 

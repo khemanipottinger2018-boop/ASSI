@@ -54,6 +54,8 @@ interface SessionStoreState {
   startedAt:        number | null;
   endsAt:           number | null;
   graceExpiresAt:   number | null;
+  // Whether the session can still be extended (+15 min). False once used.
+  canExtend:        boolean;
   // Live participant list (seeded from API, updated via socket)
   participants:     Participant[];
   // System messages injected by chat:system_message events
@@ -67,6 +69,7 @@ interface SessionStoreState {
   setStartedAt:          (t: number | null) => void;
   setEndsAt:             (t: number | null) => void;
   setGraceExpiresAt:     (t: number | null) => void;
+  setCanExtend:          (v: boolean) => void;
   setParticipants:       (ps: Participant[]) => void;
   appendSystemMessage:   (msg: Omit<SystemMessage, 'id'>) => void;
   mergeMeta:             (partial: Partial<SessionMeta> & { sessionId: string }) => void;
@@ -83,6 +86,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   startedAt:        null,
   endsAt:           null,
   graceExpiresAt:   null,
+  canExtend:        false,
   participants:     [],
   systemMessages:   [],
   pendingInvite:    null,
@@ -99,6 +103,8 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
   setEndsAt: (endsAt) => set({ endsAt }),
 
   setGraceExpiresAt: (graceExpiresAt) => set({ graceExpiresAt }),
+
+  setCanExtend: (canExtend) => set({ canExtend }),
 
   setParticipants: (participants) => set({ participants }),
 
@@ -138,6 +144,7 @@ export const useSessionStore = create<SessionStoreState>((set) => ({
         startedAt:        null,
         endsAt:           null,
         graceExpiresAt:   null,
+        canExtend:        false,
         participants:     [],
         systemMessages:   [],
       };

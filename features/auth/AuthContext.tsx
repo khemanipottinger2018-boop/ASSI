@@ -172,6 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem(REMEMBER_ME_KEY);
       localStorage.removeItem('assi:sidebar-collapsed');
       localStorage.removeItem('assi:streak_pause');
+      localStorage.removeItem('assi:streak_last_ping');
       // Clear sessionStorage
       sessionStorage.removeItem('assi_demo_credentials');
       setUser(null);

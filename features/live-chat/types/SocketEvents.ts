@@ -43,6 +43,11 @@ export type SessionMeta = {
   isPublic?:        boolean;       // conference only
   endsAt?:          number;        // ms epoch — hard session end time from backend
   graceExpiresAt?:  number;        // ms epoch — host-left grace period expiry
+  // Participant identity — seeded from API, used in header without a profile call
+  tutorId?:         string;
+  studentId?:       string;
+  tutorName?:       string;
+  studentName?:     string;
 };
 
 export type ServerToClientEvents = {
@@ -61,6 +66,7 @@ export type ServerToClientEvents = {
   'study:drawing:stop':         (p: { sessionId: string; username: string }) => void;
   'study:problem:posted':       (p: { sessionId: string; username: string }) => void;
   'session:participant_joined': (p: { sessionId: string; username: string }) => void;
+  'session:participant_left':   (p: { sessionId: string; userId: string }) => void;
 
   'session:meta':          (meta: SessionMeta) => void;
   'session:request':       (p: { sessionId: string }) => void;
@@ -68,6 +74,7 @@ export type ServerToClientEvents = {
   'session:started':       (p: { sessionId: string }) => void;
   'session:paused':        (p: { reason: string }) => void;
   'session:ended':         (p: { sessionId: string; reason: string }) => void;
+  'session:extended':      (p: { sessionId: string; endsAt: number; canExtend: boolean }) => void;
   'session:host_left':     (p: { sessionId: string; graceExpiresAt: number }) => void;
   'session:resumed':       (p: { sessionId: string }) => void;
   'session:participants':  (p: { sessionId: string; participants: Participant[] }) => void;
@@ -81,6 +88,7 @@ export type ServerToClientEvents = {
   'conference:unmuted':       (p: { sessionId: string; userId: string }) => void;
   'conference:floor_granted': (p: { sessionId: string; userId: string }) => void;
 
+  'session:kicked':   (p: { sessionId: string; by: string }) => void;
   'session:invited':  (p: { sessionId: string; fromUsername: string; subjectName?: string }) => void;
   'session:upcoming': (p: { sessionId: string; type: 'booked' | 'conference'; scheduledAt: string | null }) => void;
   // Emitted by backend when session meta changes (e.g. speakMode updated mid-conference).
@@ -92,6 +100,8 @@ export type ClientToServerEvents = {
   'session:join':   (p: { sessionId: string }) => void;
   'session:accept': (p: { sessionId: string }) => void;
   'session:end':    (p: { sessionId: string; reason: string }) => void;
+  'session:extend': (p: { sessionId: string }) => void;
+  'session:leave':  (p: { sessionId: string }) => void;
 
   'chat:join':  (sessionId: string) => void;
   'chat:leave': (sessionId: string) => void;

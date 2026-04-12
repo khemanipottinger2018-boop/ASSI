@@ -5,12 +5,20 @@ import { api } from '@/lib/api/client';
  * ===================================================== */
 
 export type SessionStatus =
-  | 'pending'     // awaiting tutor (booked or instant)
-  | 'matched'     // tutor accepted (instant flow)
-  | 'confirmed'   // scheduled session confirmed
-  | 'active'      // session in progress
+  // Prisma / booking statuses
+  | 'pending'          // awaiting tutor (booked or instant)
+  | 'matched'          // tutor accepted (instant flow)
+  | 'confirmed'        // scheduled session confirmed
+  | 'active'           // session in progress
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  // Runtime / Redis statuses (can appear in API responses for live sessions)
+  | 'waiting'          // instant session waiting for a tutor to accept
+  | 'in_progress'      // legacy alias for active
+  | 'instant_pending'  // instant session created, not yet waiting
+  | 'paused'           // session paused due to inactivity
+  | 'host_left_grace'  // tutor left, grace period active
+  | 'ended';           // terminal (from Redis; maps to completed in Prisma)
 
 /* =====================================================
  * Request Bodies

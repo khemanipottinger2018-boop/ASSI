@@ -35,6 +35,7 @@ import {
   SessionHeader, MessageFeed, ChatInput,
   SessionEndedScreen, SessionWaitingRoom, PausedBanner,
   GraceStateBanner, ActivityFeed, useActivityEvents, ConfirmEndBanner,
+  ExtensionPromptBanner,
 } from '../components/SessionShared';
 import type { SessionMeta, InviteRequest } from '@/features/live-chat/types/SocketEvents';
 
@@ -73,7 +74,7 @@ export function InstantChatView({
   const { events: activityEvents, push: pushActivity } = useActivityEvents();
 
   // ── Backend-authoritative session state — all transitions via useLiveSession ──
-  const { hydrating, status, endReason, startedAt, endsAt, graceExpiresAt } = useLiveSession(sessionId);
+  const { hydrating, status, endReason, startedAt, endsAt, graceExpiresAt, canExtend } = useLiveSession(sessionId);
   // Optimistic updates (handleEnd) still need direct store access
   const { setStatus, setEndReason } = useSessionStore();
   const sessionEnded      = status === 'ended';
@@ -91,6 +92,11 @@ export function InstantChatView({
   // Student-only: show the confirmation banner when they click End
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [pendingInvite, setPendingInvite] = useState<InviteRequest | null>(null);
+  const [extending,       setExtending]       = useState(false);
+  const [dismissedExtend, setDismissedExtend] = useState(false);
+  // Tick state: forces re-render every second so extension banner threshold
+  // is evaluated fresh without drift (same pattern as GraceStateBanner).
+  const [extTick, setExtTick] = useState(0);
 
   const [showTools,    setShowTools]    = useState(false);
   const joinedRef      = useRef(false);
@@ -146,6 +152,19 @@ export function InstantChatView({
   useEffect(() => {
     if (status === 'ended') clearActivityInterval();
   }, [status]);
+
+  /* ── Extension prompt tick — re-render every second to check remaining time ── */
+  useEffect(() => {
+    if (!endsAt || status === 'ended') return;
+    const t = setInterval(() => setExtTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [endsAt, status]);
+
+  /* ── Reset dismiss flag when endsAt changes (session was extended) ── */
+  useEffect(() => {
+    setDismissedExtend(false);
+    setExtending(false);
+  }, [endsAt]);
 
   /* ── session:activity heartbeat — keeps server watchdog alive ── */
   useEffect(() => {
@@ -227,6 +246,21 @@ export function InstantChatView({
       setAccepting(false);
     }
   }, [accepting, isReady, sessionId]);
+
+  // Derived: show extension banner when ≤ 3 min remain AND canExtend is true AND not dismissed.
+  // extTick drives re-evaluation every second. dismissedExtend lets the user hide it.
+  const remainingMs      = endsAt ? endsAt - Date.now() : Infinity;
+  const showExtendBanner = canExtend && !dismissedExtend && remainingMs <= 3 * 60 * 1000 && remainingMs > 0;
+  void extTick; // consumed to force re-render on each tick
+
+  const handleExtend = useCallback(() => {
+    if (extending || !canExtend) return;
+    setExtending(true);
+    emit('session:extend', { sessionId });
+    // canExtend will flip to false via session:extended socket event → banner hides
+    // Reset extending flag after a short timeout in case the event doesn't fire
+    setTimeout(() => setExtending(false), 5000);
+  }, [extending, canExtend, emit, sessionId]);
 
   // Student only: opens the ConfirmEndBanner; confirmed → ends session for both
   const handleEndRequest = useCallback(() => {
@@ -421,6 +455,17 @@ export function InstantChatView({
             <span className="text-orange-300/70 text-[11px]">Waiting for your tutor to join…</span>
           </div>
         )}
+        {/* Extension prompt — shown when ≤ 3 min remain on the 30-min cap */}
+        <AnimatePresence>
+          {showExtendBanner && !sessionEnded && (
+            <ExtensionPromptBanner
+              onExtend={handleExtend}
+              onDismiss={() => setDismissedExtend(true)}
+              extending={extending}
+            />
+          )}
+        </AnimatePresence>
+
         {sessionPaused && <PausedBanner />}
         {sessionGrace && graceExpiresAt && (
           <GraceStateBanner

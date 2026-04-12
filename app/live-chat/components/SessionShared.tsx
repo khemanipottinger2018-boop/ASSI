@@ -324,6 +324,57 @@ export function ConfirmEndBanner({ onConfirm, onCancel }: { onConfirm: () => voi
   );
 }
 
+/* ── Session extension prompt ── */
+/**
+ * ExtensionPromptBanner
+ *
+ * Shown when an instant session has ≤ 3 minutes remaining AND
+ * canExtend is true. Either participant can request the one-time
+ * 15-minute extension. Dismissed automatically once extended or
+ * the session ends.
+ */
+export function ExtensionPromptBanner({
+  onExtend,
+  onDismiss,
+  extending,
+}: {
+  onExtend:  () => void;
+  onDismiss: () => void;
+  extending: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+      transition={{ duration: 0.18 }}
+      className="shrink-0 flex items-center justify-between gap-3 px-4 py-2.5 border-b border-amber-500/20 bg-amber-500/8"
+    >
+      <div className="min-w-0">
+        <p className="text-amber-300/90 text-xs font-medium">Session ending soon</p>
+        <p className="text-amber-400/50 text-[10px] mt-0.5">Need more time? You can extend by 15 minutes once.</p>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button
+          onClick={onDismiss}
+          className="px-2.5 py-1.5 rounded-lg glass-soft text-white/35 text-[11px] hover:text-white/60 transition"
+        >
+          Dismiss
+        </button>
+        <button
+          onClick={onExtend}
+          disabled={extending}
+          className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold hover:bg-amber-500/30 disabled:opacity-50 transition flex items-center gap-1.5"
+        >
+          {extending ? (
+            <><span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin" />Extending…</>
+          ) : (
+            <>+15 min</>
+          )}
+        </button>
+      </div>
+    </motion.div>
+  );
+}
+
 /* ── Paused banner ── */
 export function PausedBanner() {
   return (

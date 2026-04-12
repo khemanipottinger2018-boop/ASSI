@@ -54,6 +54,7 @@ export type {
   AdminMetrics,
   DashboardStats,
   LiveSession,
+  LiveSessionStatus,
   ApplicationStatus,
 } from './admin';
 

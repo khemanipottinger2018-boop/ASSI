@@ -16,6 +16,7 @@ import TutorAvailabilityToggle from '@/features/presence/TutorAvailabilityToggle
 import { sessionsApi, api }    from '@/lib/api';
 import { browseApi }           from '@/features/booking/browseApi';
 import type { SessionSummary } from '@/features/booking/browseApi';
+import OngoingSessionCard      from '@/features/sessions/OngoingSessionCard';
 
 type QueueEntry = {
   sessionId:   string;
@@ -104,7 +105,9 @@ export default function TutorHomeSelector() {
 
     const unsubEnd = subscribe('session:ended', (payload: any) => {
       setQueue(prev => prev.filter(q => q.sessionId !== payload.sessionId));
-      setActiveSession(prev => prev?.sessionId === payload.sessionId ? null : prev);
+      setActiveSession(prev =>
+        !payload.sessionId || prev?.sessionId === payload.sessionId ? null : prev
+      );
     });
 
     const unsubStarted = subscribe('session:started', (payload: any) => {
@@ -217,23 +220,14 @@ export default function TutorHomeSelector() {
 
           {/* ── Active session ── */}
           {!loading && activeSession && (
-            <button
-              onClick={() => router.push(`/live-chat/${activeSession.sessionId}`)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-left transition hover:opacity-90"
-              style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.22)' }}
-            >
-              <div className="relative flex-shrink-0">
-                <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
-                <MessageCircle size={15} className="text-emerald-400 relative" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-emerald-400 text-xs font-semibold">Ongoing Session</p>
-                <p className="text-white/40 text-xs truncate">
-                  {activeSession.subjectName} · with {activeSession.partnerName}
-                </p>
-              </div>
-              <ChevronRight size={13} className="text-emerald-400/50 flex-shrink-0" />
-            </button>
+            <OngoingSessionCard
+              sessionId={activeSession.sessionId}
+              partnerName={activeSession.partnerName}
+              subjectName={activeSession.subjectName}
+              startedAt={activeSession.startedAt}
+              role="tutor"
+              onCleared={() => setActiveSession(null)}
+            />
           )}
 
           {/* ── Incoming requests ── */}

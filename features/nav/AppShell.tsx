@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth }        from '@/features/auth';
+import { useActivityStreak } from '@/features/streak/useActivityStreak';
 import { useSettings }    from '@/features/settings';
 import { useFeatures }    from '@/features/platform';
 import { useSocketContext } from '@/features/socket';
@@ -36,6 +37,7 @@ const NO_SCROLL_ROUTES = ['/assi', '/live-chat'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user }                                       = useAuth();
+  useActivityStreak(user);
   const { settings }                                   = useSettings();
   const { features, tier } = useFeatures();
   const { subscribe }                                  = useSocketContext();

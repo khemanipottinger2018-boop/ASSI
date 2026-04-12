@@ -7,11 +7,12 @@ import {
   Calendar, User, BookOpen, ChevronRight,
   Loader2, LogIn, XCircle, CheckCircle,
   X, AlertTriangle, MessageCircle,
+  PhoneOff, LogOut, Clock,
 } from 'lucide-react';
 import { sessionsApi, api }  from '@/lib/api';
 import { browseApi }         from '@/features/booking/browseApi';
 import { useAuth }           from '@/features/auth';
-import { useSocket }         from '@/features/socket';
+import { useSocketContext }  from '@/features/socket';
 import type { ChatSession }  from '@/lib/api';
 
 type Tab = 'upcoming' | 'completed' | 'all';
@@ -24,21 +25,25 @@ const statusStyle: Record<string, { label: string; color: string }> = {
   instant_pending: { label: 'Pending',   color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
   matched:         { label: 'Matched',   color: 'text-blue-400 bg-blue-500/15 border-blue-500/20'         },
   confirmed:       { label: 'Confirmed', color: 'text-purple-400 bg-purple-500/15 border-purple-500/20'   },
+  host_left_grace: { label: 'Grace',     color: 'text-orange-400 bg-orange-500/15 border-orange-500/20'   },
+  paused:          { label: 'Paused',    color: 'text-yellow-400 bg-yellow-500/15 border-yellow-500/20'   },
   completed:       { label: 'Done',      color: 'text-white/30 bg-white/5 border-white/10'                },
   cancelled:       { label: 'Cancelled', color: 'text-red-400/60 bg-red-500/10 border-red-500/15'         },
   ended:           { label: 'Ended',     color: 'text-white/30 bg-white/5 border-white/10'                },
 };
 
-const UPCOMING_STATUSES   = ['pending', 'confirmed', 'waiting', 'in_progress', 'active', 'matched', 'instant_pending'];
-const COMPLETED_STATUSES  = ['completed', 'cancelled', 'ended'];
-const LIVE_STATUSES       = ['active', 'in_progress', 'waiting', 'instant_pending', 'matched'];
-const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'active', 'in_progress', 'waiting', 'matched', 'instant_pending'];
-const INSTANT_STATUSES    = ['waiting', 'instant_pending'];
+const UPCOMING_STATUSES    = ['pending', 'confirmed', 'waiting', 'in_progress', 'active', 'matched', 'instant_pending', 'host_left_grace', 'paused'];
+const COMPLETED_STATUSES   = ['completed', 'cancelled', 'ended'];
+const LIVE_STATUSES        = ['active', 'in_progress', 'waiting', 'instant_pending', 'matched', 'host_left_grace', 'paused'];
+// Statuses where "Cancel" makes sense (pre-session, not yet live)
+const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'waiting', 'matched', 'instant_pending'];
+// Statuses where "End" / "Leave" makes sense (already live)
+const ENDABLE_STATUSES     = ['active', 'in_progress', 'host_left_grace', 'paused'];
 
 export default function SessionsPage() {
   const router = useRouter();
-  const { isTutor, user } = useAuth();
-  const { subscribe } = useSocket();
+  const { isTutor } = useAuth();
+  const { subscribe, emit, isConnected } = useSocketContext();
 
   const [sessions,    setSessions]    = useState<ChatSession[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -93,7 +98,9 @@ export default function SessionsPage() {
     return () => clearInterval(id);
   }, [fetchSessions]);
 
-  // Real-time status updates
+  // ── Real-time socket subscriptions ──────────────────────────────
+
+  // Booked session status change (e.g. waiting → active for scheduled sessions)
   useEffect(() => {
     return subscribe(
       'session:status_changed',
@@ -104,6 +111,44 @@ export default function SessionsPage() {
       },
     );
   }, [subscribe]);
+
+  // Session ended (by any party, watchdog, or inactivity)
+  useEffect(() => {
+    return subscribe(
+      'session:ended',
+      ({ sessionId }: { sessionId: string }) => {
+        setSessions(prev => prev.map(s =>
+          s.sessionId === sessionId ? { ...s, status: 'ended' as any, live: false } : s
+        ));
+        // Dismiss modal if it was showing this session
+        setSelected(prev => prev?.sessionId === sessionId ? null : prev);
+      },
+    );
+  }, [subscribe, isConnected]);
+
+  // Session paused (inactivity or manual)
+  useEffect(() => {
+    return subscribe(
+      'session:paused',
+      ({ sessionId }: { sessionId: string }) => {
+        setSessions(prev => prev.map(s =>
+          s.sessionId === sessionId ? { ...s, status: 'paused' as any } : s
+        ));
+      },
+    );
+  }, [subscribe, isConnected]);
+
+  // Host left → grace period started
+  useEffect(() => {
+    return subscribe(
+      'session:host_left',
+      ({ sessionId }: { sessionId: string }) => {
+        setSessions(prev => prev.map(s =>
+          s.sessionId === sessionId ? { ...s, status: 'host_left_grace' as any } : s
+        ));
+      },
+    );
+  }, [subscribe, isConnected]);
 
   // Tutor accepted → alert the student
   useEffect(() => {
@@ -165,7 +210,7 @@ export default function SessionsPage() {
     setActioning(true);
     setActionError('');
     try {
-      const isInstant = INSTANT_STATUSES.includes(selected.status);
+      const isInstant = ['waiting', 'instant_pending'].includes(selected.status);
       if (isInstant) {
         await api.post<{ success: boolean }>(`/api/live-chat/${selected.sessionId}/accept`);
       } else {
@@ -179,9 +224,7 @@ export default function SessionsPage() {
     }
   }, [selected, actioning, router]);
 
-  // Either party: cancel with optional reason
-  // Always use PATCH /api/browse/sessions/:id/cancel — it handles all statuses and both parties.
-  // POST /api/live-chat/:id/cancel is student-only from the waiting room (live-chat UI only).
+  // Cancel pre-live session (pending/confirmed/waiting/matched)
   const handleCancel = useCallback(async () => {
     if (!selected || actioning) return;
     setActioning(true);
@@ -202,6 +245,35 @@ export default function SessionsPage() {
       setActioning(false);
     }
   }, [selected, actioning, cancelReason]);
+
+  // End live session (student or tutor full-end) via socket
+  const handleEnd = useCallback(async () => {
+    if (!selected || actioning) return;
+    setActioning(true);
+    try {
+      emit('session:end', {
+        sessionId: selected.sessionId,
+        reason:    isTutor ? 'ended_by_tutor' : 'ended_by_student',
+      });
+      // Optimistic update — socket `session:ended` will also fire
+      setSessions(prev => prev.map(s =>
+        s.sessionId === selected.sessionId ? { ...s, status: 'ended' as any, live: false } : s
+      ));
+      closeModal();
+    } finally {
+      setActioning(false);
+    }
+  }, [selected, actioning, isTutor, emit]);
+
+  // Tutor leaves — triggers 2-min grace period, does NOT end the session
+  const handleLeave = useCallback(() => {
+    if (!selected) return;
+    emit('session:host_leave', { sessionId: selected.sessionId });
+    setSessions(prev => prev.map(s =>
+      s.sessionId === selected.sessionId ? { ...s, status: 'host_left_grace' as any } : s
+    ));
+    closeModal();
+  }, [selected, emit]);
 
   // ── Derived lists ──────────────────────────────────────────────
 
@@ -278,7 +350,7 @@ export default function SessionsPage() {
           <p className="text-white/30 text-sm">
             {tab === 'upcoming' ? 'No upcoming sessions' : 'No sessions yet'}
           </p>
-          {tab === 'upcoming' && (
+          {tab === 'upcoming' && !isTutor && (
             <button onClick={() => router.push('/browse')}
               className="mt-4 px-5 py-2 rounded-xl bg-white text-orange-600 text-xs font-semibold hover:bg-white/90 transition">
               Find a tutor
@@ -290,6 +362,7 @@ export default function SessionsPage() {
           {displayed.map((session, i) => {
             const style     = statusStyle[session.status] ?? statusStyle.pending;
             const isLive    = LIVE_STATUSES.includes(session.status);
+            const isGrace   = session.status === 'host_left_grace';
             const startedAt = session.startedAt ? new Date(session.startedAt) : null;
             const dateStr   = startedAt
               ? startedAt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -304,13 +377,16 @@ export default function SessionsPage() {
                 transition={{ delay: i * 0.04, duration: 0.3 }}
                 onClick={() => openModal(session)}
                 className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition group"
+                style={isGrace ? { borderColor: 'rgba(251,146,60,0.2)' } : undefined}
               >
                 <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
-                  {isLive
+                  {isLive && !isGrace
                     ? <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
                       </span>
+                    : isGrace
+                    ? <Clock size={15} className="text-orange-400" />
                     : <User size={15} className="text-white/35" />
                   }
                 </div>
@@ -395,6 +471,8 @@ export default function SessionsPage() {
             onConfirmCancel={handleCancel}
             onBackFromCancel={() => { setCancelMode(false); setCancelReason(''); setActionError(''); }}
             onRejoin={() => { closeModal(); router.push(`/live-chat/${selected.sessionId}`); }}
+            onEnd={handleEnd}
+            onLeave={handleLeave}
           />
         )}
       </AnimatePresence>
@@ -407,7 +485,7 @@ export default function SessionsPage() {
 function SessionModal({
   session, isTutor, cancelMode, cancelReason, actioning, actionError,
   onClose, onJoin, onStartCancel, onCancelReasonChange,
-  onConfirmCancel, onBackFromCancel, onRejoin,
+  onConfirmCancel, onBackFromCancel, onRejoin, onEnd, onLeave,
 }: {
   session:              ChatSession;
   isTutor:              boolean;
@@ -422,12 +500,15 @@ function SessionModal({
   onConfirmCancel:      () => void;
   onBackFromCancel:     () => void;
   onRejoin:             () => void;
+  onEnd:                () => void;
+  onLeave:              () => void;
 }) {
-  const style        = statusStyle[session.status] ?? statusStyle.pending;
-  const isLive       = LIVE_STATUSES.includes(session.status);
-  const isCancellable = CANCELLABLE_STATUSES.includes(session.status);
-  const canJoin      = isTutor && isCancellable;
-  const startedAt    = session.startedAt ? new Date(session.startedAt) : null;
+  const style          = statusStyle[session.status] ?? statusStyle.pending;
+  const isLive         = LIVE_STATUSES.includes(session.status);
+  const isCancellable  = CANCELLABLE_STATUSES.includes(session.status);
+  const isEndable      = ENDABLE_STATUSES.includes(session.status);
+  const canJoin        = isTutor && isCancellable;
+  const startedAt      = session.startedAt ? new Date(session.startedAt) : null;
 
   return (
     <>
@@ -485,6 +566,12 @@ function SessionModal({
                   {' · '}
                   {startedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
                 </span>
+              </div>
+            )}
+            {session.status === 'host_left_grace' && (
+              <div className="flex items-center gap-2 text-orange-400/70 text-xs">
+                <Clock size={11} />
+                <span>Tutor left — grace period active</span>
               </div>
             )}
           </div>
@@ -552,7 +639,27 @@ function SessionModal({
                   </button>
                 )}
 
-                {/* Cancel */}
+                {/* ── End / Leave actions for live sessions ── */}
+                {isEndable && (
+                  <>
+                    {/* Tutor: Leave (grace period) — only if not already in grace */}
+                    {isTutor && session.status !== 'host_left_grace' && (
+                      <button onClick={onLeave}
+                        className="w-full py-2.5 rounded-xl glass-soft text-orange-400/70 hover:text-orange-400 hover:bg-orange-500/8 text-sm transition flex items-center justify-center gap-2">
+                        <LogOut size={13} />
+                        Leave Session
+                      </button>
+                    )}
+                    {/* End session (both roles) */}
+                    <button onClick={onEnd} disabled={actioning}
+                      className="w-full py-2.5 rounded-xl bg-red-500/12 border border-red-500/22 text-red-400 hover:bg-red-500/20 text-sm font-medium transition disabled:opacity-40 flex items-center justify-center gap-2">
+                      {actioning ? <Loader2 size={13} className="animate-spin" /> : <PhoneOff size={13} />}
+                      End Session
+                    </button>
+                  </>
+                )}
+
+                {/* Cancel pre-live session */}
                 {isCancellable && (
                   <button onClick={onStartCancel}
                     className="w-full py-2.5 rounded-xl glass-soft text-white/40 hover:text-red-400 hover:bg-red-500/8 text-sm transition flex items-center justify-center gap-2">
@@ -562,7 +669,7 @@ function SessionModal({
                 )}
 
                 {/* No actions available */}
-                {!isLive && !canJoin && !isCancellable && (
+                {!isLive && !canJoin && !isCancellable && !isEndable && (
                   <p className="text-center text-white/25 text-sm py-2">No actions available</p>
                 )}
               </motion.div>

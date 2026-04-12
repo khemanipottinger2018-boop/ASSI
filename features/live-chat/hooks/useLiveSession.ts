@@ -35,6 +35,7 @@ type LiveSessionApiResponse = {
     startedAt?:      number | null;
     endsAt?:         number | null;
     graceExpiresAt?: number | null;
+    canExtend?:      boolean;
     participants?:   Participant[];
   } | null;
 };
@@ -48,6 +49,7 @@ export function useLiveSession(sessionId: string) {
     startedAt,
     endsAt,
     graceExpiresAt,
+    canExtend,
     participants,
     systemMessages,
     setStatus,
@@ -55,6 +57,7 @@ export function useLiveSession(sessionId: string) {
     setStartedAt,
     setEndsAt,
     setGraceExpiresAt,
+    setCanExtend,
     setParticipants,
     reset,
   } = useSessionStore();
@@ -75,7 +78,7 @@ export function useLiveSession(sessionId: string) {
     api.get<LiveSessionApiResponse>(`/api/live-chat/${sessionId}`)
       .then(d => {
         if (cancelled || !d.success || !d.session) return;
-        const { status: s, endedReason, startedAt: sa, endsAt: ea, graceExpiresAt: gea, participants: ps } = d.session;
+        const { status: s, endedReason, startedAt: sa, endsAt: ea, graceExpiresAt: gea, canExtend: ce, participants: ps } = d.session;
 
         // Let the backend status drive the store — no local inference.
         const mapped = s as StoreSessionStatus;
@@ -86,6 +89,7 @@ export function useLiveSession(sessionId: string) {
         if (sa  != null) setStartedAt(sa);
         if (ea  != null) setEndsAt(ea);
         if (gea != null) setGraceExpiresAt(gea);
+        if (ce  != null) setCanExtend(ce);
         if (ps  != null) setParticipants(ps);
       })
       .catch(() => {
@@ -106,6 +110,7 @@ export function useLiveSession(sessionId: string) {
     startedAt,
     endsAt,
     graceExpiresAt,
+    canExtend,
     participants,
     systemMessages,
   };

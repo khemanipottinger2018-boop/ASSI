@@ -32,6 +32,8 @@ export function useSessionEvents(sessionId: string) {
   const setStatus            = useSessionStore(s => s.setStatus);
   const setEndReason         = useSessionStore(s => s.setEndReason);
   const setGraceExpiresAt    = useSessionStore(s => s.setGraceExpiresAt);
+  const setEndsAt            = useSessionStore(s => s.setEndsAt);
+  const setCanExtend         = useSessionStore(s => s.setCanExtend);
   const appendSystemMessage  = useSessionStore(s => s.appendSystemMessage);
   const mergeMeta            = useSessionStore(s => s.mergeMeta);
 
@@ -91,6 +93,15 @@ export function useSessionEvents(sessionId: string) {
       mergeMeta(meta);
     };
 
+    // session:extended — backend confirms the one-time +15 min extension.
+    // Updates endsAt so the timer resets and marks canExtend false so the
+    // prompt never shows again.
+    const onExtended = ({ sessionId: sid, endsAt, canExtend }: { sessionId: string; endsAt: number; canExtend: boolean }) => {
+      if (sid !== sessionId) return;
+      setEndsAt(endsAt);
+      setCanExtend(canExtend);
+    };
+
     // chat:system_message — backend-generated notifications (e.g. "host has left")
     const onSystemMessage = ({ sessionId: sid, content, timestamp }: { sessionId: string; content: string; timestamp: number }) => {
       if (sid !== sessionId) return;
@@ -104,6 +115,7 @@ export function useSessionEvents(sessionId: string) {
     on('session:resumed',      onResumed);
     on('session:updated',      onUpdated);
     on('session:meta',         onMeta);
+    on('session:extended',     onExtended);
     on('chat:system_message',  onSystemMessage);
 
     return () => {
@@ -114,7 +126,8 @@ export function useSessionEvents(sessionId: string) {
       off('session:resumed',     onResumed);
       off('session:updated',     onUpdated);
       off('session:meta',        onMeta);
+      off('session:extended',    onExtended);
       off('chat:system_message', onSystemMessage);
     };
-  }, [sessionId, isConnected, on, off, setStatus, setEndReason, setGraceExpiresAt, appendSystemMessage, mergeMeta]);
+  }, [sessionId, isConnected, on, off, setStatus, setEndReason, setGraceExpiresAt, setEndsAt, setCanExtend, appendSystemMessage, mergeMeta]);
 }

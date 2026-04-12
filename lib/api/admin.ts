@@ -55,16 +55,20 @@ export type AdminApplicationDetail = AdminApplication & {
 
 /* =====================================================
  * Live Session — GET /api/admin/sessions/live
- * ⚠️  Does NOT have subjectName or messageCount
  * ===================================================== */
+
+export type LiveSessionStatus = 'waiting' | 'active' | 'paused' | 'host_left_grace';
 
 export type LiveSession = {
   sessionId:        string;
-  status:           'waiting' | 'active';
+  status:           LiveSessionStatus;
   type:             'instant' | 'scheduled';
   studentId:        string;
+  studentUsername:  string;
   tutorId:          string | null;
-  subjectId:        string | null;   // uuid only — no name
+  tutorUsername:    string | null;
+  subjectId:        string | null;
+  subjectName:      string | null;
   startedAt:        number;          // ms epoch
   participants:     string[];
   participantCount: number;
