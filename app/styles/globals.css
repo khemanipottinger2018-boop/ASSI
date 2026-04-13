@@ -38,6 +38,34 @@
   --light-surface:   #ffffff;
   --light-tint:      rgba(249, 115, 22, 0.0);
   --light-shadow:    rgba(0, 0, 0, 0.08);
+
+  /* ── Visual Intensity defaults (balanced) ── */
+  --intensity-blur:        14px;
+  --intensity-blur-soft:   10px;
+  --intensity-panel-blur:   6px;
+}
+
+/* =====================================================
+   VISUAL INTENSITY SYSTEM
+   data-intensity="high|balanced|minimal" on <html>
+   Controls backdrop blur depth across .glass, .panel.
+   ===================================================== */
+[data-intensity="high"] {
+  --intensity-blur:        20px;
+  --intensity-blur-soft:   14px;
+  --intensity-panel-blur:  10px;
+}
+
+[data-intensity="balanced"] {
+  --intensity-blur:        14px;
+  --intensity-blur-soft:   10px;
+  --intensity-panel-blur:   6px;
+}
+
+[data-intensity="minimal"] {
+  --intensity-blur:         6px;
+  --intensity-blur-soft:    4px;
+  --intensity-panel-blur:   2px;
 }
 
 /* =====================================================
@@ -265,6 +293,135 @@
 
 
 /* =====================================================
+   SYSTEM MODE — follows OS prefers-color-scheme
+   CSS handles the token swap; no JS needed.
+   ===================================================== */
+@media (prefers-color-scheme: light) {
+  [data-color-mode="system"] {
+    --foreground:       #0f0f0f;
+    --foreground-muted: #2a2a2a;
+    --foreground-dim:   #666666;
+
+    --panel-bg:        rgba(255, 255, 255, 0.78);
+    --panel-border:    rgba(0, 0, 0, 0.07);
+    --panel-hover:     rgba(255, 255, 255, 0.92);
+
+    --glass-bg:        rgba(255, 255, 255, 0.72);
+    --glass-border:    rgba(0, 0, 0, 0.09);
+    --glass-highlight: rgba(255, 255, 255, 0.95);
+
+    --sidebar-bg:      rgba(255, 255, 255, 0.80);
+    --sidebar-border:  rgba(0, 0, 0, 0.07);
+
+    --light-shadow:    rgba(0, 0, 0, 0.10);
+  }
+
+  /* Component overrides — mirrors [data-color-mode="light"] */
+  [data-color-mode="system"] .panel {
+    background:    var(--panel-bg);
+    border-color:  var(--panel-border);
+    box-shadow:
+      0 1px 3px var(--light-shadow),
+      0 8px 24px rgba(0, 0, 0, 0.06),
+      0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  [data-color-mode="system"] .panel:hover {
+    box-shadow:
+      0 2px 8px var(--light-shadow),
+      0 16px 40px rgba(0, 0, 0, 0.08),
+      0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  }
+
+  [data-color-mode="system"] .glass {
+    background:    var(--glass-bg);
+    border-color:  var(--glass-border);
+    box-shadow:
+      0 4px  12px  var(--light-shadow),
+      0 12px 32px  rgba(0, 0, 0, 0.06),
+      0 32px 64px  rgba(0, 0, 0, 0.04),
+      inset 0  1px 0 rgba(255, 255, 255, 0.90),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.06),
+      0 0 0 0.5px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  [data-color-mode="system"] .glass-soft {
+    background:   rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.07);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  [data-color-mode="system"] .sidebar-bg {
+    background:   var(--sidebar-bg);
+    border-color: var(--sidebar-border);
+    box-shadow:   2px 0 20px rgba(0, 0, 0, 0.06);
+  }
+
+  [data-color-mode="system"] .text-white       { color: #0f0f0f !important; }
+  [data-color-mode="system"] .text-white\/80   { color: #1a1a1a !important; }
+  [data-color-mode="system"] .text-white\/70   { color: #2a2a2a !important; }
+  [data-color-mode="system"] .text-white\/60   { color: #404040 !important; }
+  [data-color-mode="system"] .text-white\/55   { color: #4a4a4a !important; }
+  [data-color-mode="system"] .text-white\/50   { color: #555555 !important; }
+  [data-color-mode="system"] .text-white\/40   { color: #6a6a6a !important; }
+  [data-color-mode="system"] .text-white\/35   { color: #777777 !important; }
+  [data-color-mode="system"] .text-white\/30   { color: #888888 !important; }
+  [data-color-mode="system"] .text-white\/25   { color: #999999 !important; }
+  [data-color-mode="system"] .text-white\/20   { color: #aaaaaa !important; }
+
+  [data-color-mode="system"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
+  [data-color-mode="system"] .border-white\/8  { border-color: rgba(0, 0, 0, 0.06) !important; }
+  [data-color-mode="system"] .border-white\/15 { border-color: rgba(0, 0, 0, 0.09) !important; }
+  [data-color-mode="system"] .border-white\/20 { border-color: rgba(0, 0, 0, 0.11) !important; }
+  [data-color-mode="system"] .border-white\/30 { border-color: rgba(0, 0, 0, 0.14) !important; }
+
+  [data-color-mode="system"] .bg-white\/4   { background: rgba(0, 0, 0, 0.025) !important; }
+  [data-color-mode="system"] .bg-white\/5   { background: rgba(0, 0, 0, 0.03)  !important; }
+  [data-color-mode="system"] .bg-white\/6   { background: rgba(0, 0, 0, 0.035) !important; }
+  [data-color-mode="system"] .bg-white\/8   { background: rgba(0, 0, 0, 0.045) !important; }
+  [data-color-mode="system"] .bg-white\/10  { background: rgba(0, 0, 0, 0.055) !important; }
+  [data-color-mode="system"] .bg-white\/12  { background: rgba(0, 0, 0, 0.065) !important; }
+  [data-color-mode="system"] .bg-white\/15  { background: rgba(0, 0, 0, 0.08)  !important; }
+
+  [data-color-mode="system"] input,
+  [data-color-mode="system"] textarea,
+  [data-color-mode="system"] select {
+    color: var(--foreground);
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.10);
+  }
+
+  [data-color-mode="system"] input::placeholder,
+  [data-color-mode="system"] textarea::placeholder {
+    color: rgba(0, 0, 0, 0.25);
+  }
+
+  [data-color-mode="system"] input:focus,
+  [data-color-mode="system"] textarea:focus,
+  [data-color-mode="system"] select:focus {
+    border-color: rgba(249, 115, 22, 0.40);
+    box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.08);
+  }
+
+  [data-color-mode="system"] ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+  }
+  [data-color-mode="system"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  [data-color-mode="system"] ::selection {
+    background: rgba(249, 115, 22, 0.20);
+    color: #0f0f0f;
+  }
+}
+
+/* =====================================================
    PREMIUM THEMES (ASSI+)
    ===================================================== */
 
@@ -379,8 +536,8 @@ html {
    ===================================================== */
 .glass {
   background:              var(--glass-bg);
-  backdrop-filter:         blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter:         blur(var(--intensity-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-blur));
   border:                  1px solid var(--glass-border);
   box-shadow:
     /* Outer depth — three layers */
@@ -398,8 +555,8 @@ html {
 
 .glass-soft {
   background:              rgba(255, 255, 255, 0.06);
-  backdrop-filter:         blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter:         blur(var(--intensity-blur-soft));
+  -webkit-backdrop-filter: blur(var(--intensity-blur-soft));
   border:                  1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     /* Lighter outer — nested surfaces sit closer */
@@ -417,8 +574,8 @@ html {
 .panel {
   background:              var(--panel-bg);
   border:                  1px solid var(--panel-border);
-  backdrop-filter:         blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter:         blur(var(--intensity-panel-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-panel-blur));
   box-shadow:
     0 2px  8px  rgba(0, 0, 0, 0.12),
     0 8px  24px rgba(0, 0, 0, 0.14),
@@ -431,8 +588,8 @@ html {
 
 .glass-active {
   background:              var(--glass-bg);
-  backdrop-filter:         blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter:         blur(var(--intensity-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-blur));
   border:                  1px solid var(--accent);
   box-shadow:
     0 4px  12px  rgba(0, 0, 0, 0.18),
@@ -535,144 +692,6 @@ html {
 .ui-layer {
   position: relative;
   z-index:  11; /* beats Vignette(9) + GrainOverlay(10) */
-}
-/* =====================================================
-   COLORED THEME GLASS OVERRIDES
-   Dark rgba(255,255,255,0.08) glass looks muddy on
-   orange, green, blue backgrounds. Per-theme overrides
-   shift to frosted white + color accent.
-   ===================================================== */
-
-/* Lava Lamp variants */
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="midnight"] {
-  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(124,58,237,0.25); --glass-highlight: rgba(124,58,237,0.12); --panel-bg: rgba(0,0,0,0.45); --panel-border: rgba(124,58,237,0.15);
-}
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="forest"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(113,178,128,0.22); --glass-highlight: rgba(113,178,128,0.10); --panel-bg: rgba(0,10,5,0.40); --panel-border: rgba(113,178,128,0.14);
-}
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="ocean"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(0,180,219,0.22); --glass-highlight: rgba(0,180,219,0.10); --panel-bg: rgba(0,5,20,0.42); --panel-border: rgba(0,180,219,0.14);
-}
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="sunset"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(255,210,80,0.20); --glass-highlight: rgba(255,210,80,0.10); --panel-bg: rgba(20,5,0,0.40); --panel-border: rgba(247,151,30,0.16);
-}
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="aurora"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(0,195,255,0.22); --glass-highlight: rgba(168,85,247,0.12); --panel-bg: rgba(0,8,16,0.42); --panel-border: rgba(0,195,255,0.14);
-}
-[data-color-mode="dark"][data-theme-group="lavalamp"][data-theme-variant="rose"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(233,30,99,0.22); --glass-highlight: rgba(233,30,99,0.10); --panel-bg: rgba(20,0,10,0.42); --panel-border: rgba(201,75,75,0.16);
-}
-
-/* Space variants */
-[data-color-mode="dark"][data-theme-group="space"] {
-  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(79,195,247,0.18); --glass-highlight: rgba(79,195,247,0.08); --panel-bg: rgba(0,0,10,0.50); --panel-border: rgba(79,195,247,0.12);
-}
-[data-color-mode="dark"][data-theme-group="space"][data-theme-variant="nebula"] {
-  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(124,58,237,0.22); --glass-highlight: rgba(168,85,247,0.10); --panel-bg: rgba(5,0,20,0.52); --panel-border: rgba(124,58,237,0.16);
-}
-[data-color-mode="dark"][data-theme-group="space"][data-theme-variant="galaxy"] {
-  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(157,78,221,0.22); --glass-highlight: rgba(157,78,221,0.10); --panel-bg: rgba(0,0,20,0.52); --panel-border: rgba(66,103,212,0.18);
-}
-
-/* Season variants */
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="spring"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="spring"] {
-  --glass-bg: rgba(255,255,255,0.13); --glass-border: rgba(86,171,47,0.28); --glass-highlight: rgba(168,224,99,0.14); --panel-bg: rgba(10,25,0,0.38); --panel-border: rgba(86,171,47,0.18);
-}
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="summer"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="summer"] {
-  --glass-bg: rgba(255,255,255,0.13); --glass-border: rgba(255,210,0,0.28); --glass-highlight: rgba(255,210,0,0.12); --panel-bg: rgba(20,12,0,0.38); --panel-border: rgba(247,151,30,0.20);
-}
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="autumn"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="autumn"] {
-  --glass-bg: rgba(255,255,255,0.11); --glass-border: rgba(233,100,67,0.26); --glass-highlight: rgba(233,100,67,0.10); --panel-bg: rgba(18,6,0,0.40); --panel-border: rgba(144,78,149,0.18);
-}
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="winter"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="winter"] {
-  --glass-bg: rgba(255,255,255,0.12); --glass-border: rgba(130,164,212,0.28); --glass-highlight: rgba(182,251,255,0.14); --panel-bg: rgba(5,12,25,0.40); --panel-border: rgba(130,164,212,0.20);
-}
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="dry"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="dry"] {
-  --glass-bg: rgba(255,255,255,0.11); --glass-border: rgba(231,111,81,0.26); --glass-highlight: rgba(244,162,97,0.12); --panel-bg: rgba(20,8,0,0.38); --panel-border: rgba(231,111,81,0.18);
-}
-[data-color-mode="dark"][data-theme-group="seasons"][data-theme-variant="rainy"],
-[data-color-mode="custom"][data-theme-group="seasons"][data-theme-variant="rainy"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(100,140,200,0.22); --glass-highlight: rgba(100,140,200,0.10); --panel-bg: rgba(5,10,20,0.44); --panel-border: rgba(100,140,200,0.15);
-}
-
-/* Event variants */
-[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="christmas"],
-[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="christmas"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(220,53,69,0.24); --glass-highlight: rgba(25,135,84,0.12); --panel-bg: rgba(5,18,8,0.42); --panel-border: rgba(25,135,84,0.18);
-}
-[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="halloween"],
-[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="halloween"] {
-  --glass-bg: rgba(255,255,255,0.07); --glass-border: rgba(255,117,24,0.28); --glass-highlight: rgba(255,117,24,0.10); --panel-bg: rgba(15,5,0,0.48); --panel-border: rgba(255,117,24,0.18);
-}
-[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="new_year"],
-[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="new_year"] {
-  --glass-bg: rgba(255,255,255,0.08); --glass-border: rgba(79,195,247,0.22); --glass-highlight: rgba(255,215,0,0.14); --panel-bg: rgba(0,0,8,0.50); --panel-border: rgba(255,215,0,0.16);
-}
-[data-color-mode="dark"][data-theme-group="events"][data-theme-variant="independence"],
-[data-color-mode="custom"][data-theme-group="events"][data-theme-variant="independence"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(0,155,58,0.26); --glass-highlight: rgba(254,209,0,0.12); --panel-bg: rgba(0,12,4,0.42); --panel-border: rgba(0,155,58,0.18);
-}
-
-/* Subject variants */
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="mathematics"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="mathematics"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(25,118,210,0.28); --glass-highlight: rgba(66,165,245,0.12); --panel-bg: rgba(0,5,20,0.42); --panel-border: rgba(25,118,210,0.18);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="sciences"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="sciences"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(46,125,50,0.28); --glass-highlight: rgba(102,187,106,0.12); --panel-bg: rgba(0,10,2,0.42); --panel-border: rgba(46,125,50,0.18);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="languages"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="languages"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(142,36,170,0.28); --glass-highlight: rgba(206,147,216,0.12); --panel-bg: rgba(10,0,15,0.42); --panel-border: rgba(142,36,170,0.18);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="business"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="business"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(0,105,92,0.28); --glass-highlight: rgba(77,182,172,0.12); --panel-bg: rgba(0,10,8,0.42); --panel-border: rgba(0,105,92,0.18);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="technology"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="technology"] {
-  --glass-bg: rgba(255,255,255,0.09); --glass-border: rgba(40,53,147,0.30); --glass-highlight: rgba(121,134,203,0.12); --panel-bg: rgba(0,0,18,0.44); --panel-border: rgba(40,53,147,0.20);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="arts"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="arts"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(230,74,25,0.26); --glass-highlight: rgba(255,138,101,0.12); --panel-bg: rgba(18,4,0,0.40); --panel-border: rgba(230,74,25,0.18);
-}
-[data-color-mode="dark"][data-theme-group="subjects"][data-theme-variant="health"],
-[data-color-mode="custom"][data-theme-group="subjects"][data-theme-variant="health"] {
-  --glass-bg: rgba(255,255,255,0.10); --glass-border: rgba(194,24,91,0.26); --glass-highlight: rgba(240,98,146,0.12); --panel-bg: rgba(18,0,8,0.42); --panel-border: rgba(194,24,91,0.18);
-}
-
-/* Apply tokens to components on colored themes */
-[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .glass,
-[data-theme-group="space"] .glass,
-[data-theme-group="seasons"] .glass,
-[data-theme-group="events"] .glass,
-[data-theme-group="subjects"] .glass {
-  background:   var(--glass-bg);
-  border-color: var(--glass-border);
-  box-shadow:   0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 var(--glass-highlight);
-}
-[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .glass-soft,
-[data-theme-group="space"] .glass-soft,
-[data-theme-group="seasons"] .glass-soft,
-[data-theme-group="events"] .glass-soft,
-[data-theme-group="subjects"] .glass-soft {
-  background:   var(--glass-bg);
-  border-color: var(--glass-border);
-}
-[data-theme-group="lavalamp"]:not([data-theme-variant="assi"]) .panel,
-[data-theme-group="space"] .panel,
-[data-theme-group="seasons"] .panel,
-[data-theme-group="events"] .panel,
-[data-theme-group="subjects"] .panel {
-  background:   var(--panel-bg);
-  border-color: var(--panel-border);
 }
 
 /* ASSI DOF overlay */

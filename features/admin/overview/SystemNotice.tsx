@@ -5,13 +5,13 @@ import { CheckCircle, AlertTriangle } from 'lucide-react';
 export default function SystemNotice({ status }: { status: 'ok' | 'warning' }) {
   const ok = status === 'ok';
 
+  const borderColor = ok ? 'rgba(0,255,150,0.15)' : 'rgba(255,159,10,0.2)';
+
   return (
-    <div style={{
-      padding: '12px 16px', borderRadius: 10,
-      background: ok ? 'rgba(0,255,150,0.04)' : 'rgba(255,159,10,0.06)',
-      border: `1px solid ${ok ? 'rgba(0,255,150,0.15)' : 'rgba(255,159,10,0.2)'}`,
-      display: 'flex', alignItems: 'center', gap: 12,
-    }}>
+    <div
+      className="panel flex items-center gap-3"
+      style={{ borderRadius: 10, padding: '12px 16px', borderColor }}
+    >
       {ok
         ? <CheckCircle size={14} style={{ color: '#00ff96', flexShrink: 0 }} />
         : <AlertTriangle size={14} style={{ color: '#ff9f0a', flexShrink: 0 }} />

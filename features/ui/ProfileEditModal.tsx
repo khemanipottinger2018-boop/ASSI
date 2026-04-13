@@ -83,7 +83,7 @@ export default function ProfileEditModal({
             <input
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full px-3 py-2 rounded-lg bg-white/10 text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             />
           </div>
 
@@ -100,7 +100,7 @@ export default function ProfileEditModal({
         </div>
 
         {isTutor && (
-          <div className="rounded-xl bg-purple-500/10 border border-purple-500/20 p-4 space-y-4">
+          <div className="glass-soft rounded-xl p-4 space-y-4">
             <h3 className="text-sm font-semibold text-white/90">Tutor Details</h3>
 
             <div>
@@ -109,7 +109,7 @@ export default function ProfileEditModal({
                 type="number"
                 value={form.hourlyRate}
                 onChange={(e) => setForm({ ...form, hourlyRate: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                 placeholder="e.g. 25"
                 min={0}
               />
@@ -120,7 +120,7 @@ export default function ProfileEditModal({
               <input
                 value={form.timezone}
                 onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
                 placeholder="e.g. America/Jamaica"
               />
             </div>
@@ -142,7 +142,7 @@ export default function ProfileEditModal({
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition disabled:opacity-50"
+            className="px-5 py-2 rounded-lg bg-[var(--accent)] hover:brightness-110 text-white font-medium transition disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save Changes'}
           </button>

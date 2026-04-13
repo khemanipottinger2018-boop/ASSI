@@ -15,6 +15,7 @@ import { NotificationsProvider } from '@/features/notifications';
 import AnimatedGradient from '@/features/themes/visuals/AnimatedGradient';
 import FloatingBlobs from '@/features/themes/visuals/FloatingBlobs';
 import AppShell from '@/features/nav/AppShell';
+import { BootGate } from '@/features/boot';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -38,15 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           {/* Main App Providers + Suspense Boundary */}
-          <Suspense
-            fallback={
-              <div className="min-h-screen flex items-center justify-center bg-black">
-                <span className="text-white/30 text-xs tracking-widest uppercase animate-pulse">
-                  Loading ASSI...
-                </span>
-              </div>
-            }
-          >
+          <Suspense fallback={null}>
             <AuthProvider>
               <ViewContextProvider>
                 <SocketProvider>
@@ -54,15 +47,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                     <SettingsProvider>
                       <FeaturesProvider>
                         {/* UI Layer */}
-                        <div 
-                          className="ui-layer" 
-                          style={{ 
-                            height: '100dvh', 
-                            width: '100vw', 
-                            overflow: 'hidden' 
+                        <div
+                          className="ui-layer"
+                          style={{
+                            height: '100dvh',
+                            width: '100vw',
+                            overflow: 'hidden'
                           }}
                         >
-                          <AppShell>{children}</AppShell>
+                          <BootGate>
+                            <AppShell>{children}</AppShell>
+                          </BootGate>
                         </div>
                       </FeaturesProvider>
                     </SettingsProvider>

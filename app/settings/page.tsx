@@ -6,7 +6,7 @@ import {
   Settings, Bell, Palette, Sliders, Check,
   Sun, Moon, Sparkles, Star, Leaf, BookOpen,
   User, Globe, Lock, Zap, Eye, EyeOff, Crown, Calendar,
-  ShieldCheck, Flame, Loader2,
+  ShieldCheck, Flame, Loader2, Monitor, Layers,
 } from 'lucide-react';
 import { useSettings } from '@/features/settings';
 import { useAuth } from '@/features/auth';
@@ -20,6 +20,7 @@ import {
 } from '@/features/themes/core/ThemeProvider';
 import type {
   ColorMode,
+  VisualIntensity,
   LavaLampVariant,
   SpaceVariant,
   SeasonVariant,
@@ -28,6 +29,7 @@ import type {
   ThemeGroup,
   PremiumVariant,
 } from '@/features/themes/core/ThemeProvider';
+import { REMEMBER_ME_KEY } from '@/features/auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -41,8 +43,15 @@ const fade = {
 
 const COLOR_MODES: { value: ColorMode; label: string; icon: React.ElementType; desc: string }[] = [
   { value: 'dark',   label: 'Dark',   icon: Moon,     desc: 'Black + orange accents' },
-  { value: 'light',  label: 'Light',  icon: Sun,      desc: 'White + orange accents' },
+  { value: 'light',  label: 'Light',  icon: Sun,      desc: 'White + black text' },
+  { value: 'system', label: 'System', icon: Monitor,  desc: 'Follows your OS' },
   { value: 'custom', label: 'Custom', icon: Sparkles, desc: 'Your chosen theme' },
+];
+
+const VISUAL_INTENSITY_OPTIONS: { value: VisualIntensity; label: string; desc: string }[] = [
+  { value: 'high',     label: 'High',     desc: 'Vivid blur + full glow' },
+  { value: 'balanced', label: 'Balanced', desc: 'Default — works for most' },
+  { value: 'minimal',  label: 'Minimal',  desc: 'Quieter blur, less glass' },
 ];
 
 const THEME_GROUPS: { value: ThemeGroup; label: string; icon: React.ElementType; desc: string; plus?: boolean }[] = [
@@ -143,11 +152,26 @@ export default function SettingsPage() {
   const {
     themeGroup, themeVariant, colorMode, isSentinel, isSyncing,
     applyTheme, setThemeVariant, setColorMode, setCustomPreset,
+    visualIntensity, setVisualIntensity,
+    timeAuto, setTimeAuto,
     seasonAuto, weatherAuto, setSeasonAuto, setWeatherAuto,
   } = useTheme();
 
   const [saved,         setSaved]         = useState(false);
   const [userMe,        setUserMe]        = useState<UserMe | null>(null);
+
+  // Remember Me — persisted in localStorage
+  const [rememberMe, setRememberMeState] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(REMEMBER_ME_KEY) === 'true';
+  });
+
+  function handleRememberMeToggle(val: boolean) {
+    setRememberMeState(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(REMEMBER_ME_KEY, String(val));
+    }
+  }
 
   // Profile state
   const [username,      setUsername]      = useState('');
@@ -415,14 +439,27 @@ export default function SettingsPage() {
           onChange={(v) => handleUpdate({ streakNotifications: v })} />
       </motion.div>
 
-      {/* Appearance */}
+      {/* Session */}
       <motion.div custom={5} variants={fade} initial="initial" animate="animate"
+        className="panel rounded-3xl p-5 space-y-4"
+      >
+        <SectionHeader icon={ShieldCheck} title="Session" />
+        <ToggleRow
+          label="Remember Me"
+          description="Stay logged in between browser sessions. Required for login streak tracking."
+          value={rememberMe}
+          onChange={handleRememberMeToggle}
+        />
+      </motion.div>
+
+      {/* Appearance */}
+      <motion.div custom={6} variants={fade} initial="initial" animate="animate"
         className="panel rounded-3xl p-5 space-y-5"
       >
         <SectionHeader icon={Palette} title="Appearance" />
         <div>
           <p className="text-white/75 text-xs font-medium mb-3">UI Mode</p>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {COLOR_MODES
               .filter(m => settings.themesEnabled || m.value !== 'custom')
               .map(({ value, label, icon: Icon, desc }) => {
@@ -438,6 +475,29 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
+          </div>
+        </div>
+
+        {/* Visual Intensity */}
+        <div>
+          <p className="text-white/75 text-xs font-medium mb-3">Visual Intensity</p>
+          <div className="grid grid-cols-3 gap-2">
+            {VISUAL_INTENSITY_OPTIONS.map(({ value, label, desc }) => {
+              const active = visualIntensity === value;
+              return (
+                <button key={value} onClick={() => setVisualIntensity(value)}
+                  className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center transition-all ${
+                    active
+                      ? 'bg-white/15 border-white/30 text-white'
+                      : 'bg-white/4 border-white/8 text-white/55 hover:text-white/80 hover:bg-white/8'
+                  }`}
+                >
+                  <Layers size={15} className={active ? 'text-orange-400' : 'text-white/40'} />
+                  <span className="text-xs font-semibold">{label}</span>
+                  <span className="text-[10px] leading-tight text-white/40 hidden sm:block">{desc}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -542,6 +602,16 @@ export default function SettingsPage() {
                 </div>
               )}
 
+              <div className="space-y-3 pt-1 border-t border-white/8">
+                <p className="text-white/75 text-xs font-medium pt-1">Time &amp; Environment</p>
+                <ToggleRow
+                  label="Time of day effects"
+                  description="Darkens the background at night and warms it at sunrise and sunset"
+                  value={timeAuto}
+                  onChange={setTimeAuto}
+                />
+              </div>
+
               {settings.dynamicThemes && (
                 <div className="space-y-3 pt-1 border-t border-white/8">
                   <p className="text-white/75 text-xs font-medium pt-1">Dynamic Themes</p>
@@ -555,13 +625,6 @@ export default function SettingsPage() {
                     onChange={setWeatherAuto} />
                 </div>
               )}
-
-              <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
-                <span className="text-orange-400 text-xs mt-0.5">✦</span>
-                <p className="text-white/40 text-xs leading-relaxed">
-                  All themes adjust brightness and warmth throughout the day — darker at night, warmer at sunrise and sunset.
-                </p>
-              </div>
             </motion.div>
           )}
         </AnimatePresence>

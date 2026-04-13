@@ -26,10 +26,10 @@ export default function StatCard({ title, value, icon: Icon, accent = 'blue', de
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="panel"
       style={{
         position: 'relative', overflow: 'hidden',
         borderRadius: 12, padding: '16px 18px',
-        background: 'rgba(0,10,22,0.8)',
         border: `1px solid ${a.border}`,
         boxShadow: `inset 0 0 30px ${a.glow}`,
       }}

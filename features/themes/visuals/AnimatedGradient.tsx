@@ -67,7 +67,7 @@ const WEATHER_ATMOSPHERE: Record<string, string> = {
 export default function AnimatedGradient() {
   const {
     themeGroup, themeVariant, colorMode, timeOfDay,
-    nightIntensity, isSentinel,
+    nightIntensity, timeAuto, isSentinel,
     seasonAuto, currentSeason,
     weatherAuto, currentWeather,
   } = useTheme();
@@ -78,23 +78,34 @@ export default function AnimatedGradient() {
     return <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none" style={{ backgroundColor: '#050505' }} />;
   }
 
-  if (colorMode === 'light') {
-    // Light mode: theme-tinted white background, handled mostly by CSS
-    return (
-      <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none" style={{ backgroundColor: '#f8f8f8' }}>
-        {/* Subtle warm tint in corner */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'radial-gradient(ellipse 60% 40% at 80% 0%, rgba(249,115,22,0.04) 0%, transparent 70%), radial-gradient(ellipse 50% 30% at 20% 100%, rgba(249,115,22,0.03) 0%, transparent 60%)',
-        }} />
-      </div>
-    );
+  /* ── Neutral modes — no themed gradient ── */
+  const lightBg = (
+    <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none" style={{ backgroundColor: '#f8f8f8' }}>
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: 'radial-gradient(ellipse 60% 40% at 80% 0%, rgba(249,115,22,0.04) 0%, transparent 70%), radial-gradient(ellipse 50% 30% at 20% 100%, rgba(249,115,22,0.03) 0%, transparent 60%)',
+      }} />
+    </div>
+  );
+  const darkBg = (
+    <div aria-hidden className="fixed inset-0 -z-20 pointer-events-none" style={{ backgroundColor: '#050505' }} />
+  );
+
+  if (colorMode === 'light') return lightBg;
+
+  if (colorMode === 'dark') return darkBg;
+
+  if (colorMode === 'system') {
+    // Prefer dark if not yet mounted (SSR safe) or OS prefers dark
+    const prefersDark = !mounted || !window.matchMedia('(prefers-color-scheme: light)').matches;
+    return prefersDark ? darkBg : lightBg;
   }
 
+  // colorMode === 'custom' — render themed gradient
   const baseGradient  = resolveGradient(themeGroup, themeVariant as string);
   const atmosphereKey = `${themeGroup}_${themeVariant}`;
   const atmosphere    = ATMOSPHERE[atmosphereKey] ?? '';
-  const timeOverlay   = mounted ? getTimeOverlay(timeOfDay, nightIntensity) : 'rgba(0,0,0,0)';
+  const timeOverlay   = (mounted && timeAuto) ? getTimeOverlay(timeOfDay, nightIntensity) : 'rgba(0,0,0,0)';
   const isSpace       = themeGroup === 'space';
   const isPremium     = themeGroup === 'premium';
 
@@ -149,10 +160,8 @@ export default function AnimatedGradient() {
         }} />
       )}
 
-      {/* Dark color mode: extra overlay so panels still feel dark against the gradient */}
-      {colorMode === 'dark' && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.28)', pointerEvents: 'none' }} />
-      )}
+      {/* Base darkness overlay — keeps surfaces neutral against the gradient */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', pointerEvents: 'none' }} />
 
       {/* Space / cyberpunk: extra deep darkness */}
       {(isSpace || isPremium) && (

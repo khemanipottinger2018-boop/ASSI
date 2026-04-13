@@ -275,7 +275,7 @@ function SpaceEffects({ variant }: { variant: SpaceVariant }) {
 /* ---------------------------------- */
 
 export default function FloatingBlobs() {
-  const { themeGroup, themeVariant, colorMode, timeOfDay, nightIntensity, isSentinel, weatherAuto, currentWeather } = useTheme();
+  const { themeGroup, themeVariant, colorMode, timeOfDay, nightIntensity, timeAuto, isSentinel, weatherAuto, currentWeather } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   const jamaicaEvent = useMemo(() => detectJamaicaEvent(), []);
@@ -296,11 +296,11 @@ export default function FloatingBlobs() {
     windy:   0.85,
   };
   const weatherScale = weatherAuto ? (WEATHER_BLOB_SCALE[currentWeather] ?? 1.0) : 1.0;
-  const opacity = getBlobOpacity(timeOfDay, nightIntensity) * weatherScale;
+  const opacity = getBlobOpacity(timeAuto ? timeOfDay : 'day', timeAuto ? nightIntensity : 0) * weatherScale;
 
-  /* ---------- LIGHT MODE ---------- */
-  // Flat light background — no blobs needed
-  if (colorMode === 'light') return null;
+  /* ---------- NEUTRAL MODES — no background effects ---------- */
+  // dark, light, and system are all neutral (no gradient behind them), so no blobs
+  if (colorMode !== 'custom') return null;
 
   /* ---------- SPACE ---------- */
   if (themeGroup === 'space') {

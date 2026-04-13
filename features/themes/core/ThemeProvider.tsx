@@ -88,10 +88,11 @@ export function requiresAssisPlus(variant: ThemeVariant): boolean {
   return ASSI_PLUS_VARIANTS.includes(variant);
 }
 
-export type ThemeType    = ThemeVariant;
-export type CustomPreset = LavaLampVariant;
-export type ColorMode    = 'dark' | 'light' | 'custom';
-export type TimeOfDay    = 'dawn' | 'morning' | 'day' | 'afternoon' | 'dusk' | 'evening' | 'night' | 'midnight';
+export type ThemeType       = ThemeVariant;
+export type CustomPreset    = LavaLampVariant;
+export type ColorMode       = 'dark' | 'light' | 'system' | 'custom';
+export type VisualIntensity = 'high' | 'balanced' | 'minimal';
+export type TimeOfDay       = 'dawn' | 'morning' | 'day' | 'afternoon' | 'dusk' | 'evening' | 'night' | 'midnight';
 export type WeatherOverlay = 'clear' | 'sunny' | 'cloudy' | 'rainy' | 'stormy' | 'foggy' | 'windy';
 
 // =============================================================================
@@ -398,20 +399,24 @@ async function fetchWeather(): Promise<WeatherOverlay> {
 // =============================================================================
 
 interface ThemeContextProps {
-  themeGroup:    ThemeGroup;
-  themeVariant:  ThemeVariant;
-  colorMode:     ColorMode;
-  customPreset:  LavaLampVariant;
-  timeOfDay:      TimeOfDay;
-  nightIntensity: number;
-  isSentinel:     boolean;
-  isSyncing:      boolean;
+  themeGroup:      ThemeGroup;
+  themeVariant:    ThemeVariant;
+  colorMode:       ColorMode;
+  customPreset:    LavaLampVariant;
+  visualIntensity: VisualIntensity;
+  timeOfDay:       TimeOfDay;
+  nightIntensity:  number;
+  timeAuto:        boolean;
+  isSentinel:      boolean;
+  isSyncing:       boolean;
 
-  setThemeGroup:      (group: ThemeGroup)       => void;
-  setThemeVariant:    (variant: ThemeVariant)   => void;
-  setColorMode:       (mode: ColorMode)         => void;
-  setCustomPreset:    (preset: LavaLampVariant) => void;
-  setSubjectOverride: (subjectName: string | null) => void;
+  setThemeGroup:      (group: ThemeGroup)           => void;
+  setThemeVariant:    (variant: ThemeVariant)        => void;
+  setColorMode:       (mode: ColorMode)              => void;
+  setCustomPreset:    (preset: LavaLampVariant)      => void;
+  setVisualIntensity: (intensity: VisualIntensity)   => void;
+  setTimeAuto:        (val: boolean)                 => void;
+  setSubjectOverride: (subjectName: string | null)   => void;
 
   // Automation
   seasonAuto:     boolean;
@@ -423,7 +428,7 @@ interface ThemeContextProps {
   setWeatherAuto: (val: boolean) => void;
 
   // Called by SettingsContext after GET /api/user/settings resolves
-  hydrateFromServer: (prefs: { colorMode: string; themeGroup: string; themeVariant: string; seasonAuto?: boolean; weatherAuto?: boolean }) => void;
+  hydrateFromServer: (prefs: { colorMode: string; themeGroup: string; themeVariant: string; seasonAuto?: boolean; weatherAuto?: boolean; visualIntensity?: string }) => void;
 
   // Called by SettingsContext on logout — resets to defaults and disables DB persistence
   resetTheme: () => void;
@@ -448,12 +453,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [subjectOverride, setSubjectOverrideState] = useState<string | null>(null);
   const [timeOfDay,       setTimeOfDay]      = useState<TimeOfDay>('day');
   const [nightIntensity,  setNightIntensity] = useState<number>(0);
+  const [timeAuto,        setTimeAutoState]  = useState<boolean>(true);
   const [isSyncing,       setIsSyncing]      = useState(false);
   const [seasonAuto,      setSeasonAuto]     = useState<boolean>(false);
   const [weatherAuto,     setWeatherAuto]    = useState<boolean>(false);
   const [currentSeason,   setCurrentSeason]  = useState<SeasonVariant>(detectSeason());
   const [currentWeather,  setCurrentWeather] = useState<WeatherOverlay>('clear');
-  const [weatherLoading,  setWeatherLoading] = useState<boolean>(false);
+  const [weatherLoading,  setWeatherLoading]  = useState<boolean>(false);
+  const [visualIntensity, setIntensityState]  = useState<VisualIntensity>('balanced');
 
   // Prevents the debounced save from firing on the initial hydration write
   const hydratedRef = useRef(false);
@@ -503,11 +510,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-color-mode', colorMode);
   }, [colorMode]);
 
+  useEffect(() => {
+    document.documentElement.setAttribute('data-intensity', visualIntensity);
+  }, [visualIntensity]);
+
   // ── Debounced DB persist ──
   const persistToDb = useCallback((
     mode: ColorMode,
     group: ThemeGroup,
     variant: ThemeVariant,
+    intensity?: VisualIntensity,
   ) => {
     if (!hydratedRef.current) return;
 
@@ -521,11 +533,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           credentials: 'include',
           headers:     { 'Content-Type': 'application/json' },
           body:        JSON.stringify({
-            colorMode: mode,
-            themeGroup: group,
-            themeVariant: variant,
+            colorMode:       mode,
+            themeGroup:      group,
+            themeVariant:    variant,
             seasonAuto,
             weatherAuto,
+            visualIntensity: intensity,
+            timeAuto,
           }),
         });
       } catch (err) {
@@ -534,16 +548,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setIsSyncing(false);
       }
     }, DB_DEBOUNCE_MS);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seasonAuto, weatherAuto, timeAuto]);
 
   // ── Called by SettingsContext once GET /api/user/settings resolves ──
   // Server is the single source of truth — no localStorage involved
   const hydrateFromServer = useCallback((prefs: {
-    colorMode: string;
-    themeGroup: string;
-    themeVariant: string;
-    seasonAuto?:  boolean;
-    weatherAuto?: boolean;
+    colorMode:        string;
+    themeGroup:       string;
+    themeVariant:     string;
+    seasonAuto?:      boolean;
+    weatherAuto?:     boolean;
+    visualIntensity?: string;
+    timeAuto?:        boolean;
   }) => {
     const mode    = (prefs.colorMode    as ColorMode)    || 'dark';
     const group   = (prefs.themeGroup   as ThemeGroup)   || 'lavalamp';
@@ -554,6 +571,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setVariantState(variant);
     if (prefs.seasonAuto  !== undefined) setSeasonAuto(prefs.seasonAuto);
     if (prefs.weatherAuto !== undefined) setWeatherAuto(prefs.weatherAuto);
+    if (prefs.visualIntensity) setIntensityState(prefs.visualIntensity as VisualIntensity);
+    if (prefs.timeAuto    !== undefined) setTimeAutoState(prefs.timeAuto);
 
     // Mark hydrated — future changes will trigger DB saves
     hydratedRef.current = true;
@@ -569,6 +588,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setSubjectOverrideState(null);
     setSeasonAuto(false);
     setWeatherAuto(false);
+    setIntensityState('balanced');
+    setTimeAutoState(true);
   }, []);
 
   // ── Resolve active variant (subject override wins) ──
@@ -612,6 +633,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     persistToDb(colorMode, themeGroup, next);
   }
 
+  function setVisualIntensity(next: VisualIntensity) {
+    setIntensityState(next);
+    persistToDb(colorMode, themeGroup, themeVariant, next);
+  }
+
+  function setTimeAuto(val: boolean) {
+    setTimeAutoState(val);
+    persistToDb(colorMode, themeGroup, themeVariant);
+  }
+
   function setSubjectOverride(subjectName: string | null) {
     setSubjectOverrideState(subjectName);
     // Subject override is ephemeral (page-scoped) — never persisted to DB
@@ -633,8 +664,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     themeVariant: activeVariant,
     colorMode,
     customPreset,
+    visualIntensity,
     timeOfDay,
     nightIntensity,
+    timeAuto,
     isSentinel,
     isSyncing,
     seasonAuto,
@@ -646,6 +679,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeVariant,
     setColorMode,
     setCustomPreset,
+    setVisualIntensity,
+    setTimeAuto,
     setSubjectOverride,
     setSeasonAuto,
     setWeatherAuto,
@@ -655,7 +690,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     theme,
     setTheme,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [activeGroup, activeVariant, colorMode, customPreset, timeOfDay, nightIntensity, isSentinel, isSyncing, seasonAuto, weatherAuto, currentSeason, currentWeather, weatherLoading]);
+  }), [activeGroup, activeVariant, colorMode, customPreset, visualIntensity, timeOfDay, nightIntensity, timeAuto, isSentinel, isSyncing, seasonAuto, weatherAuto, currentSeason, currentWeather, weatherLoading]);
 
   return (
     <ThemeContext.Provider value={value}>
