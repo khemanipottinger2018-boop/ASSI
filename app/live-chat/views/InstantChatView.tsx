@@ -268,14 +268,28 @@ export function InstantChatView({
     setConfirmingEnd(true);
   }, [status]);
 
-  const handleEndConfirm = useCallback(() => {
+  const handleEndConfirm = useCallback(async () => {
     if (endedRef.current || status === 'ended') return;
     endedRef.current = true;
     setConfirmingEnd(false);
-    emit('session:end', { sessionId, reason: 'ended_by_student' });
+    // Optimistic update — UI transitions immediately
     clearActivityInterval();
     setEndReason('ended_by_student');
     setStatus('ended');
+    // REST is the authoritative DB path: calls sessionService.endSession() which
+    // awaits the Prisma update (status → completed, endedAt, endedReason,
+    // durationMinutes) and emits session:ended to the tutor via socket.
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      await fetch(`${API_URL}/api/live-chat/${sessionId}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch {
+      // If REST fails (network/server down), fall back to socket event so
+      // the server can still attempt cleanup on its end.
+      emit('session:end', { sessionId, reason: 'ended_by_student' });
+    }
   }, [status, emit, sessionId, setEndReason, setStatus]);
 
   // Tutor only: step away without ending — triggers 2-min grace period on backend
@@ -378,7 +392,15 @@ export function InstantChatView({
         subtitle="Hang tight — a tutor will join shortly. Free for up to 60 minutes."
         onJoinNow={() => setSkipWaiting(true)}
         onCancel={() => {
-          emit('session:end', { sessionId, reason: 'ended_by_student' });
+          // Fire REST cancel (waiting → cancelled in DB) and navigate immediately.
+          // Fallback to socket emit if REST fails.
+          const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+          fetch(`${API_URL}/api/live-chat/${sessionId}/cancel`, {
+            method: 'POST',
+            credentials: 'include',
+          }).catch(() => {
+            emit('session:end', { sessionId, reason: 'ended_by_student' });
+          });
           router.push('/browse');
         }}
       />
