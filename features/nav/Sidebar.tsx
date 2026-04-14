@@ -17,6 +17,7 @@ import { usePresenceDisplay, PresenceDot, PRESENCE_LABEL_COLOR } from '@/feature
 import { useSocketContext }   from '@/features/socket';
 import AvailabilityModal      from '@/features/presence/AvailabilityModal';
 import type { UserFeatures }  from '@/lib/api/user';
+import { sidebarTransition, slideVariants, slideTransition, listItemVariants, listTransition } from '@/lib/motion';
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -277,7 +278,7 @@ export default function Sidebar({
             ? 'opacity-35 cursor-not-allowed'
             : active
               ? 'bg-white/15 text-white'
-              : 'text-white/65 hover:text-white hover:bg-white/8'
+              : 'text-white/80 hover:text-white hover:bg-white/8'
           }
         `}
       >
@@ -296,7 +297,7 @@ export default function Sidebar({
             >
               {item.label}
               {soon && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/8 text-white/28 border border-white/10 uppercase tracking-wide">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/8 text-white/55 border border-white/10 uppercase tracking-wide">
                   Soon
                 </span>
               )}
@@ -325,7 +326,7 @@ export default function Sidebar({
 
       <motion.aside
         animate={{ width: w }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        transition={sidebarTransition}
         className="hidden md:flex flex-col flex-shrink-0 h-full border-r overflow-hidden sidebar-bg"
         style={{ borderColor: 'var(--sidebar-border)' }}
       >
@@ -360,7 +361,7 @@ export default function Sidebar({
           </AnimatePresence>
           <button
             onClick={onToggle}
-            className="glass-soft w-7 h-7 rounded-lg flex items-center justify-center text-white/55 hover:text-white transition flex-shrink-0"
+            className="glass-soft w-7 h-7 rounded-lg flex items-center justify-center text-white/75 hover:text-white transition flex-shrink-0"
           >
             {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
           </button>
@@ -375,7 +376,7 @@ export default function Sidebar({
             >
               <button
                 onClick={prev}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-white/28 hover:text-white/65 hover:bg-white/6 transition flex-shrink-0"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-white/55 hover:text-white/80 hover:bg-white/6 transition flex-shrink-0"
               >
                 <ChevronLeft size={12} />
               </button>
@@ -383,16 +384,17 @@ export default function Sidebar({
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={catIndex}
-                    initial={{ x: dir * 20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    exit={{ x: dir * -20, opacity: 0 }}
-                    transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                    variants={slideVariants(dir)}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={slideTransition}
                     className="flex items-center justify-center gap-1.5"
                   >
                     {activeCat && (
                       <>
-                        <activeCat.icon size={11} className="text-white/45 flex-shrink-0" />
-                        <span className="text-white/55 text-[10px] font-bold uppercase tracking-widest">
+                        <activeCat.icon size={11} className="text-white/70 flex-shrink-0" />
+                        <span className="text-white/80 text-[10px] font-bold uppercase tracking-widest">
                           {activeCat.label}
                         </span>
                       </>
@@ -402,7 +404,7 @@ export default function Sidebar({
               </div>
               <button
                 onClick={next}
-                className="w-6 h-6 rounded-md flex items-center justify-center text-white/28 hover:text-white/65 hover:bg-white/6 transition flex-shrink-0"
+                className="w-6 h-6 rounded-md flex items-center justify-center text-white/55 hover:text-white/80 hover:bg-white/6 transition flex-shrink-0"
               >
                 <ChevronRight size={12} />
               </button>
@@ -418,7 +420,7 @@ export default function Sidebar({
                   <span className={`block rounded-full transition-all duration-200 ${
                     i === catIndex
                       ? 'w-4 h-1.5 bg-orange-400'
-                      : 'w-1.5 h-1.5 bg-white/18 hover:bg-white/35'
+                      : 'w-1.5 h-1.5 bg-white/35 hover:bg-white/55'
                   }`} />
                 </button>
               ))}
@@ -440,7 +442,7 @@ export default function Sidebar({
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
                   i === catIndex
                     ? 'bg-white/15 text-white'
-                    : 'text-white/28 hover:text-white/60 hover:bg-white/6'
+                    : 'text-white/55 hover:text-white/80 hover:bg-white/6'
                 }`}
               >
                 <cat.icon size={14} />
@@ -460,10 +462,11 @@ export default function Sidebar({
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={`cat-${catIndex}`}
-                initial={{ x: dir * 30, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: dir * -30, opacity: 0 }}
-                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                variants={slideVariants(dir)}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={slideTransition}
                 className="space-y-0.5"
               >
                 {activeCat?.items.map(item => (
@@ -526,7 +529,7 @@ export default function Sidebar({
                         {presenceDisplay.label}
                       </p>
                     ) : (
-                      <p className="text-white/40 text-[10px] capitalize">
+                      <p className="text-white/60 text-[10px] capitalize">
                         {undercoverRole
                           ? `${user.role} · viewing as ${undercoverRole}`
                           : user.role.replace('_', ' ')}
@@ -574,7 +577,7 @@ export default function Sidebar({
               <Zap size={12} className="text-orange-400 flex-shrink-0" />
               <div className="text-left min-w-0">
                 <p className="text-orange-400 text-[11px] font-semibold">Get ASSI+</p>
-                <p className="text-white/28 text-[10px]">Unlock all features</p>
+                <p className="text-white/55 text-[10px]">Unlock all features</p>
               </div>
             </button>
           )}

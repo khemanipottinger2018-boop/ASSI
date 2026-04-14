@@ -10,17 +10,17 @@ import {
 import { useAuth }            from '@/features/auth';
 import { usePresence, usePresenceDisplay } from '@/features/presence';
 import { useSocketContext }   from '@/features/socket';
-import { sessionsApi, tutorsApi, api } from '@/lib/api';
+import { sessionsApi, tutorsApi, userApi } from '@/lib/api';
 import type { ChatSession } from '@/lib/api';
 
 import DashboardSection         from '@/features/dashboard/tutor/DashboardSection';
 import TutorAvailabilityToggle  from '@/features/presence/TutorAvailabilityToggle';
 import TutorStatusCard          from '@/features/dashboard/tutor/TutorStatusCard';
-import TutorEarningsCard        from '@/features/dashboard/tutor/TutorEarningsCard';
 import TutorLiveRequestCard     from '@/features/dashboard/tutor/TutorLiveRequestCard';
 import TutorUpcomingSessionCard from '@/features/dashboard/tutor/TutorUpcomingSessionCard';
 import ActiveChatCard           from '@/features/dashboard/tutor/ActiveChatCard';
 import TutorRequestModal        from '@/features/dashboard/tutor/TutorRequestModal';
+import { listItemVariants, listTransition } from '@/lib/motion';
 
 type QueueEntry = {
   sessionId:   string;
@@ -40,12 +40,9 @@ type ActiveSession = {
 };
 
 type TutorStats = {
-  sessionsTotal:  number;
-  sessionsToday:  number;
-  sessionsWeek:   number;
-  avgRating:      number | null;
-  totalReviews:   number;
-  totalEarned:    number;
+  sessionsTotal: number;
+  sessionsToday: number;
+  sessionsWeek:  number;
 };
 
 type TutorSubject = {
@@ -54,19 +51,11 @@ type TutorSubject = {
   category: string | null;
 };
 
-const fade = {
-  initial: { opacity: 0, y: 12 },
-  animate: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.32, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
 
 const STAT_CARDS = [
   { label: 'Today',     color: '#34d399', icon: Zap,       key: 'sessionsToday', suffix: 'sessions' },
   { label: 'This Week', color: '#60a5fa', icon: Clock,     key: 'sessionsWeek',  suffix: 'sessions' },
   { label: 'All Time',  color: '#a78bfa', icon: BarChart2, key: 'sessionsTotal', suffix: 'sessions' },
-  { label: 'Rating',    color: '#fb923c', icon: Star,      key: 'avgRating',     suffix: '/ 5'      },
 ] as const;
 
 function deriveStats(sessions: ChatSession[]): TutorStats {
@@ -79,9 +68,6 @@ function deriveStats(sessions: ChatSession[]): TutorStats {
     sessionsTotal: completed.length,
     sessionsToday: todayDone.length,
     sessionsWeek:  weekDone.length,
-    avgRating:     null,
-    totalReviews:  0,
-    totalEarned:   0,
   };
 }
 
@@ -102,6 +88,7 @@ export default function TutorDashboard() {
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [stats,          setStats]          = useState<TutorStats | null>(null);
   const [subjects,       setSubjects]       = useState<TutorSubject[]>([]);
+  const [hourlyRate,     setHourlyRate]     = useState<number | null>(null);
   const [loadingStats,   setLoadingStats]   = useState(true);
 
   /* ── Socket: incoming requests ── */
@@ -147,9 +134,11 @@ export default function TutorDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const [sessionsData, activeData] = await Promise.all([
+        const [sessionsData, activeData, meData, subjectsData] = await Promise.all([
           sessionsApi.getChatSessions(),
           sessionsApi.getActiveSession(),
+          userApi.getMe(),
+          tutorsApi.getMySubjects(),
         ]);
         if (sessionsData.success) setStats(deriveStats(sessionsData.sessions));
         if (activeData.success && activeData.session) {
@@ -161,24 +150,18 @@ export default function TutorDashboard() {
             startedAt:   s.startedAt ? new Date(s.startedAt).getTime() : Date.now(),
           }]);
         }
-      } catch { /* silent */ }
-      finally { setLoadingStats(false); }
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!user?.username) return;
-    (async () => {
-      try {
-        const data = await tutorsApi.getPublicProfile(user.username);
-        if (data.success && data.user.subjects) {
-          setSubjects(data.user.subjects.map((s: any) => ({
+        if (meData.success && meData.user.tutor) {
+          setHourlyRate(meData.user.tutor.hourlyRate);
+        }
+        if (subjectsData.success) {
+          setSubjects(subjectsData.subjects.map(s => ({
             id: s.id, name: s.name, category: s.category ?? null,
           })));
         }
       } catch { /* silent */ }
+      finally { setLoadingStats(false); }
     })();
-  }, [user?.username]);
+  }, []);
 
   const isTutorApp = user?.role === 'tutor_applicant';
 
@@ -217,16 +200,16 @@ export default function TutorDashboard() {
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-7">
 
         {/* ── Header ── */}
-        <motion.div custom={0} variants={fade} initial="initial" animate="animate">
+        <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(0)}>
           <div className="panel rounded-2xl p-5">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4">
                 <TutorStatusCard />
                 <div>
-                  <p className="text-white/40 text-xs tracking-widest uppercase mb-0.5">
+                  <p className="text-white/65 text-xs tracking-widest uppercase mb-0.5">
                     {isTutorApp ? 'Application Pending' : 'Tutor Dashboard'}
                   </p>
-                  <p className="text-white/40 text-sm">
+                  <p className="text-white/80 text-sm">
                     {isTutorApp ? "Under review — you'll be notified once approved." : display.subtitle}
                   </p>
                 </div>
@@ -238,12 +221,12 @@ export default function TutorDashboard() {
 
         {/* ── Applicant banner ── */}
         {isTutorApp && (
-          <motion.div custom={1} variants={fade} initial="initial" animate="animate">
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(1)}>
             <div className="flex items-start gap-3 px-[18px] py-3.5 rounded-[14px] bg-purple-500/[0.08] border border-purple-500/20">
               <Bell size={14} className="text-purple-400 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-purple-400 text-xs font-semibold mb-1">Application Under Review</p>
-                <p className="text-purple-200/55 text-xs leading-relaxed">
+                <p className="text-purple-200/80 text-xs leading-relaxed">
                   Our team is reviewing your application. This typically takes 24–48 hours.
                   You&apos;ll receive a notification once a decision is made.
                 </p>
@@ -252,33 +235,64 @@ export default function TutorDashboard() {
           </motion.div>
         )}
 
-        {/* ── Earnings + stats ── */}
+        {/* ── Rate overview + stats ── */}
         {!isTutorApp && (
-          <motion.div custom={1} variants={fade} initial="initial" animate="animate" className="space-y-3">
-            <TutorEarningsCard
-              totalEarned={stats?.totalEarned ?? 0}
-              sessionCount={stats?.sessionsTotal ?? 0}
-              loading={loadingStats}
-            />
-            <div className="grid grid-cols-4 gap-2.5">
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(1)} className="space-y-3">
+
+            {/* Rate card — real data from userApi.getMe() */}
+            <div className="glass rounded-2xl p-5 relative overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: 'radial-gradient(ellipse 60% 50% at 90% 50%, rgba(52,211,153,0.06), transparent)' }} />
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white/65 text-xs uppercase tracking-widest">Your Rate</p>
+                  {loadingStats ? (
+                    <div className="h-8 w-24 rounded-lg bg-white/8 animate-pulse mt-2" />
+                  ) : (
+                    <p className="text-white font-bold text-3xl mt-1 tracking-tight">
+                      {hourlyRate != null ? `$${hourlyRate}/hr` : 'Not set'}
+                    </p>
+                  )}
+                </div>
+                <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Star size={16} className="text-emerald-400" />
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/8">
+                <div>
+                  <p className="text-white/60 text-[10px] uppercase tracking-wide">Total Sessions</p>
+                  <p className="text-white font-medium mt-0.5">
+                    {loadingStats ? '—' : (stats?.sessionsTotal ?? 0)}
+                  </p>
+                </div>
+                <div className="w-px h-6 bg-white/8" />
+                <div>
+                  <p className="text-white/60 text-[10px] uppercase tracking-wide">This Week</p>
+                  <p className="text-white font-medium mt-0.5">
+                    {loadingStats ? '—' : (stats?.sessionsWeek ?? 0)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Stat cards */}
+            <div className="grid grid-cols-3 gap-2.5">
               {STAT_CARDS.map(({ label, color, icon: Icon, key, suffix }) => {
                 const raw   = stats?.[key as keyof TutorStats];
-                const value = loadingStats ? null
-                  : key === 'avgRating' ? (typeof raw === 'number' ? raw.toFixed(1) : '—')
-                  : (raw ?? 0);
+                const value = loadingStats ? null : (raw ?? 0);
                 return (
                   <div key={label} className="panel rounded-2xl px-4 py-4 relative overflow-hidden">
                     <div className="absolute top-0 inset-x-0 h-px"
                       style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
                     <div className="flex items-center gap-1.5 mb-2">
-                      <Icon size={11} className="text-white/25" />
-                      <p className="text-white/25 text-[10px]">{label}</p>
+                      <Icon size={11} className="text-white/60" />
+                      <p className="text-white/65 text-[10px]">{label}</p>
                     </div>
                     {value === null
                       ? <div className="h-6 w-12 rounded bg-white/[0.06] animate-pulse" />
                       : <div>
                           <span className="text-[22px] font-bold leading-none" style={{ color }}>{value}</span>
-                          {suffix && <span className="text-[10px] text-white/25 ml-1.5">{suffix}</span>}
+                          {suffix && <span className="text-[10px] text-white/60 ml-1.5">{suffix}</span>}
                         </div>
                     }
                   </div>
@@ -290,31 +304,31 @@ export default function TutorDashboard() {
 
         {/* ── Incoming requests ── */}
         {!isTutorApp && (
-          <motion.div custom={2} variants={fade} initial="initial" animate="animate">
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(2)}>
             <DashboardSection title="Incoming Requests" icon={Bell}>
               {queue.length === 0 ? (
                 <div className="panel rounded-2xl px-6 py-10 text-center">
                   {!hydrated ? (
                     <>
-                      <Loader2 size={22} className="text-white/20 mx-auto mb-3 animate-spin" />
-                      <p className="text-white/30 text-sm">Checking live status…</p>
+                      <Loader2 size={22} className="text-white/50 mx-auto mb-3 animate-spin" />
+                      <p className="text-white/70 text-sm">Checking live status…</p>
                     </>
                   ) : !available ? (
                     <>
-                      <WifiOff size={22} className="text-white/15 mx-auto mb-3" />
-                      <p className="text-white/30 text-sm">
+                      <WifiOff size={22} className="text-white/45 mx-auto mb-3" />
+                      <p className="text-white/75 text-sm">
                         {busy ? 'Currently in a session' : "You're offline"}
                       </p>
-                      <p className="text-white/20 text-xs mt-1">
+                      <p className="text-white/55 text-xs mt-1">
                         {busy ? 'Finish your session to receive new requests'
                               : 'Go available to start receiving student requests'}
                       </p>
                     </>
                   ) : (
                     <>
-                      <Wifi size={22} className="text-emerald-400/40 mx-auto mb-3" />
-                      <p className="text-white/30 text-sm">No requests right now</p>
-                      <p className="text-white/20 text-xs mt-1">You&apos;re live — students will appear here</p>
+                      <Wifi size={22} className="text-emerald-400/70 mx-auto mb-3" />
+                      <p className="text-white/75 text-sm">No requests right now</p>
+                      <p className="text-white/55 text-xs mt-1">You&apos;re live — students will appear here</p>
                     </>
                   )}
                 </div>
@@ -340,7 +354,7 @@ export default function TutorDashboard() {
 
         {/* ── Active sessions ── */}
         {!isTutorApp && activeSessions.length > 0 && (
-          <motion.div custom={3} variants={fade} initial="initial" animate="animate">
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(3)}>
             <DashboardSection title="Active Sessions">
               {activeSessions.map(session => (
                 <ActiveChatCard
@@ -356,7 +370,7 @@ export default function TutorDashboard() {
 
         {/* ── Subjects ── */}
         {subjects.length > 0 && (
-          <motion.div custom={4} variants={fade} initial="initial" animate="animate">
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(4)}>
             <DashboardSection title="Subjects I Teach" icon={BookOpen}>
               <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
                 {subjects.map(sub => {
@@ -366,7 +380,7 @@ export default function TutorDashboard() {
                       style={{ border: `1px solid ${color}18` }}>
                       <div className="absolute top-0 inset-x-0 h-px"
                         style={{ background: `linear-gradient(90deg, transparent, ${color}35, transparent)` }} />
-                      <p className="text-white/65 text-xs font-medium mb-1">{sub.name}</p>
+                      <p className="text-white/90 text-xs font-medium mb-1">{sub.name}</p>
                       {sub.category && (
                         <span className="text-[9px] px-1.5 py-px rounded-full"
                           style={{ color, background: `${color}15`, border: `1px solid ${color}25` }}>
@@ -383,7 +397,7 @@ export default function TutorDashboard() {
 
         {/* ── Quick links ── */}
         {!isTutorApp && (
-          <motion.div custom={5} variants={fade} initial="initial" animate="animate"
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(5)}
             className="grid grid-cols-2 gap-2.5">
             {[
               { label: 'Session History', sub: 'View past sessions', icon: Calendar, path: '/sessions'      },
@@ -392,11 +406,11 @@ export default function TutorDashboard() {
               <button key={path} onClick={() => router.push(path)}
                 className="panel rounded-2xl px-5 py-4 text-left hover:bg-white/[0.06] transition group">
                 <div className="flex items-center justify-between">
-                  <Icon size={14} className="text-white/30" />
-                  <ArrowRight size={12} className="text-white/15 group-hover:text-white/40 transition" />
+                  <Icon size={14} className="text-white/65" />
+                  <ArrowRight size={12} className="text-white/40 group-hover:text-white/70 transition" />
                 </div>
-                <p className="text-white/70 text-[13px] font-medium mt-2.5">{label}</p>
-                <p className="text-white/25 text-[11px] mt-0.5">{sub}</p>
+                <p className="text-white text-[13px] font-medium mt-2.5">{label}</p>
+                <p className="text-white/65 text-[11px] mt-0.5">{sub}</p>
               </button>
             ))}
           </motion.div>

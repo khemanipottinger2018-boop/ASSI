@@ -49,7 +49,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-4 pb-4 sm:pb-0"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+        style={{ background: 'rgba(0,0,0,0.6)' }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
@@ -62,7 +62,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
         >
           {/* Header */}
           <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-white/6"
-            style={{ background: 'rgba(14,14,20,0.9)', backdropFilter: 'blur(16px)' }}>
+            style={{ background: 'rgba(14,14,20,0.9)' }}>
             <div className="flex items-center gap-2.5">
               <Flame size={16} className="text-orange-400" />
               <span className="text-white font-semibold text-sm">Streak rewards</span>

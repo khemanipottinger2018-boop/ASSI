@@ -11,6 +11,7 @@ import {
 import { browseApi }   from '@/lib/api/browse';
 import { useCurrency } from '@/features/platform';
 import type { SubjectSummary } from '@/lib/api/tutors';
+import { modalVariants, modalTransition, backdropVariants, backdropTransition, listItemVariants, listTransition } from '@/lib/motion';
 
 export type BookingMode = 'instant' | 'scheduled';
 
@@ -143,19 +144,17 @@ export default function BookingModal({
         <>
           <motion.div
             key="backdrop"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            variants={backdropVariants} initial="initial" animate="animate" exit="exit"
+            transition={backdropTransition}
             onClick={onClose}
-            className="fixed inset-0 z-[10010] bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 z-[10010] overlay"
           />
 
           <motion.div
             key="modal"
-            initial={{ opacity: 0, scale: 0.96, y: 16 }}
-            animate={{ opacity: 1, scale: 1,    y: 0  }}
-            exit={{    opacity: 0, scale: 0.96, y: 16 }}
-            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed z-[10011] inset-x-4 bottom-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md glass rounded-3xl p-6 shadow-2xl"
+            variants={modalVariants} initial="initial" animate="animate" exit="exit"
+            transition={modalTransition}
+            className="fixed z-[10011] inset-x-4 bottom-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-md elevated rounded-3xl p-6 shadow-2xl"
           >
             <button onClick={onClose}
               className="absolute top-4 right-4 text-white/25 hover:text-white/60 transition">
@@ -205,8 +204,8 @@ export default function BookingModal({
 
                 {stage === 1 && (
                   <motion.div key="s1"
-                    initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}
+                    variants={listItemVariants} initial="initial" animate="animate" exit="exit"
+                    transition={listTransition(0)}
                     className="space-y-4">
                     <div>
                       <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Session type</p>
@@ -265,8 +264,8 @@ export default function BookingModal({
 
                 {stage === 2 && (
                   <motion.div key="s2"
-                    initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}
+                    variants={listItemVariants} initial="initial" animate="animate" exit="exit"
+                    transition={listTransition(1)}
                     className="space-y-4">
                     <div>
                       <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Date & time</p>
@@ -313,10 +312,10 @@ export default function BookingModal({
 
                 {stage === 3 && (
                   <motion.div key="s3"
-                    initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -16 }} transition={{ duration: 0.2 }}
+                    variants={listItemVariants} initial="initial" animate="animate" exit="exit"
+                    transition={listTransition(2)}
                     className="space-y-4">
-                    <div className="glass-soft rounded-2xl p-4 space-y-3">
+                    <div className="surface rounded-2xl p-4 space-y-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-white/35">Type</span>
                         <span className="text-white/70 font-medium flex items-center gap-1.5">

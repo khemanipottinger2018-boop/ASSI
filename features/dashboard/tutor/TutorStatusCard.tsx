@@ -29,7 +29,7 @@ export default function TutorStatusCard() {
       }} />
       <div className="text-sm">
         <div className="font-medium">{user?.username}</div>
-        <div className="text-xs text-white/50">{label}</div>
+        <div className="text-xs text-white/70">{label}</div>
       </div>
     </div>
   );

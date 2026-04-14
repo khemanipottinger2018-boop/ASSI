@@ -12,6 +12,10 @@ import { motion, AnimatePresence }          from 'framer-motion';
 import { useRouter }                        from 'next/navigation';
 import { Zap, X, Clock, Loader2 }           from 'lucide-react';
 import { api }                              from '@/lib/api';
+import {
+  modalVariants, modalTransition,
+  backdropVariants, backdropTransition,
+} from '@/lib/motion';
 
 interface Props {
   sessionId:   string;
@@ -82,19 +86,22 @@ export default function TutorRequestModal({
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
       {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        variants={backdropVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={backdropTransition}
         className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={handleDecline}
       />
 
       {/* Modal */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 24 }}
-        animate={{ opacity: 1, scale: 1,    y: 0  }}
-        exit={{    opacity: 0, scale: 0.92, y: 16 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        variants={modalVariants}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        transition={modalTransition}
         className="relative w-full max-w-sm glass rounded-3xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
@@ -128,7 +135,7 @@ export default function TutorRequestModal({
             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
               urgency
                 ? 'bg-red-500/15 border-red-500/20 text-red-400'
-                : 'bg-white/5 border-white/10 text-white/40'
+                : 'bg-white/5 border-white/10 text-white/65'
             }`}>
               <Clock size={11} />
               <span className="text-xs font-mono font-semibold tabular-nums">
@@ -140,18 +147,18 @@ export default function TutorRequestModal({
           {/* Student + subject info */}
           <div className="glass-soft rounded-2xl px-4 py-3.5 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-white/35">Student</span>
-              <span className="text-white/75 font-medium">{studentName}</span>
+              <span className="text-white/65">Student</span>
+              <span className="text-white font-medium">{studentName}</span>
             </div>
             {subjectName && (
               <div className="flex items-center justify-between text-xs">
-                <span className="text-white/35">Subject</span>
-                <span className="text-white/75 font-medium">{subjectName}</span>
+                <span className="text-white/65">Subject</span>
+                <span className="text-white font-medium">{subjectName}</span>
               </div>
             )}
             <div className="flex items-center justify-between text-xs">
-              <span className="text-white/35">Type</span>
-              <span className="text-white/75">Instant chat · Free · up to 60 min</span>
+              <span className="text-white/65">Type</span>
+              <span className="text-white">Instant chat · Free · up to 60 min</span>
             </div>
           </div>
 
@@ -164,7 +171,7 @@ export default function TutorRequestModal({
             <button
               onClick={handleDecline}
               disabled={accepting}
-              className="flex items-center justify-center w-11 h-11 rounded-2xl glass-soft border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 transition flex-shrink-0"
+              className="flex items-center justify-center w-11 h-11 rounded-2xl glass-soft border border-white/10 text-white/60 hover:text-white hover:border-white/20 transition flex-shrink-0"
             >
               <X size={16} />
             </button>
@@ -181,7 +188,7 @@ export default function TutorRequestModal({
             </button>
           </div>
 
-          <p className="text-white/15 text-[10px] text-center">
+          <p className="text-white/50 text-[10px] text-center">
             Request expires in {remaining}s — tap outside or × to dismiss
           </p>
         </div>

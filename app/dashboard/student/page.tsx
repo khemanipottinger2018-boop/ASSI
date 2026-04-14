@@ -3,9 +3,10 @@
 import { useEffect, useState }  from 'react';
 import { useRouter }             from 'next/navigation';
 import { motion }                from 'framer-motion';
+import { listItemVariants, listTransition } from '@/lib/motion';
 import {
   Search, Cpu, Calendar, Bell, BookOpen, Inbox,
-  Flame, CheckCircle2, Circle,
+  Flame, CheckCircle2, Circle, Coins,
 } from 'lucide-react';
 import { useAuth }          from '@/features/auth';
 import { useNotifications } from '@/features/notifications';
@@ -26,14 +27,6 @@ import OngoingSessionCard from '@/features/sessions/OngoingSessionCard';
 import AvailableTutorCard from '@/features/browse/AvailableTutorCard';
 import StatCard           from '@/features/dashboard/student/StatCard';
 import StreakCard, { StreakCardSkeleton } from '@/features/dashboard/student/StreakCard';
-
-const fade = {
-  initial: { opacity: 0, y: 10 },
-  animate: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.3, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
 
 function greeting() {
   const h = new Date().getHours();
@@ -105,10 +98,10 @@ export default function StudentDashboard() {
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-7">
 
       {/* ── Header ── */}
-      <motion.div custom={0} variants={fade} initial="initial" animate="animate">
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(0)}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">
+            <p className="text-white/65 text-xs font-semibold uppercase tracking-widest mb-1">
               {greeting()}
             </p>
             <h1 className="text-white font-semibold text-xl tracking-tight flex items-center gap-2">
@@ -120,7 +113,7 @@ export default function StudentDashboard() {
                 </span>
               )}
             </h1>
-            <p className="text-white/40 text-sm mt-1">
+            <p className="text-white/70 text-sm mt-1">
               {upcoming.length > 0
                 ? `You have ${upcoming.length} upcoming session${upcoming.length > 1 ? 's' : ''}`
                 : 'Ready to learn something new today?'}
@@ -148,7 +141,7 @@ export default function StudentDashboard() {
 
       {/* ── Active session rejoin ── */}
       {activeSession && (
-        <motion.div custom={0.5} variants={fade} initial="initial" animate="animate">
+        <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(0.5)}>
           <OngoingSessionCard
             sessionId={activeSession.sessionId}
             partnerName={activeSession.partnerName}
@@ -160,15 +153,16 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Stat cards ── */}
-      <motion.div custom={1} variants={fade} initial="initial" animate="animate"
-        className="grid grid-cols-3 gap-3">
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(1)}
+        className="grid grid-cols-2 gap-3">
         <StatCard title="Upcoming"  value={loading ? undefined : upcoming.length}  icon={Calendar} accent="emerald" />
         <StatCard title="Completed" value={loading ? undefined : completed.length} icon={BookOpen} />
         <StatCard title="Unread"    value={loading ? undefined : unread}            icon={Bell}     accent={unread > 0 ? 'orange' : 'white'} />
+        <StatCard title="Credits"   value={user?.creditBalance ?? undefined}        icon={Coins}    accent="orange" />
       </motion.div>
 
       {/* ── Quick actions ── */}
-      <motion.div custom={2} variants={fade} initial="initial" animate="animate"
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(2)}
         className="grid grid-cols-2 gap-3">
         <QuickActionButton
           icon={Search} label="Find a Tutor" sub="Browse available tutors"
@@ -181,7 +175,7 @@ export default function StudentDashboard() {
       </motion.div>
 
       {/* ── Streak ── */}
-      <motion.div custom={3} variants={fade} initial="initial" animate="animate">
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(3)}>
         {streakLoading
           ? <StreakCardSkeleton />
           : <StreakCard streak={streak} />
@@ -190,7 +184,7 @@ export default function StudentDashboard() {
 
       {/* ── Daily tasks ── */}
       {(loading || dailyTasks.length > 0) && (
-        <motion.div custom={4} variants={fade} initial="initial" animate="animate">
+        <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(4)}>
           <DashboardSection
             title={`Daily Tasks${tasksTotal > 0 ? ` (${tasksCompleted}/${tasksTotal})` : ''}`}
             icon={CheckCircle2}
@@ -205,15 +199,15 @@ export default function StudentDashboard() {
                   }`}>
                   {task.completed
                     ? <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
-                    : <Circle size={14} className="text-white/20 flex-shrink-0" />
+                    : <Circle size={14} className="text-white/45 flex-shrink-0" />
                   }
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-tight ${task.completed ? 'line-through text-white/30' : 'text-white/75'}`}>
+                    <p className={`text-sm leading-tight ${task.completed ? 'line-through text-white/35' : 'text-white'}`}>
                       {task.title}
                     </p>
                   </div>
                   {task.reward > 0 && (
-                    <span className="text-[10px] text-orange-400/70 font-semibold flex-shrink-0">
+                    <span className="text-[10px] text-orange-400 font-semibold flex-shrink-0">
                       +{task.reward}cr
                     </span>
                   )}
@@ -225,15 +219,15 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Upcoming sessions ── */}
-      <motion.div custom={5} variants={fade} initial="initial" animate="animate">
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(5)}>
         <DashboardSection title="Upcoming Sessions" icon={Calendar} onSeeAll={() => router.push('/sessions')}>
           {loading ? (
             <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-14 animate-pulse" />)}</>
           ) : upcoming.length === 0 ? (
             <div className="glass-soft rounded-2xl px-4 py-6 text-center">
-              <p className="text-white/30 text-sm">No upcoming sessions</p>
+              <p className="text-white/60 text-sm">No upcoming sessions</p>
               <button onClick={() => router.push('/browse')}
-                className="mt-2 text-xs text-white/40 hover:text-white/60 underline underline-offset-2 transition">
+                className="mt-2 text-xs text-white/70 hover:text-white underline underline-offset-2 transition">
                 Book one now
               </button>
             </div>
@@ -254,7 +248,7 @@ export default function StudentDashboard() {
 
       {/* ── Available tutors ── */}
       {(loading || tutors.length > 0) && (
-        <motion.div custom={6} variants={fade} initial="initial" animate="animate">
+        <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(6)}>
           <DashboardSection title="Available Now" icon={Search} onSeeAll={() => router.push('/browse')}>
             {loading ? (
               <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-20 animate-pulse" />)}</>
@@ -276,13 +270,13 @@ export default function StudentDashboard() {
       )}
 
       {/* ── Notifications ── */}
-      <motion.div custom={7} variants={fade} initial="initial" animate="animate">
+      <motion.div initial={listItemVariants.initial} animate={listItemVariants.animate} transition={listTransition(7)}>
         <DashboardSection title="Notifications" icon={Bell} onSeeAll={() => router.push('/notifications')}>
           {loading ? (
             <>{[0, 1, 2].map(i => <div key={i} className="glass-soft rounded-2xl h-12 animate-pulse" />)}</>
           ) : notifications.length === 0 ? (
             <div className="glass-soft rounded-2xl px-4 py-5 text-center">
-              <p className="text-white/30 text-sm">You&apos;re all caught up</p>
+              <p className="text-white/60 text-sm">You&apos;re all caught up</p>
             </div>
           ) : (
             notifications.map(n => (
@@ -291,8 +285,8 @@ export default function StudentDashboard() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-white/75 text-sm font-medium">{n.title}</p>
-                  <p className="text-white/35 text-xs mt-0.5 leading-relaxed">{n.body}</p>
+                  <p className="text-white text-sm font-medium">{n.title}</p>
+                  <p className="text-white/65 text-xs mt-0.5 leading-relaxed">{n.body}</p>
                 </div>
               </div>
             ))

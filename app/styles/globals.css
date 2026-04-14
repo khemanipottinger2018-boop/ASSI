@@ -43,6 +43,39 @@
   --intensity-blur:        14px;
   --intensity-blur-soft:   10px;
   --intensity-panel-blur:   6px;
+
+  /* ── Surface Z-axis layers ── */
+  --surface-base:     rgba(0, 0, 0, 0.18);
+  --surface-raised:   rgba(0, 0, 0, 0.32);
+  --surface-elevated: rgba(255, 255, 255, 0.09);
+  --surface-overlay:  rgba(0, 0, 0, 0.55);
+  --surface-floating: rgba(255, 255, 255, 0.13);
+
+  /* ── Shadow hierarchy (depth via shadow, not blur alone) ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.20), 0 1px 2px rgba(0,0,0,0.14);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.28), 0 2px 4px rgba(0,0,0,0.18);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.35), 0 4px 8px rgba(0,0,0,0.22), 0 1px 2px rgba(0,0,0,0.16);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.50), 0 8px 24px rgba(0,0,0,0.30), 0 2px 8px rgba(0,0,0,0.22);
+
+  /* ── Semantic text (absolute hex — no opacity) ── */
+  --text-primary:   #f0f0f0;
+  --text-secondary: #b8b8b8;
+  --text-tertiary:  #787878;
+  --text-inverse:   #111111;
+
+  /* ── Semantic color roles ── */
+  --color-success:        #34d399;
+  --color-success-bg:     rgba(52, 211, 153, 0.12);
+  --color-success-border: rgba(52, 211, 153, 0.25);
+  --color-info:           #60a5fa;
+  --color-info-bg:        rgba(96, 165, 250, 0.12);
+  --color-info-border:    rgba(96, 165, 250, 0.25);
+  --color-warning:        #fbbf24;
+  --color-warning-bg:     rgba(251, 191, 36, 0.12);
+  --color-warning-border: rgba(251, 191, 36, 0.25);
+  --color-danger:         #f87171;
+  --color-danger-bg:      rgba(248, 113, 113, 0.12);
+  --color-danger-border:  rgba(248, 113, 113, 0.25);
 }
 
 /* =====================================================
@@ -69,6 +102,22 @@
 }
 
 /* =====================================================
+   DARK MODE READABILITY FLOOR
+   Overrides Tailwind's text-white/{n} for values that
+   render below a readable threshold on dark surfaces.
+   [data-color-mode="light"] overrides below win via
+   higher selector specificity — safe to place here.
+   ===================================================== */
+.text-white\/14, .text-white\/15 { color: rgb(255 255 255 / 0.55); }
+.text-white\/18, .text-white\/20 { color: rgb(255 255 255 / 0.55); }
+.text-white\/22, .text-white\/25 { color: rgb(255 255 255 / 0.58); }
+.text-white\/28, .text-white\/30 { color: rgb(255 255 255 / 0.62); }
+.text-white\/32, .text-white\/35 { color: rgb(255 255 255 / 0.65); }
+.text-white\/38, .text-white\/40 { color: rgb(255 255 255 / 0.68); }
+.text-white\/42, .text-white\/45 { color: rgb(255 255 255 / 0.70); }
+.text-white\/48, .text-white\/50 { color: rgb(255 255 255 / 0.72); }
+
+/* =====================================================
    LIGHT MODE — BASE
    Applied when data-color-mode="light"
    ===================================================== */
@@ -89,6 +138,39 @@
   --sidebar-border:  rgba(0, 0, 0, 0.07);
 
   --light-shadow:    rgba(0, 0, 0, 0.10);
+
+  /* ── Light surface layers (true white, no fake glass) ── */
+  --surface-base:     rgba(240, 240, 240, 1.0);
+  --surface-raised:   rgba(255, 255, 255, 0.90);
+  --surface-elevated: rgba(255, 255, 255, 1.0);
+  --surface-overlay:  rgba(0, 0, 0, 0.42);
+  --surface-floating: rgba(255, 255, 255, 1.0);
+
+  /* ── Light shadows (real depth, no dark bleed) ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.10), 0 2px 4px rgba(0,0,0,0.07);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.07);
+
+  /* ── Light text (absolute dark values) ── */
+  --text-primary:   #111111;
+  --text-secondary: #444444;
+  --text-tertiary:  #888888;
+  --text-inverse:   #f4f4f4;
+
+  /* ── Light semantic colors (same hue, adjusted for light bg) ── */
+  --color-success:        #059669;
+  --color-success-bg:     rgba(5, 150, 105, 0.10);
+  --color-success-border: rgba(5, 150, 105, 0.22);
+  --color-info:           #2563eb;
+  --color-info-bg:        rgba(37, 99, 235, 0.10);
+  --color-info-border:    rgba(37, 99, 235, 0.22);
+  --color-warning:        #d97706;
+  --color-warning-bg:     rgba(217, 119, 6, 0.10);
+  --color-warning-border: rgba(217, 119, 6, 0.22);
+  --color-danger:         #dc2626;
+  --color-danger-bg:      rgba(220, 38, 38, 0.10);
+  --color-danger-border:  rgba(220, 38, 38, 0.22);
 }
 
 /* ── Lava Lamp light: frosted warm glass ── */
@@ -230,15 +312,31 @@
 /* Text on light backgrounds — crisp black hierarchy */
 [data-color-mode="light"] .text-white       { color: #0f0f0f !important; }
 [data-color-mode="light"] .text-white\/80   { color: #1a1a1a !important; }
+[data-color-mode="light"] .text-white\/75   { color: #222222 !important; }
 [data-color-mode="light"] .text-white\/70   { color: #2a2a2a !important; }
+[data-color-mode="light"] .text-white\/65   { color: #353535 !important; }
 [data-color-mode="light"] .text-white\/60   { color: #404040 !important; }
 [data-color-mode="light"] .text-white\/55   { color: #4a4a4a !important; }
 [data-color-mode="light"] .text-white\/50   { color: #555555 !important; }
+[data-color-mode="light"] .text-white\/48   { color: #5c5c5c !important; }
+[data-color-mode="light"] .text-white\/45   { color: #606060 !important; }
 [data-color-mode="light"] .text-white\/40   { color: #6a6a6a !important; }
 [data-color-mode="light"] .text-white\/35   { color: #777777 !important; }
 [data-color-mode="light"] .text-white\/30   { color: #888888 !important; }
+[data-color-mode="light"] .text-white\/28   { color: #8f8f8f !important; }
 [data-color-mode="light"] .text-white\/25   { color: #999999 !important; }
 [data-color-mode="light"] .text-white\/20   { color: #aaaaaa !important; }
+[data-color-mode="light"] .text-white\/15   { color: #bbbbbb !important; }
+[data-color-mode="light"] .text-white\/14   { color: #bbbbbb !important; }
+[data-color-mode="light"] .text-white\/18   { color: #aaaaaa !important; }
+[data-color-mode="light"] .text-white\/22   { color: #999999 !important; }
+[data-color-mode="light"] .text-white\/32   { color: #777777 !important; }
+[data-color-mode="light"] .text-white\/38   { color: #6a6a6a !important; }
+[data-color-mode="light"] .text-white\/42   { color: #606060 !important; }
+[data-color-mode="light"] .text-white\/85   { color: #161616 !important; }
+[data-color-mode="light"] .text-white\/88   { color: #141414 !important; }
+[data-color-mode="light"] .text-white\/90   { color: #111111 !important; }
+[data-color-mode="light"] .text-white\/95   { color: #0a0a0a !important; }
 
 /* Borders on light backgrounds */
 [data-color-mode="light"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
@@ -364,15 +462,21 @@
 
   [data-color-mode="system"] .text-white       { color: #0f0f0f !important; }
   [data-color-mode="system"] .text-white\/80   { color: #1a1a1a !important; }
+  [data-color-mode="system"] .text-white\/75   { color: #222222 !important; }
   [data-color-mode="system"] .text-white\/70   { color: #2a2a2a !important; }
+  [data-color-mode="system"] .text-white\/65   { color: #353535 !important; }
   [data-color-mode="system"] .text-white\/60   { color: #404040 !important; }
   [data-color-mode="system"] .text-white\/55   { color: #4a4a4a !important; }
   [data-color-mode="system"] .text-white\/50   { color: #555555 !important; }
+  [data-color-mode="system"] .text-white\/48   { color: #5c5c5c !important; }
+  [data-color-mode="system"] .text-white\/45   { color: #606060 !important; }
   [data-color-mode="system"] .text-white\/40   { color: #6a6a6a !important; }
   [data-color-mode="system"] .text-white\/35   { color: #777777 !important; }
   [data-color-mode="system"] .text-white\/30   { color: #888888 !important; }
+  [data-color-mode="system"] .text-white\/28   { color: #8f8f8f !important; }
   [data-color-mode="system"] .text-white\/25   { color: #999999 !important; }
   [data-color-mode="system"] .text-white\/20   { color: #aaaaaa !important; }
+  [data-color-mode="system"] .text-white\/15   { color: #bbbbbb !important; }
 
   [data-color-mode="system"] .border-white\/10 { border-color: rgba(0, 0, 0, 0.07) !important; }
   [data-color-mode="system"] .border-white\/8  { border-color: rgba(0, 0, 0, 0.06) !important; }
@@ -610,6 +714,106 @@ html {
     transparent
   );
 }
+
+/* =====================================================
+   SEMANTIC SURFACE SYSTEM
+   Use instead of inline bg-white/X + border + blur combos.
+   Depth is communicated via shadow stack, not blur alone.
+   ===================================================== */
+
+/* Base content layer — list rows, secondary cards */
+.surface {
+  background: var(--surface-raised);
+  backdrop-filter: blur(var(--intensity-panel-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-panel-blur));
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Primary cards, main content panels */
+.elevated {
+  background: var(--surface-elevated);
+  backdrop-filter: blur(var(--intensity-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Modal backdrops */
+.overlay {
+  background: var(--surface-overlay);
+  backdrop-filter: blur(var(--intensity-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-xl);
+}
+
+/* Floating elements: dropdowns, tooltips, active modals */
+.floating {
+  background: var(--surface-floating);
+  backdrop-filter: blur(var(--intensity-blur));
+  -webkit-backdrop-filter: blur(var(--intensity-blur));
+  border: 1px solid var(--glass-highlight);
+  box-shadow: var(--shadow-xl), inset 0 1px 0 var(--glass-highlight);
+}
+
+/* =====================================================
+   SEMANTIC TEXT UTILITIES
+   Use instead of text-white/{n} opacity utilities.
+   Automatically adapt to dark/light via CSS vars.
+   ===================================================== */
+.text-p   { color: var(--text-primary); }
+.text-s   { color: var(--text-secondary); }
+.text-t   { color: var(--text-tertiary); }
+.text-inv { color: var(--text-inverse); }
+
+/* =====================================================
+   TYPOGRAPHY SCALE
+   Named scale — use instead of ad-hoc text-xs/sm/xl.
+   ===================================================== */
+.type-display  {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.10;
+  letter-spacing: -0.03em;
+}
+.type-headline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.20;
+  letter-spacing: -0.02em;
+}
+.type-body {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.60;
+  letter-spacing: -0.01em;
+}
+.type-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.40;
+  letter-spacing: 0;
+}
+.type-caption {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.40;
+  letter-spacing: 0.02em;
+}
+
+/* =====================================================
+   SEMANTIC COLOR ROLE UTILITIES
+   ===================================================== */
+.text-success { color: var(--color-success); }
+.text-info    { color: var(--color-info); }
+.text-warning { color: var(--color-warning); }
+.text-danger  { color: var(--color-danger); }
+
+.bg-success { background: var(--color-success-bg); border-color: var(--color-success-border); }
+.bg-info    { background: var(--color-info-bg);    border-color: var(--color-info-border); }
+.bg-warning { background: var(--color-warning-bg); border-color: var(--color-warning-border); }
+.bg-danger  { background: var(--color-danger-bg);  border-color: var(--color-danger-border); }
 
 /* =====================================================
    SIDEBAR

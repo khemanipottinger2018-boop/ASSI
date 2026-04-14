@@ -211,7 +211,7 @@ export function SessionHeader({
   return (
     <div
       className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07]"
-      style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}
+      style={{ background: 'var(--panel-bg)' }}
     >
       {isDual ? (
         /* ── Dual-user layout ── */

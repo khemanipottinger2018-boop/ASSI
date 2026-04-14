@@ -72,4 +72,10 @@ export const tutorsApi = {
     api.get<{ success: boolean; user: PublicProfile }>(
       `/api/users-public/${username}`
     ),
+
+  /* GET /api/tutors/my-subjects — auth-gated, returns the logged-in tutor's subjects */
+  getMySubjects: () =>
+    api.get<{ success: boolean; subjects: SubjectSummary[]; limit: number; tier: string }>(
+      '/api/tutors/my-subjects'
+    ),
 };

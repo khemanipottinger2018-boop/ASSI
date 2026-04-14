@@ -314,11 +314,11 @@ export default function SettingsPage() {
           </div>
           <div>
             <h1 className="text-white font-semibold text-lg tracking-tight">Settings</h1>
-            <p className="text-white/60 text-xs">Personalize your ASSI experience</p>
+            <p className="text-white/75 text-xs">Personalize your ASSI experience</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isSyncing && <Loader2 size={13} className="text-white/30 animate-spin" />}
+          {isSyncing && <Loader2 size={13} className="text-white/55 animate-spin" />}
           <AnimatedCheck visible={saved} />
         </div>
       </motion.div>
@@ -334,7 +334,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <p className="text-white font-medium text-sm">{tierInfo.label} Plan</p>
-              <p className="text-white/40 text-xs mt-0.5">
+              <p className="text-white/65 text-xs mt-0.5">
                 {isAdmin
                   ? 'Full platform access — all themes unlocked'
                   : tier === 'standard'
@@ -363,8 +363,8 @@ export default function SettingsPage() {
           <div className="mt-4 pt-4 border-t border-white/8 grid grid-cols-3 gap-2">
             {['Unlimited ASSI', 'Unlimited subjects', 'Priority tutors'].map((f) => (
               <div key={f} className="flex items-center gap-1.5">
-                <span className="text-white/20 text-xs">🔒</span>
-                <span className="text-white/35 text-xs">{f}</span>
+                <span className="text-white/40 text-xs">🔒</span>
+                <span className="text-white/60 text-xs">{f}</span>
               </div>
             ))}
           </div>
@@ -376,7 +376,7 @@ export default function SettingsPage() {
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={User} title="Account" />
-        <p className="text-white/40 text-xs">Leave a field blank to keep it unchanged.</p>
+        <p className="text-white/65 text-xs">Leave a field blank to keep it unchanged.</p>
         <div className="space-y-3">
           <InputRow label="Username" placeholder={user?.username ?? 'New username'}
             value={username} onChange={setUsername}
@@ -469,9 +469,9 @@ export default function SettingsPage() {
                     className={`flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center transition-all ${
                       active ? 'bg-white/15 border-white/30 text-white' : 'bg-white/4 border-white/8 text-white/55 hover:text-white/80 hover:bg-white/8'
                     }`}>
-                    <Icon size={16} className={active ? 'text-orange-400' : 'text-white/50'} />
+                    <Icon size={16} className={active ? 'text-orange-400' : 'text-white/70'} />
                     <span className="text-xs font-semibold">{label}</span>
-                    <span className="text-[10px] leading-tight text-white/40 hidden sm:block">{desc}</span>
+                    <span className="text-[10px] leading-tight text-white/65 hidden sm:block">{desc}</span>
                   </button>
                 );
               })}
@@ -492,9 +492,9 @@ export default function SettingsPage() {
                       : 'bg-white/4 border-white/8 text-white/55 hover:text-white/80 hover:bg-white/8'
                   }`}
                 >
-                  <Layers size={15} className={active ? 'text-orange-400' : 'text-white/40'} />
+                  <Layers size={15} className={active ? 'text-orange-400' : 'text-white/70'} />
                   <span className="text-xs font-semibold">{label}</span>
-                  <span className="text-[10px] leading-tight text-white/40 hidden sm:block">{desc}</span>
+                  <span className="text-[10px] leading-tight text-white/65 hidden sm:block">{desc}</span>
                 </button>
               );
             })}
@@ -521,18 +521,18 @@ export default function SettingsPage() {
                           locked  ? 'border-white/5 bg-white/2 opacity-60 cursor-not-allowed' :
                           'border-white/8 bg-white/4 hover:bg-white/8'
                         }`}>
-                        <Icon size={15} className={active ? 'text-orange-400' : locked ? 'text-white/25' : 'text-white/40'} />
+                        <Icon size={15} className={active ? 'text-orange-400' : locked ? 'text-white/40' : 'text-white/65'} />
                         <div className="text-left">
                           <div className="flex items-center gap-1.5">
-                            <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/35' : 'text-white/60'}`}>{label}</p>
+                            <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/50' : 'text-white/85'}`}>{label}</p>
                             {plus && isAdmin                    && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">ADMIN</span>}
                             {plus && !isAdmin && hasAssisPlus  && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
                             {plus && !hasAssisPlus             && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
                           </div>
-                          <p className="text-[10px] text-white/30">{desc}</p>
+                          <p className="text-[10px] text-white/60">{desc}</p>
                         </div>
                         {active && !locked && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
-                        {locked            && <Lock  size={11} className="ml-auto text-white/20 flex-shrink-0" />}
+                        {locked            && <Lock  size={11} className="ml-auto text-white/45 flex-shrink-0" />}
                       </button>
                     );
                   })}
@@ -562,7 +562,7 @@ export default function SettingsPage() {
                     active={themeVariant as string} onSelect={(v) => setThemeVariant(v as EventVariant)} />
                   <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
                     <span className="text-orange-400 text-xs mt-0.5">✦</span>
-                    <p className="text-white/40 text-xs leading-relaxed">
+                    <p className="text-white/70 text-xs leading-relaxed">
                       Events are also auto-detected by date — ASSI switches to the right theme automatically around each holiday.
                     </p>
                   </div>
@@ -592,7 +592,7 @@ export default function SettingsPage() {
                             style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }} />
                           <div className="text-left">
                             <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-white/65'}`}>{label}</p>
-                            <p className="text-[10px] text-white/30">{desc}</p>
+                            <p className="text-[10px] text-white/60">{desc}</p>
                           </div>
                           {isActive && <Check size={12} className="ml-auto text-orange-400 flex-shrink-0" />}
                         </button>
@@ -665,7 +665,7 @@ export default function SettingsPage() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-white text-sm font-medium">Two-factor authentication</p>
-            <p className="text-white/55 text-xs mt-0.5">
+            <p className="text-white/70 text-xs mt-0.5">
               {twoFaEnabled
                 ? 'Your account is protected with 2FA'
                 : 'Add an extra layer of security to your account'}
@@ -693,7 +693,7 @@ export default function SettingsPage() {
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden space-y-3"
             >
-              <p className="text-white/55 text-xs">
+              <p className="text-white/70 text-xs">
                 Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.), then enter the 6-digit code to confirm.
               </p>
               {twoFaQr && (
@@ -717,7 +717,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() => { setTwoFaStep('idle'); setTwoFaQr(''); setTwoFaCode(''); setTwoFaError(''); }}
-                className="text-xs text-white/30 hover:text-white/60 transition">
+                className="text-xs text-white/55 hover:text-white/80 transition">
                 Cancel
               </button>
             </motion.div>
@@ -729,7 +729,7 @@ export default function SettingsPage() {
               exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
               className="overflow-hidden space-y-3"
             >
-              <p className="text-white/55 text-xs">Enter your current 6-digit authenticator code to disable 2FA.</p>
+              <p className="text-white/70 text-xs">Enter your current 6-digit authenticator code to disable 2FA.</p>
               {twoFaError && <p className="text-red-400 text-xs">{twoFaError}</p>}
               <div className="flex gap-2">
                 <input
@@ -746,7 +746,7 @@ export default function SettingsPage() {
               </div>
               <button
                 onClick={() => { setTwoFaStep('idle'); setTwoFaCode(''); setTwoFaError(''); }}
-                className="text-xs text-white/30 hover:text-white/60 transition">
+                className="text-xs text-white/55 hover:text-white/80 transition">
                 Cancel
               </button>
             </motion.div>
@@ -755,7 +755,7 @@ export default function SettingsPage() {
 
         {twoFaEnabled && twoFaStep === 'idle' && (
           <button onClick={() => setTwoFaStep('disable')}
-            className="text-xs text-red-400/50 hover:text-red-400 transition">
+            className="text-xs text-red-400/80 hover:text-red-400 transition">
             Disable 2FA
           </button>
         )}
@@ -766,17 +766,17 @@ export default function SettingsPage() {
         className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Lock} title="Privacy" />
-        <p className="text-white/40 text-xs leading-relaxed">
+        <p className="text-white/70 text-xs leading-relaxed">
           Control what other users can see about you. Your email is never shared.
         </p>
         <div className="space-y-2">
           <div className="glass-soft rounded-xl px-4 py-3">
-            <p className="text-white/60 text-xs font-medium">Email address</p>
-            <p className="text-white/30 text-xs mt-0.5">Never visible to other users</p>
+            <p className="text-white/80 text-xs font-medium">Email address</p>
+            <p className="text-white/60 text-xs mt-0.5">Never visible to other users</p>
           </div>
           <div className="glass-soft rounded-xl px-4 py-3">
-            <p className="text-white/60 text-xs font-medium">Phone number</p>
-            <p className="text-white/30 text-xs mt-0.5">
+            <p className="text-white/80 text-xs font-medium">Phone number</p>
+            <p className="text-white/60 text-xs mt-0.5">
               {showPhone ? 'Visible to tutors and students' : 'Hidden — enable in Account section above'}
             </p>
           </div>
@@ -794,7 +794,7 @@ export default function SettingsPage() {
         <div className="glass-soft rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-white/60 text-xs font-medium">App version</p>
-            <p className="text-white/25 text-xs">ASSI Platform v1.0 · Kingston, Jamaica 🇯🇲</p>
+            <p className="text-white/60 text-xs">ASSI Platform v1.0 · Kingston, Jamaica 🇯🇲</p>
           </div>
         </div>
       </motion.div>
@@ -836,8 +836,8 @@ function VariantGrid({ label, items, active, onSelect, cols = 2 }: {
 function SectionHeader({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
     <div className="flex items-center gap-2.5 pb-1 border-b border-white/10">
-      <Icon size={14} className="text-white/60" />
-      <p className="text-white/70 text-xs font-semibold uppercase tracking-widest">{title}</p>
+      <Icon size={14} className="text-white/75" />
+      <p className="text-white/85 text-xs font-semibold uppercase tracking-widest">{title}</p>
     </div>
   );
 }
@@ -849,7 +849,7 @@ function ToggleRow({ label, description, value, onChange }: {
     <div className="flex items-center justify-between gap-4">
       <div>
         <p className="text-white text-sm font-medium">{label}</p>
-        {description && <p className="text-white/55 text-xs mt-0.5">{description}</p>}
+        {description && <p className="text-white/70 text-xs mt-0.5">{description}</p>}
       </div>
       <button onClick={() => onChange(!value)}
         className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-orange-500' : 'bg-white/15'}`}>
@@ -885,7 +885,7 @@ function InputRow({ label, placeholder, value, onChange, type = 'text', hint }: 
   const isPassword = type === 'password';
   return (
     <div className="space-y-1">
-      <label className="text-white/60 text-xs font-medium">{label}</label>
+      <label className="text-white/75 text-xs font-medium">{label}</label>
       <div className="relative">
         <input
           type={isPassword && !show ? 'password' : type === 'password' ? 'text' : type}
@@ -900,7 +900,7 @@ function InputRow({ label, placeholder, value, onChange, type = 'text', hint }: 
           </button>
         )}
       </div>
-      {hint && <p className="text-white/25 text-[10px]">{hint}</p>}
+      {hint && <p className="text-white/55 text-[10px]">{hint}</p>}
     </div>
   );
 }

@@ -271,7 +271,7 @@ function SubjectSwitcher({
               exit={{ opacity: 0, y: 6, scale: 0.96 }}
               transition={{ duration: 0.14 }}
               className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-white/10 overflow-hidden z-50 shadow-2xl"
-              style={{ background: 'rgba(10,10,16,0.97)', backdropFilter: 'blur(24px)' }}
+              style={{ background: 'rgba(10,10,16,0.97)' }}
             >
               {/* Search */}
               <div className="p-2 border-b border-white/6">
@@ -548,7 +548,7 @@ function ChatView({
     <div className="flex flex-col w-full" style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-white/6 flex-shrink-0" style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(6px)' }}>
+      <div className="flex items-center justify-between px-6 py-3 border-b border-white/6 flex-shrink-0" style={{ background: 'var(--panel-bg)' }}>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'radial-gradient(circle at 30% 30%, #ff9aa2, #b84cff)' }}>
@@ -659,7 +659,7 @@ function ChatView({
       </AnimatePresence>
 
       {/* ── Input dock — always at bottom ── */}
-      <div className="flex-shrink-0 px-4 pb-4 pt-3 border-t border-white/6" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(8px)' }}>
+      <div className="flex-shrink-0 px-4 pb-4 pt-3 border-t border-white/6" style={{ background: 'rgba(0,0,0,0.12)' }}>
 
         {/* File previews row */}
         <AnimatePresence>

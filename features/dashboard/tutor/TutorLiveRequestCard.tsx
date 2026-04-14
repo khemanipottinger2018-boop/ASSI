@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Zap, ArrowRight, Clock, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { alertVariants, alertTransition } from '@/lib/motion';
 
 interface TutorLiveRequestCardProps {
   sessionId:    string;
@@ -60,10 +61,11 @@ export default function TutorLiveRequestCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97, y: -6 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: -4 }}
-      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+      variants={alertVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={alertTransition}
       className="relative glass rounded-2xl p-4 overflow-hidden border border-emerald-500/20"
     >
       {/* Progress bar — drains left to right */}
@@ -90,9 +92,9 @@ export default function TutorLiveRequestCard({
           </div>
           <div className="flex items-center gap-3 mt-0.5">
             {subjectName && (
-              <span className="text-white/35 text-xs">{subjectName}</span>
+              <span className="text-white/70 text-xs">{subjectName}</span>
             )}
-            <span className={`flex items-center gap-1 text-xs ${urgency ? 'text-red-400' : 'text-white/30'}`}>
+            <span className={`flex items-center gap-1 text-xs ${urgency ? 'text-red-400' : 'text-white/60'}`}>
               <Clock size={10} />
               {remaining}s
             </span>

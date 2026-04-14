@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { MessageCircle, ArrowRight } from 'lucide-react';
+import { listItemVariants, listTransition } from '@/lib/motion';
 
 interface ActiveChatCardProps {
   chatId: string;
@@ -16,9 +17,11 @@ export default function ActiveChatCard({ chatId, tutorName, subject, avatarUrl }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+      variants={listItemVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={listTransition(0)}
       onClick={() => router.push(`/live-chat/${chatId}`)}
       className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-white/8 transition"
     >
@@ -34,10 +37,10 @@ export default function ActiveChatCard({ chatId, tutorName, subject, avatarUrl }
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
           <p className="text-white/80 text-sm font-medium truncate">{subject}</p>
         </div>
-        <p className="text-white/35 text-xs mt-0.5">with {tutorName}</p>
+        <p className="text-white/65 text-xs mt-0.5">with {tutorName}</p>
       </div>
 
-      <ArrowRight size={14} className="text-white/25 flex-shrink-0" />
+      <ArrowRight size={14} className="text-white/55 flex-shrink-0" />
     </motion.div>
   );
 }

@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { User, Clock, Video } from 'lucide-react';
+import { listItemVariants, listTransition } from '@/lib/motion';
 
 interface TutorUpcomingSessionCardProps {
   sessionId: string;
@@ -35,9 +36,11 @@ export default function TutorUpcomingSessionCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+      variants={listItemVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={listTransition(0)}
       onClick={() => router.push(`/sessions/${sessionId}`)}
       className={`
         glass-soft rounded-2xl px-4 py-3.5 cursor-pointer hover:bg-white/8 transition
@@ -50,7 +53,7 @@ export default function TutorUpcomingSessionCard({
         <div className="w-9 h-9 rounded-xl glass flex items-center justify-center overflow-hidden">
           {studentAvatarUrl
             ? <img src={studentAvatarUrl} alt={studentName} className="w-full h-full object-cover" />
-            : <User size={14} className="text-white/35" />
+            : <User size={14} className="text-white/60" />
           }
         </div>
         {isIminent && (
@@ -59,15 +62,15 @@ export default function TutorUpcomingSessionCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-white/75 text-sm font-medium truncate">{subject}</p>
-        <p className="text-white/35 text-xs mt-0.5">with {studentName}</p>
+        <p className="text-white text-sm font-medium truncate">{subject}</p>
+        <p className="text-white/65 text-xs mt-0.5">with {studentName}</p>
       </div>
 
       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-        <span className={`text-xs font-medium ${isIminent ? 'text-emerald-400' : 'text-white/40'}`}>
+        <span className={`text-xs font-medium ${isIminent ? 'text-emerald-400' : 'text-white/70'}`}>
           {dateLabel}
         </span>
-        <div className="flex items-center gap-1 text-white/20">
+        <div className="flex items-center gap-1 text-white/50">
           <Clock size={10} />
           <span className="text-[10px]">{durationMinutes}m</span>
         </div>
