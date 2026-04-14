@@ -29,8 +29,8 @@
   --glass-border:    rgba(255, 255, 255, 0.15);
   --glass-highlight: rgba(255, 255, 255, 0.12);
 
-  --sidebar-bg:      rgba(0, 0, 0, 0.28);
-  --sidebar-border:  rgba(255, 255, 255, 0.08);
+  --sidebar-bg:      rgba(0, 0, 0, 0.0);
+  --sidebar-border:  rgba(255, 255, 255, 0.07);
 
   --accent:          #f97316;
 

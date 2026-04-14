@@ -167,7 +167,7 @@ function UserPill({
         </div>
         {/* In-room presence dot */}
         <span
-          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[--panel-bg] ${
+          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-transparent ${
             inRoom ? 'bg-emerald-400' : 'bg-white/15'
           }`}
         />
@@ -210,8 +210,7 @@ export function SessionHeader({
 
   return (
     <div
-      className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07]"
-      style={{ background: 'var(--panel-bg)' }}
+      className="shrink-0 flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.07] glass-soft"
     >
       {isDual ? (
         /* ── Dual-user layout ── */
@@ -466,7 +465,7 @@ export function ChatInput({ value, onChange, onSubmit, onKeystroke, disabled, pl
 }) {
   return (
     <form onSubmit={onSubmit}
-      className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-white/[0.07] bg-black/10">
+      className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-white/[0.07] bg-white/[0.03]">
       <input type="text" value={value}
         onChange={e => { onChange(e.target.value); onKeystroke(); }}
         placeholder={placeholder ?? 'Type a message…'}
@@ -770,7 +769,7 @@ export function ParticipantSidebar({ children, title, visible }: {
       {visible && (
         <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: 220 }}
           exit={{ opacity: 0, width: 0 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="flex-shrink-0 border-l border-white/[0.07] overflow-hidden bg-black/10">
+          className="flex-shrink-0 border-l border-white/[0.07] overflow-hidden bg-white/[0.03]">
           <div className="w-[220px] h-full flex flex-col p-3 gap-3">
             <p className="text-white/25 text-[9px] uppercase tracking-widest font-medium px-1">{title}</p>
             <div className="flex-1 overflow-y-auto">{children}</div>

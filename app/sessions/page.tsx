@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence }           from 'framer-motion';
 import { useRouter }                         from 'next/navigation';
+import { listItemVariants, listTransition, modalVariants, modalTransition, backdropVariants, backdropTransition } from '@/lib/motion';
 import {
   Calendar, User, BookOpen, ChevronRight,
   Loader2, LogIn, XCircle, CheckCircle,
@@ -285,12 +286,18 @@ export default function SessionsPage() {
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
-        <h1 className="text-white font-semibold text-xl tracking-tight">Sessions</h1>
-        <p className="text-white/40 text-sm mt-1">Your tutoring history and upcoming bookings</p>
+      <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(0)}>
+        <div className="flex items-center gap-3">
+          <div className="glass-soft w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Calendar size={18} className="text-white/80" />
+          </div>
+          <div>
+            <h1 className="text-white font-semibold text-xl tracking-tight">Sessions</h1>
+            <p className="text-white/40 text-sm">Your tutoring history and upcoming bookings</p>
+          </div>
+        </div>
       </motion.div>
 
       {/* ── Student alert: tutor joined ── */}
@@ -319,8 +326,7 @@ export default function SessionsPage() {
       </AnimatePresence>
 
       {/* ── Tabs ── */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05, duration: 0.3 }}
+      <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(1)}
         className="flex items-center gap-1 glass-soft rounded-xl p-1 w-fit"
       >
         {([
@@ -373,8 +379,8 @@ export default function SessionsPage() {
 
             return (
               <motion.div key={session.sessionId}
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.04, duration: 0.3 }}
+                variants={listItemVariants} initial="initial" animate="animate"
+                transition={listTransition(i)}
                 onClick={() => openModal(session)}
                 className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition group"
                 style={isGrace ? { borderColor: 'rgba(251,146,60,0.2)' } : undefined}
@@ -418,8 +424,8 @@ export default function SessionsPage() {
 
       {/* ── Upcoming Conferences (tutor only) ── */}
       {tab === 'upcoming' && isTutor && upcomingConferences.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.3 }} className="space-y-2">
+        <motion.div variants={listItemVariants} initial="initial" animate="animate"
+          transition={listTransition(2)} className="space-y-2">
           <p className="text-white/30 text-xs px-1 font-medium uppercase tracking-wide">Your Conferences</p>
           {upcomingConferences.map(conf => (
             <motion.button
@@ -514,26 +520,24 @@ function SessionModal({
     <>
       {/* Backdrop */}
       <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        variants={backdropVariants} initial="initial" animate="animate" exit="exit"
+        transition={backdropTransition}
+        className="fixed inset-0 z-40 overlay"
         onClick={onClose}
       />
 
       {/* Card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 12 }}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        variants={modalVariants} initial="initial" animate="animate" exit="exit"
+        transition={modalTransition}
         className="fixed inset-0 z-50 flex items-center justify-center px-4 pointer-events-none"
       >
-        <div className="glass rounded-3xl p-6 w-full max-w-sm space-y-5 pointer-events-auto">
+        <div className="elevated rounded-3xl p-6 w-full max-w-sm space-y-5 pointer-events-auto">
 
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0">
+              <div className="w-11 h-11 rounded-2xl surface flex items-center justify-center flex-shrink-0">
                 <span className="text-white/60 text-base font-semibold">
                   {session.partnerName?.[0]?.toUpperCase() ?? '?'}
                 </span>
@@ -553,7 +557,7 @@ function SessionModal({
           </div>
 
           {/* Details */}
-          <div className="glass-soft rounded-2xl px-4 py-3 space-y-2">
+          <div className="surface rounded-2xl px-4 py-3 space-y-2">
             <div className="flex items-center gap-2 text-white/50 text-xs">
               <BookOpen size={11} />
               <span>{session.subjectName || '—'}</span>
@@ -600,7 +604,7 @@ function SessionModal({
                   value={cancelReason}
                   onChange={e => onCancelReasonChange(e.target.value)}
                   disabled={actioning}
-                  className="w-full glass-soft rounded-xl px-3 py-2.5 text-sm text-white/80 placeholder-white/20 outline-none resize-none transition disabled:opacity-40"
+                  className="w-full surface rounded-xl px-3 py-2.5 text-sm text-white/80 placeholder-white/20 outline-none resize-none transition disabled:opacity-40"
                 />
                 <div className="flex gap-2">
                   <button onClick={onBackFromCancel} disabled={actioning}

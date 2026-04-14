@@ -160,14 +160,9 @@ export default function AnimatedGradient() {
         }} />
       )}
 
-      {/* Base darkness overlay — only when timeAuto is on; removed when user disables time effects */}
-      {timeAuto && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.30)', transition: 'opacity 0.6s ease', pointerEvents: 'none' }} />
-      )}
-
-      {/* Space / cyberpunk: extra deep darkness */}
+      {/* Space / cyberpunk: subtle depth shadow */}
       {(isSpace || isPremium) && (
-        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.42)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.18)', pointerEvents: 'none' }} />
       )}
 
       <style>{`

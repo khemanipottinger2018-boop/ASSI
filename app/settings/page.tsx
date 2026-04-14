@@ -295,7 +295,7 @@ export default function SettingsPage() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
         {[28, 32, 40, 56, 28, 32, 28].map((h, i) => (
-          <div key={i} className="panel rounded-3xl" style={{ height: `${h * 4}px` }} />
+          <div key={i} className="glass rounded-3xl" style={{ height: `${h * 4}px` }} />
         ))}
       </div>
     );
@@ -325,7 +325,7 @@ export default function SettingsPage() {
 
       {/* Tier badge */}
       <motion.div custom={1} variants={fade} initial="initial" animate="animate"
-        className={`panel rounded-3xl p-5 border ${tierInfo.border} ${tierInfo.bg}`}
+        className={`glass rounded-3xl p-5 border ${tierInfo.border} ${tierInfo.bg}`}
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -373,7 +373,7 @@ export default function SettingsPage() {
 
       {/* Account */}
       <motion.div custom={2} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={User} title="Account" />
         <p className="text-white/65 text-xs">Leave a field blank to keep it unchanged.</p>
@@ -411,7 +411,7 @@ export default function SettingsPage() {
 
       {/* Notifications */}
       <motion.div custom={3} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Bell} title="Notifications" />
         <ToggleRow label="Email notifications"
@@ -426,7 +426,7 @@ export default function SettingsPage() {
 
       {/* Streak */}
       <motion.div custom={4} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Flame} title="Streak" />
         <ToggleRow label="Daily login streak"
@@ -441,7 +441,7 @@ export default function SettingsPage() {
 
       {/* Session */}
       <motion.div custom={5} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={ShieldCheck} title="Session" />
         <ToggleRow
@@ -454,7 +454,7 @@ export default function SettingsPage() {
 
       {/* Appearance */}
       <motion.div custom={6} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-5"
+        className="glass rounded-3xl p-5 space-y-5"
       >
         <SectionHeader icon={Palette} title="Appearance" />
         <div>
@@ -632,7 +632,7 @@ export default function SettingsPage() {
 
       {/* Language & Region */}
       <motion.div custom={6} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Globe} title="Language & Region" />
         <SelectRow label="Language" value={settings.language} options={LANGUAGES}
@@ -643,7 +643,7 @@ export default function SettingsPage() {
 
       {/* ASSI Assistant */}
       <motion.div custom={7} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sparkles} title="ASSI Assistant" />
         <ToggleRow label="Show ASSI"
@@ -658,7 +658,7 @@ export default function SettingsPage() {
 
       {/* Security */}
       <motion.div custom={8} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={ShieldCheck} title="Security" />
 
@@ -763,7 +763,7 @@ export default function SettingsPage() {
 
       {/* Privacy */}
       <motion.div custom={9} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Lock} title="Privacy" />
         <p className="text-white/70 text-xs leading-relaxed">
@@ -785,7 +785,7 @@ export default function SettingsPage() {
 
       {/* Advanced */}
       <motion.div custom={10} variants={fade} initial="initial" animate="animate"
-        className="panel rounded-3xl p-5 space-y-4"
+        className="glass rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sliders} title="Advanced" />
         <p className="text-white/65 text-xs leading-relaxed">

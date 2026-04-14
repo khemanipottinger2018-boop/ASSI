@@ -485,7 +485,7 @@ export function ConferenceView({
 
         {/* ── Attendee speak status bar ── */}
         {viewerRole === 'attendee' && (
-          <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-white/[0.05] bg-black/5">
+          <div className="shrink-0 flex items-center gap-3 px-4 py-2 border-b border-white/[0.05]">
             {speakMode === 'open' ? (
               <span className="text-emerald-400/60 text-xs">Open floor — everyone can speak freely</span>
             ) : canSpeak ? (

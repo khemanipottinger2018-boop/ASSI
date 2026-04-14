@@ -133,7 +133,7 @@ export function StudyPanel({
   }, [on, off]);
 
   return (
-    <div className="w-[300px] h-full flex flex-col border-l border-white/[0.07] bg-black/15">
+    <div className="w-[300px] h-full flex flex-col border-l border-white/[0.07] bg-white/[0.03]">
 
       {/* ── Tab bar ── */}
       <div className="flex items-center border-b border-white/[0.07] px-2 pt-2 pb-0 gap-0.5 flex-shrink-0 overflow-x-auto"

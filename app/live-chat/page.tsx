@@ -625,7 +625,7 @@ export default function LiveChatPage() {
                               }
                             </div>
                             {/* Live presence dot — comes from Redis via /api/tutors/available */}
-                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black/30 shadow-sm shadow-emerald-900/50" />
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-transparent" />
                           </div>
 
                           {/* Info */}
@@ -762,7 +762,7 @@ export default function LiveChatPage() {
                               <Users size={16} className="text-blue-300" />
                             </div>
                             {room.status === 'active' && (
-                              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-black/30" />
+                              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-transparent" />
                             )}
                           </div>
 
