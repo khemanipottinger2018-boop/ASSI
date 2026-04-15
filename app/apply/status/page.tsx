@@ -146,7 +146,7 @@ export default function ApplyStatusPage() {
   if (error || !application) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="glass rounded-2xl px-8 py-10 text-center max-w-sm">
+        <div className="panel rounded-2xl px-8 py-10 text-center max-w-sm">
           <p className="text-white/60 text-sm mb-4">{error || 'Application not found'}</p>
           <button onClick={loadApplication} className="text-xs text-white/40 hover:text-white/70 transition underline underline-offset-2">
             Try again
@@ -170,7 +170,7 @@ export default function ApplyStatusPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-6 space-y-4"
+        className="panel rounded-3xl p-6 space-y-4"
       >
         <div className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl ${cfg.bg} border ${cfg.border}`}>
           <StatusIcon size={15} className={cfg.color} />
@@ -240,7 +240,7 @@ export default function ApplyStatusPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-6 space-y-4"
+        className="panel rounded-3xl p-6 space-y-4"
       >
         <p className="text-white/30 text-xs font-semibold uppercase tracking-widest">Your Application</p>
 

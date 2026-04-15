@@ -23,9 +23,9 @@ export default function ActiveChatCard({ chatId, tutorName, subject, avatarUrl }
       exit="exit"
       transition={listTransition(0)}
       onClick={() => router.push(`/live-chat/${chatId}`)}
-      className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-white/8 transition"
+      className="panel rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-white/[0.05] transition"
     >
-      <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0 overflow-hidden">
+      <div className="w-10 h-10 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0 overflow-hidden">
         {avatarUrl
           ? <img src={avatarUrl} alt={tutorName} className="w-full h-full object-cover" />
           : <MessageCircle size={15} className="text-emerald-400" />

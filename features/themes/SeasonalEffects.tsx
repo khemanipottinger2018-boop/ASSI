@@ -513,7 +513,7 @@ export function HalloweenEffects() {
           animate={{ y: [0, -12, 0], rotate: [-5, 5, -5] }}
           transition={{ duration: 4 + i, repeat: Infinity, ease: 'easeInOut', delay: p.delay }}
         >
-          🎃
+          ○
         </motion.div>
       ))}
     </div>

@@ -376,7 +376,7 @@ export function GroupStudyView({
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl px-10 py-12 text-center max-w-sm w-full space-y-6"
+        className="surface rounded-3xl px-10 py-12 text-center max-w-sm w-full space-y-6"
       >
         <div className="w-14 h-14 rounded-2xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center mx-auto">
           <Save size={22} className="text-blue-400" />

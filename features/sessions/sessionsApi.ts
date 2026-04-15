@@ -17,13 +17,14 @@ export type BookedSession = {
 };
 
 export type ChatSession = {
-  sessionId: string;
-  partnerId: string | null;
+  sessionId:   string;
+  partnerId:   string | null;
   partnerName: string;
   subjectName: string;
-  status: SessionStatus;
-  live: boolean;
-  startedAt: string | null;
+  status:      SessionStatus;
+  live:        boolean;
+  startedAt:   string | null;
+  type?:       'instant' | 'booked' | 'group_study' | 'conference';
 };
 
 export type SessionMessage = {

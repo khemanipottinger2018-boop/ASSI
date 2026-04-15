@@ -27,11 +27,11 @@ export default function InviteModal({ invite, onAccept, onDecline }: Props) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 16 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="glass rounded-2xl p-6 w-full max-w-sm text-center"
+          className="panel rounded-2xl p-6 w-full max-w-sm text-center"
         >
           {/* Icon */}
           <div className="flex justify-center mb-4">
-            <div className="glass-soft w-12 h-12 rounded-full flex items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-white/8 flex items-center justify-center">
               <UserPlus size={20} className="text-white/80" />
             </div>
           </div>

@@ -240,7 +240,7 @@ export default function TutorDashboard() {
           <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(1)} className="space-y-3">
 
             {/* Rate card — real data from userApi.getMe() */}
-            <div className="glass rounded-2xl p-5 relative overflow-hidden">
+            <div className="panel rounded-2xl p-5 relative overflow-hidden">
               <div className="absolute inset-0 pointer-events-none"
                 style={{ background: 'radial-gradient(ellipse 60% 50% at 90% 50%, rgba(52,211,153,0.06), transparent)' }} />
               <div className="flex items-start justify-between">

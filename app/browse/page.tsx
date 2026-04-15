@@ -148,7 +148,7 @@ export default function BrowsePage() {
               placeholder="Search by name or subject…"
               value={filters.query}
               onChange={e => setFilter('query', e.target.value)}
-              className="w-full glass rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:ring-1 focus:ring-white/15 transition"
+              className="w-full bg-white/6 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:border-white/25 transition"
             />
             {filters.query && (
               <button onClick={() => setFilter('query', '')} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/60 transition">
@@ -188,7 +188,7 @@ export default function BrowsePage() {
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="overflow-hidden"
             >
-              <div className="glass rounded-2xl p-4 space-y-4">
+              <div className="panel rounded-2xl p-4 space-y-4">
 
                 <div className="space-y-2">
                   <p className="text-white/30 text-[10px] uppercase tracking-widest">Level</p>
@@ -217,7 +217,7 @@ export default function BrowsePage() {
                   <div className="space-y-2">
                     <p className="text-white/30 text-[10px] uppercase tracking-widest">Subject</p>
                     <div className="relative">
-                      <select value={filters.subjectId} onChange={e => setFilter('subjectId', e.target.value)} className="w-full glass rounded-xl px-3 py-2 text-sm text-white/70 outline-none appearance-none cursor-pointer">
+                      <select value={filters.subjectId} onChange={e => setFilter('subjectId', e.target.value)} className="w-full bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-sm text-white/70 outline-none appearance-none cursor-pointer">
                         <option value="">All subjects</option>
                         {allSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                       </select>
@@ -233,9 +233,9 @@ export default function BrowsePage() {
                     {!currencyLoading && <span className="text-white/15 ml-1 normal-case">({symbol})</span>}
                   </p>
                   <div className="flex items-center gap-2">
-                    <input type="number" placeholder="Min" value={filters.minRate} onChange={e => setFilter('minRate', e.target.value)} className="flex-1 glass rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none" />
+                    <input type="number" placeholder="Min" value={filters.minRate} onChange={e => setFilter('minRate', e.target.value)} className="flex-1 bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none" />
                     <span className="text-white/20 text-xs">–</span>
-                    <input type="number" placeholder="Max" value={filters.maxRate} onChange={e => setFilter('maxRate', e.target.value)} className="flex-1 glass rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none" />
+                    <input type="number" placeholder="Max" value={filters.maxRate} onChange={e => setFilter('maxRate', e.target.value)} className="flex-1 bg-white/6 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/20 outline-none" />
                   </div>
                 </div>
 
@@ -285,7 +285,7 @@ export default function BrowsePage() {
           <Loader2 size={20} className="text-white/30 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-2xl px-4 py-12 text-center space-y-2">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="surface rounded-2xl px-4 py-12 text-center space-y-2">
           <p className="text-white/30 text-sm">
             {filters.query ? `No tutors match "${filters.query}"` : 'No tutors match your filters'}
           </p>

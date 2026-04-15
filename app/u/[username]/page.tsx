@@ -39,7 +39,7 @@ export default function PublicProfilePage({
   if (notFound || !profile) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
-        <div className="glass rounded-2xl px-6 py-8 text-center max-w-sm w-full mx-4">
+        <div className="panel rounded-2xl px-6 py-8 text-center max-w-sm w-full mx-4">
           <p className="text-white/60 text-sm">This profile doesn't exist or is unavailable.</p>
           <button
             onClick={() => router.back()}

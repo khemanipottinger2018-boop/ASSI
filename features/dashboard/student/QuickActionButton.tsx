@@ -25,7 +25,7 @@ export default function QuickActionButton({
     <motion.button
       onClick={onClick}
       whileTap={{ scale: 0.97 }}
-      className="glass rounded-2xl p-4 text-left hover:bg-white/8 transition w-full"
+      className="panel rounded-2xl p-4 text-left hover:bg-white/[0.05] transition w-full"
     >
       {Icon && (
         <div className={`w-8 h-8 rounded-xl border flex items-center justify-center mb-3 ${accents[accent]}`}>

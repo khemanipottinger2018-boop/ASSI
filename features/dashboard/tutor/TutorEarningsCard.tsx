@@ -17,7 +17,7 @@ export default function TutorEarningsCard({ totalEarned, sessionCount, loading }
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] as const }}
-      className="glass rounded-2xl p-5 relative overflow-hidden"
+      className="panel rounded-2xl p-5 relative overflow-hidden"
     >
       {/* Subtle green glow */}
       <div className="absolute inset-0 pointer-events-none"

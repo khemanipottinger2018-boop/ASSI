@@ -113,3 +113,15 @@ export const tooltipVariants: Variants = {
   exit:    { opacity: 0, scale: 0.95, y: -4 },
 };
 export const tooltipTransition: Transition = { duration: 0.14, ...spring };
+
+// ─────────────────────────────────────────────────────────────────────────
+// DROPDOWN — emerges as a lifted layer, not an expanding blur
+// Slightly different from tooltip: starts lower (-6px), scale less dramatic.
+// Use: subject pickers, select menus, command palettes
+// ─────────────────────────────────────────────────────────────────────────
+export const dropdownVariants: Variants = {
+  initial: { opacity: 0, y: -6,  scale: 0.98 },
+  animate: { opacity: 1, y: 0,   scale: 1    },
+  exit:    { opacity: 0, y: -4,  scale: 0.98 },
+};
+export const dropdownTransition: Transition = { duration: 0.18, ...spring };

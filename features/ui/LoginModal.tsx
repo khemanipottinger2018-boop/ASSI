@@ -65,7 +65,7 @@ export default function LoginModal({ isOpen, onClose, switchToSignup }: LoginMod
             transition={{ duration: 0.2, ease: 'easeOut' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="glass rounded-2xl p-6">
+            <div className="panel rounded-2xl p-6">
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div>

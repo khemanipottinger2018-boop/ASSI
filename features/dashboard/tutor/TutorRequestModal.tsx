@@ -102,7 +102,7 @@ export default function TutorRequestModal({
         animate="animate"
         exit="exit"
         transition={modalTransition}
-        className="relative w-full max-w-sm glass rounded-3xl overflow-hidden"
+        className="relative w-full max-w-sm panel rounded-3xl overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Countdown bar */}

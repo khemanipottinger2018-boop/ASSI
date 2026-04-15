@@ -23,14 +23,14 @@ export default function StatCard({ title, value, icon: Icon, accent = 'white' }:
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
-      className="glass-soft rounded-2xl px-3 py-3.5 flex flex-col gap-1.5"
+      className="surface rounded-2xl px-3 py-3.5 flex flex-col gap-1.5"
     >
-      {Icon && <Icon size={13} className="text-white/30" />}
+      {Icon && <Icon size={13} className="text-white/40" />}
       {value === undefined
         ? <div className="h-6 w-16 rounded-lg bg-white/8 animate-pulse mt-1" />
         : <p className={`text-lg font-semibold ${accents[accent]}`}>{value}</p>
       }
-      <p className="text-white/25 text-[10px] uppercase tracking-wide">{title}</p>
+      <p className="text-white/45 text-[10px] uppercase tracking-wide">{title}</p>
     </motion.div>
   );
 }

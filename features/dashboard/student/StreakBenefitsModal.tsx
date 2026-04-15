@@ -15,28 +15,28 @@ interface Props {
 
 const WEEKLY_BENEFITS = [
   {
-    week: 1, days: 7, icon: '🔥', label: 'Week 1',
+    week: 1, days: 7, label: 'Week 1',
     credits: 10,
     perks: ['10 bonus credits', 'Streak badge on profile', 'Priority in tutor matching'],
   },
   {
-    week: 2, days: 14, icon: '⚡', label: 'Week 2',
+    week: 2, days: 14, label: 'Week 2',
     credits: 25,
     perks: ['25 bonus credits', 'Exclusive Week 2 theme', 'Reduced booking fee (-2%)'],
   },
   {
-    week: 3, days: 21, icon: '💎', label: 'Week 3',
+    week: 3, days: 21, label: 'Week 3',
     credits: 50,
     perks: ['50 bonus credits', 'Free AI session summary', 'Diamond badge unlocked'],
   },
 ];
 
-const MILESTONE_REWARDS: { days: number; icon: string; reward: string; credits: number }[] = [
-  { days: 30,  icon: '🌟', reward: '1 Month',  credits: 100 },
-  { days: 60,  icon: '🚀', reward: '2 Months', credits: 200 },
-  { days: 100, icon: '💫', reward: '100 Days',  credits: 400 },
-  { days: 180, icon: '🏅', reward: '6 Months', credits: 800 },
-  { days: 365, icon: '👑', reward: '365 Days',  credits: 0   }, // Grand prize
+const MILESTONE_REWARDS: { days: number; reward: string; credits: number }[] = [
+  { days: 30,  reward: '1 Month',  credits: 100 },
+  { days: 60,  reward: '2 Months', credits: 200 },
+  { days: 100, reward: '100 Days',  credits: 400 },
+  { days: 180, reward: '6 Months', credits: 800 },
+  { days: 365, reward: '365 Days',  credits: 0   },
 ];
 
 export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
@@ -57,7 +57,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 32, scale: 0.96 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-md glass rounded-3xl overflow-hidden"
+          className="w-full max-w-md panel rounded-3xl overflow-hidden"
           style={{ maxHeight: '90vh', overflowY: 'auto', scrollbarWidth: 'none' }}
         >
           {/* Header */}
@@ -80,7 +80,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
                 ? 'bg-orange-400/8 border-orange-400/20'
                 : 'bg-white/4 border-white/8'
             }`}>
-              <span className="text-2xl">🔥</span>
+              <Flame size={20} className={currentStreak > 0 ? 'text-orange-400' : 'text-white/20'} />
               <div>
                 <p className={`font-semibold text-sm ${currentStreak > 0 ? 'text-orange-400' : 'text-white/40'}`}>
                   {currentStreak > 0 ? `${currentStreak} day streak` : 'No streak yet'}
@@ -114,7 +114,9 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
                     }`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="text-xl">{w.icon}</span>
+                          <div className="w-7 h-7 rounded-xl bg-white/6 border border-white/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-bold text-white/50">W{w.week}</span>
+                          </div>
                           <div>
                             <div className="flex items-center gap-2">
                               <p className={`text-sm font-semibold ${reached ? 'text-white' : 'text-white/50'}`}>
@@ -180,7 +182,9 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
                     <div key={m.days} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition ${
                       reached ? 'bg-orange-400/6 border-orange-400/15' : 'bg-white/2 border-white/6'
                     }`}>
-                      <span className="text-lg">{m.icon}</span>
+                      <div className="w-7 h-7 rounded-xl bg-white/6 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[9px] font-bold text-white/40">{m.days}d</span>
+                      </div>
                       <div className="flex-1">
                         <p className={`text-sm font-medium ${reached ? 'text-white/70' : 'text-white/35'}`}>
                           {m.reward}
@@ -188,7 +192,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
                         <p className="text-white/20 text-xs">{m.days} days</p>
                       </div>
                       {reached ? (
-                        <span className="text-orange-400 text-xs font-medium">✓ Reached</span>
+                        <span className="text-orange-400 text-xs font-medium">Reached</span>
                       ) : (
                         <div className="flex items-center gap-1">
                           <Lock size={10} className="text-white/20" />
@@ -222,7 +226,7 @@ export default function StreakBenefitsModal({ currentStreak, onClose }: Props) {
                   </div>
                   {currentStreak >= 365 && (
                     <span className="ml-auto text-xs font-semibold px-2 py-1 rounded-full bg-yellow-400/15 text-yellow-400 border border-yellow-400/25">
-                      Unlocked 🎉
+                      Unlocked
                     </span>
                   )}
                 </div>

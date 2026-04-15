@@ -132,7 +132,7 @@ export function SciencesSymbols() {
   return (
     <>
       <FloatingSymbols
-        symbols={['⚗','🔬','⚛','○','—','H₂O','CO₂','O₂','N₂','DNA','ATP']}
+        symbols={['⚗','⚛','○','—','H₂O','CO₂','O₂','N₂','DNA','ATP']}
         color="rgba(46,125,50,0.8)"
       />
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 1 }}>
@@ -268,7 +268,7 @@ export function ArtsSymbols() {
   return (
     <>
       <FloatingSymbols
-        symbols={['♪','♫','♬','🎵','✒','📜','⚐','★','✦','❋','✿','◈','≋','∿']}
+        symbols={['♪','♫','♬','✒','⚐','★','✦','❋','✿','◈','≋','∿']}
         color="rgba(230,74,25,0.8)"
       />
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 1 }}>

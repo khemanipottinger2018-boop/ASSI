@@ -92,7 +92,7 @@ export default function AdminUsersPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }} className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+          <div className="bg-white/8 w-9 h-9 rounded-xl flex items-center justify-center">
             <Users size={16} className="text-white/60" />
           </div>
           <div>
@@ -101,13 +101,13 @@ export default function AdminUsersPage() {
           </div>
         </div>
         <button onClick={load} disabled={loading}
-          className="glass-soft p-2 rounded-lg text-white/30 hover:text-white/60 transition">
+          className="bg-white/6 p-2 rounded-lg text-white/30 hover:text-white/60 transition">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </motion.div>
 
       {error && (
-        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+        <div className="panel rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
           <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-red-400/80 text-sm">{error}</p>
         </div>
@@ -118,7 +118,7 @@ export default function AdminUsersPage() {
         <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
         <input type="text" placeholder="Search by username…" value={query}
           onChange={e => setQuery(e.target.value)}
-          className="w-full glass rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:border-white/25 transition" />
+          className="w-full bg-white/6 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/25 outline-none focus:border-white/25 transition" />
       </motion.div>
 
       {loading ? (
@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
           <Loader2 size={20} className="text-white/30 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="glass rounded-2xl px-4 py-12 text-center">
+        <div className="surface rounded-2xl px-4 py-12 text-center">
           <p className="text-white/25 text-sm">No users found</p>
         </div>
       ) : (
@@ -138,9 +138,9 @@ export default function AdminUsersPage() {
             return (
               <motion.div key={user.userId} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.02, duration: 0.25 }}
-                className={`glass rounded-2xl p-4 flex items-center gap-4 ${suspended ? 'opacity-60' : ''}`}>
+                className={`panel rounded-2xl p-4 flex items-center gap-4 ${suspended ? 'opacity-60' : ''}`}>
 
-                <div className="w-9 h-9 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
                   <span className="text-white/50 text-sm font-semibold">{user.username[0]?.toUpperCase()}</span>
                 </div>
 
@@ -170,7 +170,7 @@ export default function AdminUsersPage() {
                   </button>
 
                   {roleMenu === user.userId && (
-                    <div className="absolute right-0 top-full mt-1 z-50 glass rounded-xl py-1 min-w-[150px] shadow-xl">
+                    <div className="absolute right-0 top-full mt-1 z-50 dropdown rounded-xl py-1 min-w-[150px] shadow-xl">
                       {ROLES.map(r => (
                         <button key={r} onClick={() => changeRole(user.userId, r)}
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/8 transition">
@@ -189,7 +189,7 @@ export default function AdminUsersPage() {
                   className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition disabled:opacity-40 ${
                     suspended
                       ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/25'
-                      : 'glass-soft text-white/30 hover:text-red-400 hover:bg-red-500/10'
+                      : 'bg-white/6 text-white/30 hover:text-red-400 hover:bg-red-500/10'
                   }`}
                 >
                   {isActioning

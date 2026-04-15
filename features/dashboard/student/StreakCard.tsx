@@ -63,7 +63,7 @@ interface Props {
 
 export function StreakCardSkeleton() {
   return (
-    <div className="glass-soft rounded-2xl px-4 py-4 animate-pulse">
+    <div className="surface rounded-2xl px-4 py-4 animate-pulse">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-white/8" />
@@ -126,7 +126,7 @@ export default function StreakCard({ streak, loading }: Props) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className={`glass rounded-2xl overflow-hidden border transition-all ${
+        className={`panel rounded-2xl overflow-hidden border transition-all ${
           is365    ? 'border-yellow-400/25' :
           paused   ? 'border-white/8' :
           isActive ? 'border-orange-400/20' :
@@ -201,7 +201,7 @@ export default function StreakCard({ streak, loading }: Props) {
               {/* Benefits button */}
               <button
                 onClick={() => setShowBenefits(true)}
-                className="glass-soft rounded-xl px-2.5 py-1.5 flex items-center gap-1 text-white/35 hover:text-white/65 transition"
+                className="bg-white/8 border border-white/10 rounded-xl px-2.5 py-1.5 flex items-center gap-1 text-white/35 hover:text-white/65 transition"
               >
                 <Info size={11} />
                 <span className="text-[10px] font-medium">Rewards</span>
@@ -215,7 +215,7 @@ export default function StreakCard({ streak, loading }: Props) {
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-white/20 text-[10px]">
-                  {daysToNext}d to {nextMs === 365 ? 'grand prize 👑' : `day ${nextMs}`}
+                  {daysToNext}d to {nextMs === 365 ? 'grand prize' : `day ${nextMs}`}
                 </span>
                 {streak && (
                   <div className="flex items-center gap-1">
@@ -267,7 +267,7 @@ export default function StreakCard({ streak, loading }: Props) {
 
           {/* Pause / resume button */}
           <div className="mt-3 pt-3 border-t border-white/6 flex items-center justify-between">
-            <p className="text-white/20 text-[10px]">
+            <p className="text-white/35 text-[10px]">
               {paused
                 ? `Streak safe until ${new Date(paused.resumeBy).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
                 : 'Streak counts daily with Remember Me on'}

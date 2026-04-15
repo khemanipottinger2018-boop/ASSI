@@ -48,7 +48,7 @@ export function SessionInviteBanner() {
         >
           {/* Invite notification */}
           {pendingInvite && (
-            <div className="glass rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 flex items-start gap-3 shadow-xl shadow-black/30">
+            <div className="panel rounded-2xl border border-emerald-500/20 bg-emerald-500/8 px-4 py-3 flex items-start gap-3 shadow-xl shadow-black/30">
               <div className="flex-1 min-w-0">
                 <p className="text-white/80 text-sm font-medium leading-snug">
                   <span className="text-emerald-300">@{pendingInvite.fromUsername}</span>
@@ -67,7 +67,7 @@ export function SessionInviteBanner() {
                 </button>
                 <button
                   onClick={() => setPendingInvite(null)}
-                  className="p-1.5 rounded-lg glass-soft text-white/25 hover:text-white/55 transition"
+                  className="p-1.5 rounded-lg bg-white/6 text-white/25 hover:text-white/55 transition"
                   aria-label="Dismiss"
                 >
                   <X size={12} />
@@ -78,7 +78,7 @@ export function SessionInviteBanner() {
 
           {/* Upcoming session notification */}
           {upcomingSession && (
-            <div className="glass rounded-2xl border border-blue-500/20 bg-blue-500/8 px-4 py-3 flex items-start gap-3 shadow-xl shadow-black/30">
+            <div className="panel rounded-2xl border border-blue-500/20 bg-blue-500/8 px-4 py-3 flex items-start gap-3 shadow-xl shadow-black/30">
               <Clock size={14} className="text-blue-400/70 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-white/80 text-sm font-medium leading-snug">
@@ -99,7 +99,7 @@ export function SessionInviteBanner() {
                 </button>
                 <button
                   onClick={() => setUpcomingSession(null)}
-                  className="p-1.5 rounded-lg glass-soft text-white/25 hover:text-white/55 transition"
+                  className="p-1.5 rounded-lg bg-white/6 text-white/25 hover:text-white/55 transition"
                   aria-label="Dismiss"
                 >
                   <X size={12} />

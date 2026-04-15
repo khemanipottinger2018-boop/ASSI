@@ -66,7 +66,7 @@ export default function StreakBriefing({ streak, onDismiss }: StreakBriefingProp
 
       {/* Card */}
       <div
-        className="glass rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer select-none"
+        className="panel rounded-2xl px-4 py-3 flex items-center gap-3 cursor-pointer select-none"
         style={{
           borderColor: `${accentColor}22`,
           minWidth: '220px',

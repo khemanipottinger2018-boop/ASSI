@@ -70,10 +70,10 @@ const PREMIUM_VARIANTS: { value: PremiumVariant; label: string; colors: [string,
 ];
 
 const EVENT_VARIANTS: { value: EventVariant; label: string; colors: [string, string] }[] = [
-  { value: 'christmas',    label: '🎄 Christmas',     colors: ['#c41e3a', '#0a7c3e'] },
-  { value: 'halloween',    label: '🎃 Halloween',     colors: ['#ff6b00', '#1a0030'] },
-  { value: 'new_year',     label: '🎆 New Year',      colors: ['#FFD700', '#4ECDC4'] },
-  { value: 'independence', label: '🇯🇲 Independence', colors: ['#FFD700', '#009B3A'] },
+  { value: 'christmas',    label: 'Christmas',    colors: ['#c41e3a', '#0a7c3e'] },
+  { value: 'halloween',    label: 'Halloween',    colors: ['#ff6b00', '#1a0030'] },
+  { value: 'new_year',     label: 'New Year',     colors: ['#FFD700', '#4ECDC4'] },
+  { value: 'independence', label: 'Independence', colors: ['#FFD700', '#009B3A'] },
 ];
 
 const SPACE_VARIANTS: { value: SpaceVariant; label: string; colors: [string, string] }[] = [
@@ -295,7 +295,7 @@ export default function SettingsPage() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
         {[28, 32, 40, 56, 28, 32, 28].map((h, i) => (
-          <div key={i} className="glass rounded-3xl" style={{ height: `${h * 4}px` }} />
+          <div key={i} className="surface rounded-3xl" style={{ height: `${h * 4}px` }} />
         ))}
       </div>
     );
@@ -309,7 +309,7 @@ export default function SettingsPage() {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center">
             <Settings size={16} className="text-white/80" />
           </div>
           <div>
@@ -325,11 +325,11 @@ export default function SettingsPage() {
 
       {/* Tier badge */}
       <motion.div custom={1} variants={fade} initial="initial" animate="animate"
-        className={`glass rounded-3xl p-5 border ${tierInfo.border} ${tierInfo.bg}`}
+        className={`panel rounded-3xl p-5 border ${tierInfo.border} ${tierInfo.bg}`}
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
               <Zap size={16} className={tierInfo.color} />
             </div>
             <div>
@@ -340,7 +340,7 @@ export default function SettingsPage() {
                   : tier === 'standard'
                     ? 'Upgrade to ASSI+ for unlimited AI, more subjects & priority tutors'
                     : tier === 'early_bird'
-                      ? 'Early bird — grandfathered pricing forever 🎉'
+                      ? 'Early bird — grandfathered pricing forever'
                       : tier === 'beta'
                         ? 'Beta tester — early access to new features'
                         : tier === 'tester'
@@ -363,7 +363,7 @@ export default function SettingsPage() {
           <div className="mt-4 pt-4 border-t border-white/8 grid grid-cols-3 gap-2">
             {['Unlimited ASSI', 'Unlimited subjects', 'Priority tutors'].map((f) => (
               <div key={f} className="flex items-center gap-1.5">
-                <span className="text-white/40 text-xs">🔒</span>
+                <span className="text-white/40 text-xs">+</span>
                 <span className="text-white/60 text-xs">{f}</span>
               </div>
             ))}
@@ -373,7 +373,7 @@ export default function SettingsPage() {
 
       {/* Account */}
       <motion.div custom={2} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={User} title="Account" />
         <p className="text-white/65 text-xs">Leave a field blank to keep it unchanged.</p>
@@ -411,7 +411,7 @@ export default function SettingsPage() {
 
       {/* Notifications */}
       <motion.div custom={3} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Bell} title="Notifications" />
         <ToggleRow label="Email notifications"
@@ -426,7 +426,7 @@ export default function SettingsPage() {
 
       {/* Streak */}
       <motion.div custom={4} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Flame} title="Streak" />
         <ToggleRow label="Daily login streak"
@@ -441,7 +441,7 @@ export default function SettingsPage() {
 
       {/* Session */}
       <motion.div custom={5} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={ShieldCheck} title="Session" />
         <ToggleRow
@@ -454,7 +454,7 @@ export default function SettingsPage() {
 
       {/* Appearance */}
       <motion.div custom={6} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-5"
+        className="panel rounded-3xl p-5 space-y-5"
       >
         <SectionHeader icon={Palette} title="Appearance" />
         <div>
@@ -526,7 +526,7 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-1.5">
                             <p className={`text-sm font-medium ${active ? 'text-white' : locked ? 'text-white/50' : 'text-white/85'}`}>{label}</p>
                             {plus && isAdmin                    && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">ADMIN</span>}
-                            {plus && !isAdmin && hasAssisPlus  && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">✓</span>}
+                            {plus && !isAdmin && hasAssisPlus  && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">ON</span>}
                             {plus && !hasAssisPlus             && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-400 font-semibold">PLUS</span>}
                           </div>
                           <p className="text-[10px] text-white/60">{desc}</p>
@@ -560,8 +560,8 @@ export default function SettingsPage() {
                 <>
                   <VariantGrid label="Jamaica & Holiday Events" items={EVENT_VARIANTS} cols={2}
                     active={themeVariant as string} onSelect={(v) => setThemeVariant(v as EventVariant)} />
-                  <div className="glass-soft rounded-xl px-3 py-2.5 flex items-start gap-2">
-                    <span className="text-orange-400 text-xs mt-0.5">✦</span>
+                  <div className="bg-white/6 rounded-xl border border-white/8 px-3 py-2.5 flex items-start gap-2">
+                    <span className="text-white/40 text-xs mt-0.5">*</span>
                     <p className="text-white/70 text-xs leading-relaxed">
                       Events are also auto-detected by date — ASSI switches to the right theme automatically around each holiday.
                     </p>
@@ -632,7 +632,7 @@ export default function SettingsPage() {
 
       {/* Language & Region */}
       <motion.div custom={6} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Globe} title="Language & Region" />
         <SelectRow label="Language" value={settings.language} options={LANGUAGES}
@@ -643,7 +643,7 @@ export default function SettingsPage() {
 
       {/* ASSI Assistant */}
       <motion.div custom={7} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sparkles} title="ASSI Assistant" />
         <ToggleRow label="Show ASSI"
@@ -658,7 +658,7 @@ export default function SettingsPage() {
 
       {/* Security */}
       <motion.div custom={8} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={ShieldCheck} title="Security" />
 
@@ -707,7 +707,7 @@ export default function SettingsPage() {
                   type="text" inputMode="numeric" maxLength={6} placeholder="000000"
                   autoFocus value={twoFaCode}
                   onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="flex-1 glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition"
+                  className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition bg-white/6"
                 />
                 <button onClick={handleVerify2FA}
                   disabled={twoFaLoading || twoFaCode.length !== 6}
@@ -736,7 +736,7 @@ export default function SettingsPage() {
                   type="text" inputMode="numeric" maxLength={6} placeholder="000000"
                   autoFocus value={twoFaCode}
                   onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  className="flex-1 glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition"
+                  className="flex-1 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none text-center tracking-[0.4em] font-mono border border-white/10 focus:border-white/25 transition bg-white/6"
                 />
                 <button onClick={handleDisable2FA}
                   disabled={twoFaLoading || twoFaCode.length !== 6}
@@ -763,18 +763,18 @@ export default function SettingsPage() {
 
       {/* Privacy */}
       <motion.div custom={9} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Lock} title="Privacy" />
         <p className="text-white/70 text-xs leading-relaxed">
           Control what other users can see about you. Your email is never shared.
         </p>
         <div className="space-y-2">
-          <div className="glass-soft rounded-xl px-4 py-3">
+          <div className="bg-white/6 rounded-xl border border-white/8 px-4 py-3">
             <p className="text-white/80 text-xs font-medium">Email address</p>
             <p className="text-white/60 text-xs mt-0.5">Never visible to other users</p>
           </div>
-          <div className="glass-soft rounded-xl px-4 py-3">
+          <div className="bg-white/6 rounded-xl border border-white/8 px-4 py-3">
             <p className="text-white/80 text-xs font-medium">Phone number</p>
             <p className="text-white/60 text-xs mt-0.5">
               {showPhone ? 'Visible to tutors and students' : 'Hidden — enable in Account section above'}
@@ -785,7 +785,7 @@ export default function SettingsPage() {
 
       {/* Advanced */}
       <motion.div custom={10} variants={fade} initial="initial" animate="animate"
-        className="glass rounded-3xl p-5 space-y-4"
+        className="panel rounded-3xl p-5 space-y-4"
       >
         <SectionHeader icon={Sliders} title="Advanced" />
         <p className="text-white/65 text-xs leading-relaxed">
@@ -794,7 +794,7 @@ export default function SettingsPage() {
         <div className="glass-soft rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-white/60 text-xs font-medium">App version</p>
-            <p className="text-white/60 text-xs">ASSI Platform v1.0 · Kingston, Jamaica 🇯🇲</p>
+            <p className="text-white/60 text-xs">ASSI Platform v1.0 · Kingston, Jamaica</p>
           </div>
         </div>
       </motion.div>
@@ -868,7 +868,7 @@ function SelectRow({ label, value, options, onChange }: {
     <div className="flex items-center justify-between gap-4">
       <p className="text-white text-sm font-medium">{label}</p>
       <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="glass-soft text-white text-sm rounded-xl px-3 py-2 outline-none border border-white/10 focus:border-white/25 transition bg-transparent">
+        className="text-white text-sm rounded-xl px-3 py-2 outline-none border border-white/10 focus:border-white/25 transition bg-white/6">
         {options.map((o) => (
           <option key={o.value} value={o.value} className="text-black bg-white">{o.label}</option>
         ))}
@@ -891,7 +891,7 @@ function InputRow({ label, placeholder, value, onChange, type = 'text', hint }: 
           type={isPassword && !show ? 'password' : type === 'password' ? 'text' : type}
           placeholder={placeholder} value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/25 outline-none border border-white/10 focus:border-white/25 transition"
+          className="w-full rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-white/25 outline-none border border-white/10 focus:border-white/25 transition bg-white/6"
         />
         {isPassword && (
           <button type="button" onClick={() => setShow(!show)}

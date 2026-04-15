@@ -271,7 +271,7 @@ export default function BookingModal({
                       <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Date & time</p>
                       <input type="datetime-local" value={datetime} min={minDatetime()}
                         onChange={e => setDatetime(e.target.value)}
-                        className="w-full glass rounded-xl px-4 py-2.5 text-sm text-white/80 outline-none focus:ring-1 focus:ring-white/15 transition [color-scheme:dark]" />
+                        className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/80 outline-none focus:ring-1 focus:ring-white/15 transition [color-scheme:dark]" />
                     </div>
                     <div>
                       <p className="text-white/30 text-[10px] uppercase tracking-widest mb-2">Duration</p>
@@ -293,7 +293,7 @@ export default function BookingModal({
                       <textarea value={notes} onChange={e => setNotes(e.target.value)}
                         placeholder="What do you need help with? Topics, exam prep, specific questions…"
                         rows={3} maxLength={500}
-                        className="w-full glass rounded-xl px-4 py-3 text-sm text-white/70 placeholder-white/20 outline-none focus:ring-1 focus:ring-white/15 transition resize-none" />
+                        className="w-full bg-white/6 border border-white/10 rounded-xl px-4 py-3 text-sm text-white/70 placeholder-white/20 outline-none focus:ring-1 focus:ring-white/15 transition resize-none" />
                       <p className="text-white/15 text-[10px] text-right mt-1">{notes.length}/500</p>
                     </div>
                     {error && <p className="text-red-400/80 text-xs flex items-center gap-1.5"><AlertCircle size={11} /> {error}</p>}

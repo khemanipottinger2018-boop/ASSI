@@ -87,7 +87,7 @@ export default function NotificationsPage() {
       </div>
 
       {error ? (
-        <div className="glass rounded-2xl px-4 py-10 text-center">
+        <div className="surface rounded-2xl px-4 py-10 text-center">
           <p className="text-sm text-red-300/90">Could not load notifications.</p>
           <button
             onClick={refresh}

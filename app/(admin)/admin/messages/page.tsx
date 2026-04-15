@@ -34,7 +34,7 @@ export default function AdminMessagesPage() {
       {/* ── Header ── */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }} className="flex items-center gap-3">
-        <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+        <div className="bg-white/8 w-9 h-9 rounded-xl flex items-center justify-center">
           <Inbox size={16} className="text-white/60" />
         </div>
         <div>
@@ -44,7 +44,7 @@ export default function AdminMessagesPage() {
       </motion.div>
 
       {/* ── Tab switcher ── */}
-      <div className="flex gap-1 glass-soft rounded-xl p-1">
+      <div className="flex gap-1 bg-white/6 border border-white/8 rounded-xl p-1">
         {(['compose', 'history'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2 rounded-lg text-sm font-medium transition capitalize ${
@@ -143,7 +143,7 @@ function ComposePanel() {
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition ${
               mode === 'broadcast'
                 ? 'bg-orange-500/15 border-orange-500/30 text-white'
-                : 'glass-soft border-white/10 text-white/50 hover:text-white/80'
+                : 'bg-white/6 border-white/10 text-white/50 hover:text-white/80'
             }`}>
             <Megaphone size={14} className={mode === 'broadcast' ? 'text-orange-400' : 'text-white/30'} />
             <div className="text-left">
@@ -157,7 +157,7 @@ function ComposePanel() {
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition ${
               mode === 'direct'
                 ? 'bg-blue-500/15 border-blue-500/30 text-white'
-                : 'glass-soft border-white/10 text-white/50 hover:text-white/80'
+                : 'bg-white/6 border-white/10 text-white/50 hover:text-white/80'
             }`}>
             <User size={14} className={mode === 'direct' ? 'text-blue-400' : 'text-white/30'} />
             <div className="text-left">
@@ -180,8 +180,8 @@ function ComposePanel() {
               <p className="text-white/40 text-xs font-semibold uppercase tracking-widest">Recipient</p>
 
               {recipient ? (
-                <div className="flex items-center gap-3 glass-soft rounded-xl px-3 py-2.5">
-                  <div className="w-7 h-7 rounded-lg glass-soft flex items-center justify-center flex-shrink-0">
+                <div className="flex items-center gap-3 bg-white/6 border border-white/8 rounded-xl px-3 py-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center flex-shrink-0">
                     <span className="text-white/60 text-xs font-semibold">
                       {recipient.username[0]?.toUpperCase()}
                     </span>
@@ -200,7 +200,7 @@ function ComposePanel() {
                   <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
                   <input value={search} onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search by username…"
-                    className="w-full glass-soft rounded-xl pl-8 pr-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition" />
+                    className="w-full bg-white/6 border border-white/8 rounded-xl pl-8 pr-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition" />
                   {searching && <Loader2 size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 animate-spin" />}
                 </div>
               )}
@@ -213,7 +213,7 @@ function ComposePanel() {
                     {results.map((u) => (
                       <button key={u.userId} onClick={() => { setRecipient(u); setResults([]); setSearch(''); }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition text-left">
-                        <div className="w-7 h-7 rounded-lg glass-soft flex items-center justify-center flex-shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-white/8 flex items-center justify-center flex-shrink-0">
                           <span className="text-white/50 text-xs font-semibold">{u.username[0]?.toUpperCase()}</span>
                         </div>
                         <div>
@@ -236,14 +236,14 @@ function ComposePanel() {
 
         <input value={subject} onChange={(e) => setSubject(e.target.value)}
           placeholder="Subject (optional)"
-          className="w-full glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition" />
+          className="w-full bg-white/6 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition" />
 
         <textarea value={content} onChange={(e) => setContent(e.target.value)}
           placeholder={mode === 'broadcast'
             ? 'Write your announcement… All users will see this.'
             : 'Write your message…'}
           rows={5}
-          className="w-full glass-soft rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition resize-none leading-relaxed" />
+          className="w-full bg-white/6 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition resize-none leading-relaxed" />
 
         <div className="flex items-center justify-between pt-1">
           <p className="text-white/20 text-xs">
@@ -310,7 +310,7 @@ function HistoryPanel() {
   );
 
   if (messages.length === 0) return (
-    <div className="glass rounded-2xl px-4 py-12 text-center">
+    <div className="surface rounded-2xl px-4 py-12 text-center">
       <p className="text-white/25 text-sm">No messages sent yet</p>
     </div>
   );
@@ -333,11 +333,11 @@ function HistoryPanel() {
           <motion.div key={msg.id}
             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="glass rounded-2xl overflow-hidden"
+            className="panel rounded-2xl overflow-hidden"
           >
             <button onClick={() => setExpanded(isOpen ? null : msg.id)}
               className="w-full flex items-center gap-3 p-4 hover:bg-white/4 transition text-left">
-              <div className={`w-8 h-8 rounded-lg glass-soft flex items-center justify-center flex-shrink-0 ${
+              <div className={`w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center flex-shrink-0 ${
                 isBroadcast ? 'text-orange-400' : 'text-blue-400'
               }`}>
                 {isBroadcast ? <Megaphone size={14} /> : <User size={14} />}

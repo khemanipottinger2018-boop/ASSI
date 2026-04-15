@@ -64,7 +64,7 @@ export default function MetricsPage() {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+          <div className="bg-white/8 w-9 h-9 rounded-xl flex items-center justify-center">
             <BarChart2 size={16} className="text-white/60" />
           </div>
           <div>
@@ -75,7 +75,7 @@ export default function MetricsPage() {
         <button
           onClick={load}
           disabled={loading}
-          className="glass-soft p-2 rounded-lg text-white/30 hover:text-white/60 transition"
+          className="bg-white/6 p-2 rounded-lg text-white/30 hover:text-white/60 transition"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -83,7 +83,7 @@ export default function MetricsPage() {
 
       {error && (
         <motion.div custom={0.5} variants={fade} initial="initial" animate="animate"
-          className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+          className="panel rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
           <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-red-400/80 text-sm">{error}</p>
         </motion.div>
@@ -98,7 +98,7 @@ export default function MetricsPage() {
           className="grid grid-cols-2 md:grid-cols-3 gap-3"
         >
           {stats.map((s) => (
-            <div key={s.label} className="glass rounded-2xl px-4 py-4">
+            <div key={s.label} className="panel rounded-2xl px-4 py-4">
               <div className="flex items-center gap-2 mb-2">
                 <s.icon size={13} className="text-white/25" />
                 <p className="text-white/30 text-xs">{s.label}</p>

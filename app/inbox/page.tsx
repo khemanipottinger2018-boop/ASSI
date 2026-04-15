@@ -184,7 +184,7 @@ export default function InboxPage() {
                 )}
               </>
             ) : (
-              <div className="glass rounded-2xl px-4 py-12 text-center">
+              <div className="surface rounded-2xl px-4 py-12 text-center">
                 <p className="text-white/25 text-sm">Failed to load message</p>
               </div>
             )}
@@ -198,7 +198,7 @@ export default function InboxPage() {
             exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
           >
             {error ? (
-              <div className="glass rounded-2xl px-4 py-10 text-center">
+              <div className="surface rounded-2xl px-4 py-10 text-center">
                 <p className="text-sm text-red-300/90">Could not load messages.</p>
                 <button onClick={refresh} className="mt-3 text-xs text-white/60 hover:text-white/90 transition">
                   Try again
@@ -220,7 +220,7 @@ export default function InboxPage() {
                 ))}
               </div>
             ) : messages.length === 0 ? (
-              <div className="glass rounded-2xl text-center py-16 px-6">
+              <div className="surface rounded-2xl text-center py-16 px-6">
                 <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 mx-auto mb-4 flex items-center justify-center">
                   <Inbox size={22} className="text-white/40" />
                 </div>
@@ -318,10 +318,10 @@ function MessageBubble({ msg, isOriginal }: { msg: InboxMessage; isOriginal?: bo
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      className={`glass rounded-2xl p-4 ${isOriginal ? 'border border-white/15' : 'border border-white/8 ml-6'}`}
+      className={`panel rounded-2xl p-4 ${isOriginal ? 'border border-white/15' : 'border border-white/8 ml-6'}`}
     >
       <div className="flex items-start gap-3">
-        <div className="glass-soft w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-white/8 flex items-center justify-center flex-shrink-0">
           <Icon size={14} className={ctx.color} />
         </div>
         <div className="flex-1 min-w-0">

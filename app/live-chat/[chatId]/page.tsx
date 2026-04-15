@@ -96,7 +96,7 @@ export default function ChatRoomPage({ params }: Props) {
   if (accessError) {
     return (
       <div className="h-full flex items-center justify-center px-4">
-        <div className="glass rounded-2xl px-10 py-12 text-center max-w-sm space-y-3">
+        <div className="surface rounded-2xl px-10 py-12 text-center max-w-sm space-y-3">
           <p className="text-white/50 text-sm">{accessError}</p>
           <button
             onClick={() => router.push('/browse')}
@@ -121,7 +121,7 @@ export default function ChatRoomPage({ params }: Props) {
   if (!meta) {
     return (
       <div className="h-full flex items-center justify-center px-4">
-        <div className="glass rounded-2xl px-10 py-12 text-center max-w-sm space-y-3">
+        <div className="surface rounded-2xl px-10 py-12 text-center max-w-sm space-y-3">
           <p className="text-white/50 text-sm">Session not found.</p>
           <button
             onClick={() => router.push('/browse')}

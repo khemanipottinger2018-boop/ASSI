@@ -56,13 +56,13 @@ export default function AvailableTutorCard({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-2xl p-4 space-y-3.5 hover:bg-white/[0.06] transition-colors duration-200"
+        className="panel rounded-2xl p-4 space-y-3.5 hover:bg-white/[0.05] transition-colors duration-200"
       >
         {/* ── Top row ── */}
         <div className="flex items-start justify-between gap-3">
           <button onClick={goToProfile} className="flex items-center gap-3 min-w-0 text-left">
             <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center overflow-hidden">
+              <div className="w-10 h-10 rounded-xl bg-white/8 flex items-center justify-center overflow-hidden">
                 {avatarUrl
                   ? <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
                   : <span className="text-white/60 text-sm font-semibold">{username[0]?.toUpperCase()}</span>

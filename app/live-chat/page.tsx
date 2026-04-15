@@ -87,7 +87,7 @@ const SESSION_MODES: SessionMode[] = [
   {
     type:         'group_study',
     label:        'Group Study',
-    description:  'Study together with peers. Invite friends or classmates to join your room.',
+    description:  'A quiet zone for students to study together. Tutors can join to help — but students lead.',
     icon:         Users,
     color:        'bg-blue-500/12',
     border:       'border-blue-500/25',
@@ -99,14 +99,14 @@ const SESSION_MODES: SessionMode[] = [
   {
     type:         'conference',
     label:        'Conference',
-    description:  'Host a live teaching session. You control who speaks, mute, and grant the floor.',
+    description:  'Host an auditorium-style session. You teach, control the floor, mute, and grant speaking rights.',
     icon:         Radio,
     color:        'bg-orange-500/12',
     border:       'border-orange-500/25',
     textColor:    'text-orange-300',
     forRoles:     ['tutor', 'admin'],
     requiresPlus: false,
-    capacity:     'Tutors/Admin · 6 default, 10 with ASSI+',
+    capacity:     'Tutors/Admin · up to 10 participants',
   },
 ];
 
@@ -432,8 +432,8 @@ export default function LiveChatPage() {
                       transition={{ delay: i * 0.06, duration: 0.28 }}
                       onClick={() => handleModeSelect(m.type)}
                       className={`
-                        w-full text-left glass rounded-2xl p-5 border transition-all duration-200
-                        hover:bg-white/[0.06] hover:scale-[1.01] active:scale-[0.99]
+                        w-full text-left panel rounded-2xl p-5 border transition-all duration-200
+                        hover:bg-white/[0.05] hover:scale-[1.01] active:scale-[0.99]
                         ${m.border}
                       `}
                     >
@@ -489,7 +489,9 @@ export default function LiveChatPage() {
                   {mode === 'instant'
                     ? "We'll find available tutors for this subject."
                     : mode === 'group_study'
-                    ? 'Your study room will be tagged to this subject.'
+                    ? role === 'tutor'
+                      ? 'Browse open student rooms to join for this subject.'
+                      : 'Your study room will be tagged to this subject.'
                     : 'Your conference will be tagged to this subject.'
                   }
                 </p>
@@ -501,7 +503,7 @@ export default function LiveChatPage() {
               {(role === 'tutor' || role === 'admin') && mode !== 'instant' && tutorSubjects.length > 0 ? (
                 <div className="space-y-1.5">
                   {tutorSubjectsLoading ? (
-                    <div className="glass rounded-2xl px-4 py-6 flex items-center justify-center">
+                    <div className="surface rounded-2xl px-4 py-6 flex items-center justify-center">
                       <Loader2 size={16} className="text-white/30 animate-spin" />
                     </div>
                   ) : (
@@ -509,7 +511,7 @@ export default function LiveChatPage() {
                       <button
                         key={s.id}
                         onClick={() => handleSubjectSelect({ id: s.id, name: s.name, category: s.category ?? '', tutorCount: 0 })}
-                        className="w-full text-left glass rounded-xl px-4 py-3 border border-white/[0.07] hover:bg-white/[0.05] hover:border-white/15 transition-all"
+                        className="w-full text-left panel rounded-xl px-4 py-3 border border-white/[0.07] hover:bg-white/[0.05] hover:border-white/15 transition-all"
                       >
                         <p className="text-white/80 text-sm">{s.name}</p>
                         {s.category && <p className="text-white/30 text-xs mt-0.5">{s.category}</p>}
@@ -531,7 +533,7 @@ export default function LiveChatPage() {
                     className="sr-only"
                   />
                   <div className={`w-4 h-4 rounded border transition flex items-center justify-center flex-shrink-0 ${isPublic ? 'bg-orange-500/40 border-orange-500/60' : 'border-white/20'}`}>
-                    {isPublic && <span className="text-orange-300 text-[10px]">✓</span>}
+                    {isPublic && <span className="text-orange-300 text-[10px]">·</span>}
                   </div>
                   <div>
                     <p className="text-white/70 text-sm">Public conference</p>
@@ -572,7 +574,7 @@ export default function LiveChatPage() {
               {loadingTutors && (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => (
-                    <div key={i} className="glass rounded-2xl p-4 animate-pulse flex items-center gap-3">
+                    <div key={i} className="surface rounded-2xl p-4 animate-pulse flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-white/8 flex-shrink-0" />
                       <div className="flex-1 space-y-2">
                         <div className="h-3 w-28 bg-white/8 rounded" />
@@ -587,7 +589,7 @@ export default function LiveChatPage() {
               {/* Empty */}
               {!loadingTutors && tutors.length === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                  className="glass rounded-2xl px-8 py-12 text-center space-y-3">
+                  className="surface rounded-2xl px-8 py-12 text-center space-y-3">
                   <WifiOff size={22} className="text-white/20 mx-auto" />
                   <div>
                     <p className="text-white/45 text-sm font-medium">No tutors available right now</p>
@@ -613,12 +615,12 @@ export default function LiveChatPage() {
                       <motion.div key={tutor.userId} layout
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.04, duration: 0.25 }}
-                        className={`glass rounded-2xl p-4 transition-opacity ${isDisabled ? 'opacity-40' : ''}`}
+                        className={`panel rounded-2xl p-4 transition-opacity ${isDisabled ? 'opacity-40' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           {/* Avatar */}
                           <div className="relative flex-shrink-0">
-                            <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center overflow-hidden">
+                            <div className="w-10 h-10 rounded-xl bg-white/8 flex items-center justify-center overflow-hidden">
                               {tutor.avatarUrl
                                 ? <img src={tutor.avatarUrl} alt={tutor.username} className="w-full h-full object-cover" />
                                 : <span className="text-white/55 text-sm font-semibold">{tutor.username[0]?.toUpperCase()}</span>
@@ -728,7 +730,7 @@ export default function LiveChatPage() {
               {loadingRooms && (
                 <div className="space-y-3">
                   {[1, 2].map(i => (
-                    <div key={i} className="glass rounded-2xl p-4 animate-pulse flex items-center gap-3">
+                    <div key={i} className="surface rounded-2xl p-4 animate-pulse flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-white/8 flex-shrink-0" />
                       <div className="flex-1 space-y-2">
                         <div className="h-3 w-28 bg-white/8 rounded" />
@@ -753,12 +755,12 @@ export default function LiveChatPage() {
                       <motion.div key={room.id} layout
                         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.04, duration: 0.25 }}
-                        className={`glass rounded-2xl p-4 transition-opacity ${isDisabled ? 'opacity-40' : ''}`}
+                        className={`panel rounded-2xl p-4 transition-opacity ${isDisabled ? 'opacity-40' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           {/* Icon */}
                           <div className="relative flex-shrink-0">
-                            <div className="w-10 h-10 rounded-xl glass-soft border border-blue-500/20 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-white/8 border border-blue-500/20 flex items-center justify-center">
                               <Users size={16} className="text-blue-300" />
                             </div>
                             {room.status === 'active' && (
@@ -822,8 +824,16 @@ export default function LiveChatPage() {
                 </div>
               )}
 
-              {/* Create new room — expandable with settings */}
-              <div className="glass rounded-2xl border border-dashed border-blue-500/20 overflow-hidden">
+              {/* Create new room — students only; tutors join existing rooms */}
+              {role === 'tutor' && availableRooms.length === 0 && !loadingRooms && (
+                <div className="surface rounded-2xl px-6 py-8 text-center space-y-2">
+                  <Users size={18} className="text-white/20 mx-auto" />
+                  <p className="text-white/35 text-sm">No open rooms for this subject yet.</p>
+                  <p className="text-white/20 text-xs">Students create the rooms — check back shortly or try a different subject.</p>
+                </div>
+              )}
+              {role !== 'tutor' && (
+              <div className="panel rounded-2xl border border-dashed border-blue-500/20 overflow-hidden">
                 {!showCreateOptions ? (
                   <button
                     onClick={() => setShowCreateOptions(true)}
@@ -911,6 +921,7 @@ export default function LiveChatPage() {
                   </div>
                 )}
               </div>
+              )}
             </motion.div>
           )}
 
@@ -946,7 +957,7 @@ export default function LiveChatPage() {
             <motion.div key="error"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }} transition={{ duration: 0.28 }}
-              className="glass rounded-2xl px-10 py-12 text-center space-y-5"
+              className="surface rounded-2xl px-10 py-12 text-center space-y-5"
             >
               <div className="w-14 h-14 rounded-full glass-soft flex items-center justify-center mx-auto">
                 <X size={20} className="text-red-400" />

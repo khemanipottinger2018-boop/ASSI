@@ -133,14 +133,14 @@ export default function SignIn() {
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl w-full max-w-4xl overflow-hidden grid grid-cols-1 md:grid-cols-2"
+        className="panel rounded-3xl w-full max-w-4xl overflow-hidden grid grid-cols-1 md:grid-cols-2"
       >
         {/* ── LEFT: Form ── */}
         <div className="p-8 flex flex-col justify-center gap-6">
 
           {/* Header */}
           <div className="flex items-center gap-3">
-            <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
               <BookOpen size={16} className="text-white/70" />
             </div>
             <div>
@@ -183,7 +183,7 @@ export default function SignIn() {
                 className="space-y-4"
               >
                 <div className="flex items-center gap-3 mb-1">
-                  <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center">
                     <ShieldCheck size={16} className="text-white/70" />
                   </div>
                   <div>
@@ -201,7 +201,7 @@ export default function SignIn() {
                     placeholder="000000" value={totpCode}
                     onChange={e => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     autoComplete="one-time-code"
-                    className="w-full glass-soft rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 text-center tracking-[0.5em] font-mono"
+                    className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 text-center tracking-[0.5em] font-mono bg-white/6 border border-white/10"
                   />
                   <motion.button
                     type="submit" disabled={loading || totpCode.length !== 6}
@@ -234,14 +234,14 @@ export default function SignIn() {
                     placeholder="Email address"
                     value={email} onChange={e => setEmail(e.target.value)}
                     autoComplete="off"
-                    className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+                    className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
                   />
                   <input
                     type="password" required disabled={loading}
                     placeholder="Password"
                     value={password} onChange={e => setPassword(e.target.value)}
                     autoComplete="new-password"
-                    className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+                    className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
                   />
 
                   {/* Remember me */}
@@ -306,8 +306,8 @@ export default function SignIn() {
             <div className="space-y-3">
               {PLATFORM_HIGHLIGHTS.map(({ icon: Icon, label, sub }) => (
                 <div key={label} className="flex items-center gap-3">
-                  <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Icon size={14} className="text-orange-400/80" />
+                  <div className="w-8 h-8 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
+                    <Icon size={14} className="text-white/55" />
                   </div>
                   <div>
                     <p className="text-white/80 text-sm leading-tight">{label}</p>
@@ -318,9 +318,9 @@ export default function SignIn() {
             </div>
           </div>
 
-          <div className="glass-soft rounded-2xl px-4 py-3 mt-6">
+          <div className="bg-white/6 rounded-2xl border border-white/8 px-4 py-3 mt-6">
             <p className="text-white/35 text-xs leading-relaxed">
-              🔥 Enable <span className="text-orange-400/80">Remember me</span> to track your daily login streak.
+              Enable <span className="text-orange-400/80">Remember me</span> to track your daily login streak.
               365 consecutive days earns you ASSI+ for a full year — free.
             </p>
           </div>

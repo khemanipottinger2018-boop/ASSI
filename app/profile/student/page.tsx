@@ -96,7 +96,7 @@ export default function StudentProfilePage() {
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
 
         {/* ── Hero ── */}
-        <motion.div {...fade(0)} className="glass rounded-3xl overflow-hidden">
+        <motion.div {...fade(0)} className="panel rounded-3xl overflow-hidden">
           <div className={`h-0.5 w-full ${
             is365             ? 'bg-gradient-to-r from-yellow-400 via-orange-300 to-yellow-400' :
             currentStreak > 0 ? 'bg-gradient-to-r from-orange-500/50 via-orange-400 to-orange-500/50' :
@@ -156,7 +156,7 @@ export default function StudentProfilePage() {
 
         {/* ── Streak ── */}
         {streak && (
-          <motion.div {...fade(0.1)} className={`glass rounded-3xl p-5 border ${
+          <motion.div {...fade(0.1)} className={`panel rounded-3xl p-5 border ${
             is365             ? 'border-yellow-400/18' :
             currentStreak > 0 ? 'border-orange-400/12' :
                                 'border-white/5'
@@ -209,7 +209,7 @@ export default function StudentProfilePage() {
                     </div>
                     {reached && (
                       <div className="w-4 h-4 rounded-full bg-orange-400 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[8px] text-white font-bold">✓</span>
+                        <span className="text-[8px] text-white font-bold">·</span>
                       </div>
                     )}
                   </div>
@@ -267,7 +267,7 @@ export default function StudentProfilePage() {
         </motion.div>
 
         {/* ── Account ── */}
-        <motion.div {...fade(0.18)} className="glass rounded-3xl p-4 space-y-1">
+        <motion.div {...fade(0.18)} className="panel rounded-3xl p-4 space-y-1">
           <p className="text-white/22 text-[10px] font-medium uppercase tracking-widest px-2 pb-2">Account</p>
           <ActionRow label="Edit profile" icon={Edit3}    onClick={() => setShowEdit(true)} />
           <ActionRow label="Settings"     icon={Sparkles} onClick={() => router.push('/settings')} />
@@ -318,10 +318,10 @@ function ActionRow({ label, onClick, destructive, icon: Icon }: {
 function ProfileSkeleton() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
-      <div className="glass rounded-3xl h-36" />
+      <div className="surface rounded-3xl h-36" />
       <div className="grid grid-cols-3 gap-3">{[0,1,2].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}</div>
-      <div className="glass rounded-3xl h-64" />
-      <div className="glass rounded-3xl h-36" />
+      <div className="surface rounded-3xl h-64" />
+      <div className="surface rounded-3xl h-36" />
     </div>
   );
 }

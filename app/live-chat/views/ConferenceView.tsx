@@ -465,7 +465,7 @@ export function ConferenceView({
             >
               <div className="flex items-center gap-3 px-4 py-2.5 overflow-x-auto">
                 <span className="text-yellow-400/60 text-[9px] uppercase tracking-widest flex-shrink-0">
-                  ✋ Raised
+                  Raised
                 </span>
                 {handQueue.map(p => (
                   <div key={p.userId} className="flex items-center gap-2 flex-shrink-0 glass-soft rounded-lg px-2.5 py-1.5">

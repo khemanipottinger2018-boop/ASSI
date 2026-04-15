@@ -202,7 +202,7 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
     return (
       <motion.div {...slide} className="space-y-4">
         <BackBtn onClick={onBack} />
-        <div className="glass rounded-3xl p-8 text-center space-y-4">
+        <div className="panel rounded-3xl p-8 text-center space-y-4">
           <div className="w-12 h-12 rounded-2xl bg-orange-400/12 border border-orange-400/20 flex items-center justify-center mx-auto">
             <CheckCircle size={20} className="text-orange-400" />
           </div>
@@ -223,7 +223,7 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
         </div>
 
         {matching === 'manual' && (
-          <div className="glass rounded-3xl p-5 space-y-2">
+          <div className="panel rounded-3xl p-5 space-y-2">
             <p className="text-white/35 text-[10px] uppercase tracking-widest mb-3">Recommended tutors</p>
             {['Tutor A', 'Tutor B', 'Tutor C'].map((t, i) => (
               <div key={i} className="glass-soft rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -249,7 +249,7 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
     <motion.div {...slide} className="space-y-3">
       <BackBtn onClick={onBack} />
 
-      <div className="glass rounded-3xl p-5 space-y-4">
+      <div className="panel rounded-3xl p-5 space-y-4">
         <SectionLabel icon={Zap} label="Assignment details" color="text-orange-400" />
         <div className="space-y-2.5">
           <input 
@@ -280,7 +280,7 @@ function ModeDone({ onBack, initialSubject }: { onBack: () => void; initialSubje
         />
       </div>
 
-      <div className="glass rounded-3xl p-4">
+      <div className="panel rounded-3xl p-4">
         <SectionLabel icon={Bot} label="Tutor matching" color="text-orange-400" />
         <div className="grid grid-cols-2 gap-2 mt-3">
           {([
@@ -341,7 +341,7 @@ function ModeGuide({ onBack, initialSubject }: { onBack: () => void; initialSubj
     <motion.div {...slide} className="space-y-3">
       <BackBtn onClick={onBack} />
 
-      <div className="glass rounded-3xl p-5 space-y-4">
+      <div className="panel rounded-3xl p-5 space-y-4">
         <SectionLabel icon={Users} label="Live guidance" color="text-emerald-400" />
 
         <div className="glass-soft rounded-xl px-4 py-3 flex items-start gap-3">
@@ -374,7 +374,7 @@ function ModeGuide({ onBack, initialSubject }: { onBack: () => void; initialSubj
         />
       </div>
 
-      <div className="glass rounded-3xl p-4 space-y-3">
+      <div className="panel rounded-3xl p-4 space-y-3">
         <SectionLabel icon={Clock} label="What happens next" color="text-emerald-400" />
         {[
           'Your request goes live — available tutors see it immediately',
@@ -522,7 +522,7 @@ function ModeReview({ onBack }: { onBack: () => void }) {
       <motion.div {...slide} className="space-y-4">
         <BackBtn onClick={() => setStep('input')} label="Scan again" />
 
-        <div className={`glass rounded-3xl p-5 border ${overallBorder}`}>
+        <div className={`panel rounded-3xl p-5 border ${overallBorder}`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Shield size={13} className={overallColor} />
@@ -556,7 +556,7 @@ function ModeReview({ onBack }: { onBack: () => void }) {
                 initial={{ opacity: 0, y: 8 }} 
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
-                className={`glass rounded-2xl border overflow-hidden ${borderCl}`}
+                className={`panel rounded-2xl border overflow-hidden ${borderCl}`}
               >
                 <div className={`px-4 py-3 ${bgTop}`}>
                   <div className="flex items-start gap-2 mb-2">
@@ -596,7 +596,7 @@ function ModeReview({ onBack }: { onBack: () => void }) {
     <motion.div {...slide} className="space-y-3">
       <BackBtn onClick={onBack} />
 
-      <div className="glass rounded-3xl p-5 space-y-4">
+      <div className="panel rounded-3xl p-5 space-y-4">
         <SectionLabel icon={Shield} label="Integrity review" color="text-purple-400" />
 
         <div className="glass-soft rounded-xl px-4 py-3 flex items-start gap-3">
@@ -679,7 +679,7 @@ function ModeSelector({ subject, onSelect }: {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.07, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           whileTap={{ scale: 0.985 }}
-          className={`w-full glass rounded-3xl p-5 text-left hover:bg-white/4 transition group border ${m.border}`}
+          className={`w-full panel rounded-3xl p-5 text-left hover:bg-white/4 transition group border ${m.border}`}
         >
           <div className="flex items-center gap-4">
             <div className={`w-11 h-11 rounded-2xl border flex items-center justify-center flex-shrink-0 ${m.iconBg}`}>

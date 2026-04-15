@@ -55,7 +55,7 @@ export default function PublicProfileCard({ profile }: { profile: UserProfileVie
     <div className="space-y-4">
 
       {/* ── Hero card ── */}
-      <motion.div {...fade(0)} className="glass rounded-3xl overflow-hidden">
+      <motion.div {...fade(0)} className="panel rounded-3xl overflow-hidden">
         {/* Role accent bar */}
         <div className={`h-1 w-full ${
           isTutor
@@ -131,7 +131,7 @@ export default function PublicProfileCard({ profile }: { profile: UserProfileVie
 
       {/* ── Subjects ── */}
       {isTutor && subjects.length > 0 && (
-        <motion.div {...fade(0.07)} className="glass rounded-3xl p-5">
+        <motion.div {...fade(0.07)} className="panel rounded-3xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <BookOpen size={13} className="text-white/30" />
             <span className="text-white/40 text-xs font-medium uppercase tracking-widest">

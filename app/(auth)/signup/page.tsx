@@ -180,14 +180,14 @@ export default function SignUp() {
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl w-full max-w-4xl overflow-hidden grid grid-cols-1 md:grid-cols-2"
+        className="panel rounded-3xl w-full max-w-4xl overflow-hidden grid grid-cols-1 md:grid-cols-2"
       >
         {/* ── LEFT: Form ── */}
         <div className="p-8 flex flex-col gap-5">
 
           {/* Header */}
           <div className="flex items-center gap-3">
-            <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
               <BookOpen size={16} className="text-white/70" />
             </div>
             <div>
@@ -197,7 +197,7 @@ export default function SignUp() {
           </div>
 
           {/* Role toggle */}
-          <div className="glass-soft rounded-xl p-1 grid grid-cols-2 gap-1">
+          <div className="bg-white/8 rounded-xl p-1 border border-white/8 grid grid-cols-2 gap-1">
             {(['student', 'tutor_applicant'] as Role[]).map(r => (
               <button
                 key={r}
@@ -209,7 +209,7 @@ export default function SignUp() {
                     : 'text-white/45 hover:text-white/70'
                 }`}
               >
-                {r === 'student' ? '🎓 Student' : '✏️ Become a Tutor'}
+                {r === 'student' ? 'Student' : 'Become a Tutor'}
               </button>
             ))}
           </div>
@@ -244,7 +244,7 @@ export default function SignUp() {
               value={form.username}
               onChange={e => update('username', e.target.value)}
               autoComplete="off"
-              className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+              className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
             />
             <input
               required type="email" disabled={isBusy}
@@ -252,7 +252,7 @@ export default function SignUp() {
               value={form.email}
               onChange={e => update('email', e.target.value)}
               autoComplete="off"
-              className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+              className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
             />
             <div className="space-y-1">
               <input
@@ -261,13 +261,13 @@ export default function SignUp() {
                 value={form.password}
                 onChange={e => update('password', e.target.value)}
                 autoComplete="new-password"
-                className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+                className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
               />
               {form.password && pwStrength && (
                 <p className="text-[11px] text-red-400/80 px-1">{pwStrength}</p>
               )}
               {form.password && !pwStrength && (
-                <p className="text-[11px] text-emerald-400/70 px-1">✓ Strong password</p>
+                <p className="text-[11px] text-emerald-400/70 px-1">Strong password</p>
               )}
             </div>
             <input
@@ -276,12 +276,12 @@ export default function SignUp() {
               value={form.confirmPassword}
               onChange={e => update('confirmPassword', e.target.value)}
               autoComplete="new-password"
-              className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40"
+              className="w-full rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 outline-none transition disabled:opacity-40 bg-white/6 border border-white/10"
             />
 
             {role === 'tutor_applicant' && (
-              <div className="rounded-xl bg-orange-500/8 border border-orange-500/20 px-3 py-2.5 flex items-start gap-2">
-                <ArrowRight size={13} className="text-orange-400 flex-shrink-0 mt-0.5" />
+              <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 px-3 py-2.5 flex items-start gap-2">
+                <ArrowRight size={13} className="text-blue-400/70 flex-shrink-0 mt-0.5" />
                 <p className="text-white/50 text-[11px] leading-relaxed">
                   After creating your account you'll fill out a short application (5–10 min).
                   Our team reviews within 24–48 hours.
@@ -316,7 +316,7 @@ export default function SignUp() {
                 type="button"
                 onClick={handleGenerateDemo}
                 disabled={isBusy}
-                className="w-full glass-soft rounded-xl px-4 py-2.5 text-sm text-white/70 hover:text-white transition disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10"
+                className="w-full rounded-xl px-4 py-2.5 text-sm text-white/70 hover:text-white transition disabled:opacity-50 flex items-center justify-center gap-2 border border-white/10 bg-white/6"
               >
                 {demoLoading ? (
                   <><Spinner /> Generating demo…</>
@@ -353,8 +353,8 @@ export default function SignUp() {
                   <div className="space-y-3">
                     {STUDENT_FEATURES.map(({ icon: Icon, label, sub }) => (
                       <div key={label} className="flex items-center gap-3">
-                        <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Icon size={14} className="text-orange-400/80" />
+                        <div className="w-8 h-8 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
+                          <Icon size={14} className="text-white/55" />
                         </div>
                         <div>
                           <p className="text-white/80 text-sm leading-tight">{label}</p>
@@ -364,7 +364,7 @@ export default function SignUp() {
                     ))}
                   </div>
                 </div>
-                <div className="glass-soft rounded-2xl px-4 py-3">
+                <div className="bg-white/6 rounded-2xl border border-white/8 px-4 py-3">
                   <p className="text-white/35 text-xs leading-relaxed">
                     Want to teach too?{' '}
                     <button onClick={() => setRole('tutor_applicant')} className="text-orange-400/70 hover:text-orange-400 underline transition">
@@ -391,8 +391,8 @@ export default function SignUp() {
                   <div className="space-y-3">
                     {TUTOR_FEATURES.map(({ icon: Icon, label, sub }) => (
                       <div key={label} className="flex items-center gap-3">
-                        <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <Icon size={14} className="text-orange-400/80" />
+                        <div className="w-8 h-8 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
+                          <Icon size={14} className="text-white/55" />
                         </div>
                         <div>
                           <p className="text-white/80 text-sm leading-tight">{label}</p>
@@ -413,7 +413,7 @@ export default function SignUp() {
                   </div>
                 </div>
 
-                <div className="glass-soft rounded-2xl px-4 py-3 space-y-1">
+                <div className="bg-white/6 rounded-2xl border border-white/8 px-4 py-3 space-y-1">
                   <p className="text-white/55 text-xs font-medium">How it works</p>
                   <p className="text-white/30 text-xs leading-relaxed">
                     Create your account → fill out a short application → our team reviews within 24–48 hours → start earning.

@@ -101,23 +101,11 @@ export default function ServiceSelector({ onOpenLogin, onOpenSignup }: Props) {
 
   return (
     <>
-      <AnimatePresence>
-        {dropdownOpen && (
-          <motion.div
-            key="blur-overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-20 pointer-events-none"
-            style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
-          />
-        )}
-      </AnimatePresence>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="glass relative z-30 w-full max-w-lg mx-auto"
+        className="panel relative z-30 w-full max-w-lg mx-auto"
         style={{ borderRadius: 28, padding: 28 }}
       >
 

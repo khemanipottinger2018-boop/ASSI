@@ -116,7 +116,7 @@ export function AdminMonitorView({ sessionId }: Props) {
 
   if (error && !session) return (
     <div className="h-full flex items-center justify-center px-4">
-      <div className="glass rounded-2xl px-8 py-10 text-center max-w-sm">
+      <div className="surface rounded-2xl px-8 py-10 text-center max-w-sm">
         <AlertTriangle size={20} className="text-red-400 mx-auto mb-3" />
         <p className="text-white/70 text-sm mb-4">{error}</p>
         <button onClick={() => router.back()}

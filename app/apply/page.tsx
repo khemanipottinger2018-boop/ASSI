@@ -64,7 +64,7 @@ export default function ApplyPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-8 space-y-6"
+        className="panel rounded-3xl p-8 space-y-6"
       >
         {/* Header */}
         <div className="flex items-center gap-4">

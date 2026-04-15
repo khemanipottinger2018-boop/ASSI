@@ -38,10 +38,10 @@ export default function AdminProfilePage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-6"
+        className="panel rounded-3xl p-6"
       >
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
+          <div className="w-16 h-16 rounded-2xl bg-white/8 flex items-center justify-center flex-shrink-0 text-white/60 font-semibold text-xl">
             {p?.username?.[0]?.toUpperCase()}
           </div>
           <div>
@@ -61,7 +61,7 @@ export default function AdminProfilePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-4 space-y-1"
+        className="panel rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Admin</p>
         <AdminAction icon={Users}         label="Manage users"       onClick={() => router.push('/admin/users')} />
@@ -75,7 +75,7 @@ export default function AdminProfilePage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl p-4 space-y-1"
+        className="panel rounded-3xl p-4 space-y-1"
       >
         <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
         <ActionRow label="Settings" onClick={() => router.push('/settings')} />
@@ -91,7 +91,7 @@ function AdminAction({ icon: Icon, label, onClick }: { icon: React.ElementType; 
       onClick={onClick}
       className="w-full flex items-center gap-3 px-2 py-2.5 rounded-xl text-sm text-white/55 hover:text-white/80 hover:bg-white/6 transition"
     >
-      <div className="glass-soft w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0">
+      <div className="bg-white/8 w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0">
         <Icon size={13} className="text-white/40" />
       </div>
       {label}
@@ -117,9 +117,9 @@ function ActionRow({ label, onClick, destructive }: { label: string; onClick: ()
 function ProfileSkeleton() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
-      <div className="glass rounded-3xl p-6 h-28" />
-      <div className="glass rounded-3xl p-4 h-48" />
-      <div className="glass rounded-3xl p-4 h-24" />
+      <div className="surface rounded-3xl p-6 h-28" />
+      <div className="surface rounded-3xl p-4 h-48" />
+      <div className="surface rounded-3xl p-4 h-24" />
     </div>
   );
 }

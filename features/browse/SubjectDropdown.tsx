@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { dropdownVariants, dropdownTransition } from '@/lib/motion';
 import { ChevronDown, Search, GraduationCap, BookOpen, X } from 'lucide-react';
 import { api } from '@/lib/api/client';
 
@@ -80,11 +81,11 @@ export default function SubjectDropdown({ selected, onSelect, onClear, onOpenCha
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border transition-all duration-200 ${
           open
             ? 'bg-white/10 border-white/20'
-            : 'glass-soft border-white/10 hover:border-white/20 hover:bg-white/8'
+            : 'bg-white/8 border-white/10 hover:border-white/20 hover:bg-white/10'
         }`}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="glass-soft w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
             {selected
               ? <GraduationCap size={15} className="text-white/80" />
               : <BookOpen size={14} className="text-white/40" />
@@ -137,11 +138,12 @@ export default function SubjectDropdown({ selected, onSelect, onClear, onOpenCha
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.99 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.99 }}
-            transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute left-0 right-0 mt-2 z-50 overflow-hidden rounded-2xl floating border border-white/10"
+            variants={dropdownVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={dropdownTransition}
+            className="absolute left-0 right-0 mt-2 z-50 overflow-hidden rounded-2xl dropdown"
           >
             {/* Search bar */}
             <div className="p-2.5 border-b border-white/8">
@@ -152,7 +154,7 @@ export default function SubjectDropdown({ selected, onSelect, onClear, onOpenCha
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder={`Search ${subjects.length} subjects…`}
-                  className="w-full glass-soft rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition"
+                  className="w-full bg-white/6 rounded-xl pl-8 pr-3 py-2 text-sm text-white placeholder-white/25 outline-none border border-white/8 focus:border-white/20 transition"
                 />
               </div>
             </div>

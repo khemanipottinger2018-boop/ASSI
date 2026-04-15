@@ -87,7 +87,7 @@ export default function TutorProfilePage() {
       <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
 
         {/* ── Hero card ── */}
-        <motion.div {...fade(0)} className="glass rounded-3xl overflow-hidden">
+        <motion.div {...fade(0)} className="panel rounded-3xl overflow-hidden">
           <div className="h-1 w-full bg-gradient-to-r from-teal-500/50 via-emerald-400 to-teal-500/50" />
           <div className="p-6">
             <div className="flex items-start justify-between gap-4">
@@ -163,7 +163,7 @@ export default function TutorProfilePage() {
         </motion.div>
 
         {/* ── Subjects ── */}
-        <motion.div {...fade(0.1)} className="glass rounded-3xl p-5">
+        <motion.div {...fade(0.1)} className="panel rounded-3xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <BookOpen size={13} className="text-white/30" />
@@ -244,7 +244,7 @@ export default function TutorProfilePage() {
         </motion.div>
 
         {/* ── Account actions ── */}
-        <motion.div {...fade(0.18)} className="glass rounded-3xl p-4 space-y-1">
+        <motion.div {...fade(0.18)} className="panel rounded-3xl p-4 space-y-1">
           <p className="text-white/25 text-xs font-medium uppercase tracking-widest px-2 pb-2">Account</p>
           <ActionRow label="Edit profile"    icon={Edit3}    onClick={() => setModal('edit')} />
           <ActionRow label="Manage subjects" icon={BookOpen}  onClick={() => setModal('subjects')} />
@@ -304,11 +304,11 @@ function ActionRow({ label, onClick, destructive, icon: Icon }: {
 function ProfileSkeleton() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-4 animate-pulse">
-      <div className="glass rounded-3xl h-40" />
+      <div className="surface rounded-3xl h-40" />
       <div className="grid grid-cols-4 gap-2">{[0,1,2,3].map(i => <div key={i} className="glass-soft rounded-2xl h-20" />)}</div>
-      <div className="glass rounded-3xl h-32" />
-      <div className="glass rounded-3xl h-40" />
-      <div className="glass rounded-3xl h-40" />
+      <div className="surface rounded-3xl h-32" />
+      <div className="surface rounded-3xl h-40" />
+      <div className="surface rounded-3xl h-40" />
     </div>
   );
 }

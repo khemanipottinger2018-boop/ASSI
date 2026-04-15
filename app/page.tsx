@@ -66,13 +66,13 @@ function LandingView() {
             onClick={() => router.push('/signup')}
             className="flex items-center gap-2 px-7 py-3 rounded-xl bg-white text-orange-600 font-semibold text-sm hover:bg-white/90 hover:scale-[1.02] active:scale-[0.98] transition shadow-lg shadow-black/20"
           >
-            Get started <ArrowRight size={14} />
+            Get started <ArrowRight size={15} />
           </button>
           <button
             onClick={() => router.push('/signin')}
             className="flex items-center gap-2 px-7 py-3 rounded-xl glass-soft text-white font-medium text-sm hover:bg-white/10 transition"
           >
-            <LogIn size={14} /> Sign in
+            <LogIn size={15} /> Sign in
           </button>
         </motion.div>
 
@@ -80,10 +80,9 @@ function LandingView() {
         <motion.div variants={stagger.item}>
           <button
             onClick={() => setShowChat(v => !v)}
-            className="flex items-center gap-2 mx-auto text-white/50 text-xs hover:text-white/80 transition group"
+            className="flex items-center gap-2 mx-auto text-white/50 text-xs hover:text-white/80 transition"
           >
-            <MessageCircle size={13} className="group-hover:text-orange-400 transition" />
-            {showChat ? 'Hide chat' : 'Not sure? Ask ASSI →'}
+            <MessageCircle size={13} /> {showChat ? 'Hide chat' : 'Not sure? Ask ASSI'}
           </button>
         </motion.div>
 

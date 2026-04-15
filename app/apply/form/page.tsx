@@ -225,7 +225,7 @@ export default function ApplyFormPage() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -16 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="glass rounded-3xl p-6 space-y-5"
+          className="panel rounded-3xl p-6 space-y-5"
         >
 
           {/* ── Step: Education ── */}

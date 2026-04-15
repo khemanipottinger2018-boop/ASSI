@@ -71,7 +71,7 @@ export default function TutorApplicationsPage() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }} className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+          <div className="bg-white/8 w-9 h-9 rounded-xl flex items-center justify-center">
             <ClipboardList size={16} className="text-white/60" />
           </div>
           <div>
@@ -82,13 +82,13 @@ export default function TutorApplicationsPage() {
           </div>
         </div>
         <button onClick={loadApplications} disabled={loading}
-          className="glass-soft p-2 rounded-lg text-white/30 hover:text-white/60 transition">
+          className="bg-white/6 p-2 rounded-lg text-white/30 hover:text-white/60 transition">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
         </button>
       </motion.div>
 
       {error && (
-        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+        <div className="panel rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
           <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-red-400/80 text-sm">{error}</p>
         </div>
@@ -147,7 +147,7 @@ export default function TutorApplicationsPage() {
           )}
 
           {applications.length === 0 && (
-            <div className="glass rounded-2xl px-4 py-12 text-center">
+            <div className="surface rounded-2xl px-4 py-12 text-center">
               <p className="text-white/25 text-sm">No applications yet</p>
             </div>
           )}
@@ -204,12 +204,12 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      className="glass rounded-2xl overflow-hidden">
+      className="panel rounded-2xl overflow-hidden">
 
       {/* ── Header row ── */}
       <button onClick={onToggle}
         className="w-full flex items-center gap-4 p-4 hover:bg-white/4 transition text-left">
-        <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-white/8 flex items-center justify-center flex-shrink-0">
           <span className="text-white/50 text-sm font-semibold">
             {app.user.username[0]?.toUpperCase()}
           </span>
@@ -241,7 +241,7 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
         {canAction && onApprove && onReject && (
           <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
             <button onClick={onReject} disabled={actioning} title="Reject"
-              className="w-7 h-7 rounded-lg glass-soft text-white/30 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition flex items-center justify-center">
+              className="w-7 h-7 rounded-lg bg-white/6 text-white/30 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition flex items-center justify-center">
               {actioning ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />}
             </button>
             <button onClick={onApprove} disabled={actioning} title="Approve"
@@ -283,7 +283,7 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {detail.subjects.map((s) => (
-                          <span key={s.id} className="px-2 py-1 rounded-lg glass-soft text-white/60 text-xs border border-white/8">
+                          <span key={s.id} className="px-2 py-1 rounded-lg bg-white/6 text-white/60 text-xs border border-white/8">
                             {s.name}
                             {s.category && <span className="text-white/30 ml-1">· {s.category}</span>}
                           </span>
@@ -311,7 +311,7 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
                   <DetailField icon={BookOpen}      label="Qualifications"          value={detail.qualifications} />
 
                   {detail.notes && (
-                    <div className="glass-soft rounded-xl px-3 py-2.5 border border-white/8">
+                    <div className="bg-white/6 rounded-xl px-3 py-2.5 border border-white/8">
                       <p className="text-white/25 text-[10px] uppercase tracking-widest mb-1">Review Notes</p>
                       <p className="text-white/55 text-xs italic">{detail.notes}</p>
                     </div>
@@ -328,7 +328,7 @@ function ApplicationCard({ app, actioning, expanded, detail, loadingDetail, onTo
                   {canAction && onApprove && onReject && (
                     <div className="flex gap-2 pt-2 border-t border-white/8">
                       <button onClick={onReject} disabled={actioning}
-                        className="flex-1 py-2.5 rounded-xl glass-soft text-white/40 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition text-sm font-medium flex items-center justify-center gap-2">
+                        className="flex-1 py-2.5 rounded-xl bg-white/6 text-white/40 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition text-sm font-medium flex items-center justify-center gap-2">
                         {actioning ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
                         Reject
                       </button>

@@ -352,10 +352,10 @@ export function InstantChatView({
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="glass rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-6"
+          className="surface rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-6"
         >
-          <div className="w-16 h-16 rounded-2xl glass-soft flex items-center justify-center mx-auto text-3xl">
-            ✋
+          <div className="w-16 h-16 rounded-2xl bg-white/8 flex items-center justify-center mx-auto">
+            <span className="text-white/40 text-xs font-semibold tracking-widest uppercase">Wait</span>
           </div>
           <div className="space-y-2">
             <p className="text-white/80 font-semibold text-lg tracking-tight">Student is waiting</p>
@@ -502,7 +502,7 @@ export function InstantChatView({
           showSenders
           emptySlot={
             <div className="flex justify-center pt-10">
-              <p className="text-white/20 text-sm">Session started — say hello! 👋</p>
+              <p className="text-white/20 text-sm">Session started — say hello!</p>
             </div>
           }
         />

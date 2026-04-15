@@ -16,7 +16,7 @@ export default function DashboardSection({ title, icon: Icon, onSeeAll, children
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
           {Icon && <Icon size={13} className="text-white/30" />}
-          <h2 className="text-white/40 text-xs font-medium uppercase tracking-widest">{title}</h2>
+          <h2 className="text-white/55 text-xs font-medium uppercase tracking-widest">{title}</h2>
         </div>
         {onSeeAll && (
           <button

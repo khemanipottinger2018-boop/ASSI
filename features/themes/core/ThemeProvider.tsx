@@ -399,24 +399,26 @@ async function fetchWeather(): Promise<WeatherOverlay> {
 // =============================================================================
 
 interface ThemeContextProps {
-  themeGroup:      ThemeGroup;
-  themeVariant:    ThemeVariant;
-  colorMode:       ColorMode;
-  customPreset:    LavaLampVariant;
-  visualIntensity: VisualIntensity;
-  timeOfDay:       TimeOfDay;
-  nightIntensity:  number;
-  timeAuto:        boolean;
-  isSentinel:      boolean;
-  isSyncing:       boolean;
+  themeGroup:          ThemeGroup;
+  themeVariant:        ThemeVariant;
+  colorMode:           ColorMode;
+  customPreset:        LavaLampVariant;
+  visualIntensity:     VisualIntensity;
+  timeOfDay:           TimeOfDay;
+  nightIntensity:      number;
+  timeAuto:            boolean;
+  isSentinel:          boolean;
+  isSyncing:           boolean;
+  subjectThemeEnabled: boolean;
 
-  setThemeGroup:      (group: ThemeGroup)           => void;
-  setThemeVariant:    (variant: ThemeVariant)        => void;
-  setColorMode:       (mode: ColorMode)              => void;
-  setCustomPreset:    (preset: LavaLampVariant)      => void;
-  setVisualIntensity: (intensity: VisualIntensity)   => void;
-  setTimeAuto:        (val: boolean)                 => void;
-  setSubjectOverride: (subjectName: string | null)   => void;
+  setThemeGroup:         (group: ThemeGroup)           => void;
+  setThemeVariant:       (variant: ThemeVariant)        => void;
+  setColorMode:          (mode: ColorMode)              => void;
+  setCustomPreset:       (preset: LavaLampVariant)      => void;
+  setVisualIntensity:    (intensity: VisualIntensity)   => void;
+  setTimeAuto:           (val: boolean)                 => void;
+  setSubjectOverride:    (subjectName: string | null)   => void;
+  setSubjectThemeEnabled:(enabled: boolean)             => void;
 
   // Automation
   seasonAuto:     boolean;
@@ -448,9 +450,10 @@ const DB_DEBOUNCE_MS = 800;
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeGroup,      setGroupState]   = useState<ThemeGroup>('lavalamp');
   const [themeVariant,    setVariantState] = useState<ThemeVariant>('assi');
-  const [colorMode,       setModeState]    = useState<ColorMode>('dark');
+  const [colorMode,       setModeState]    = useState<ColorMode>('custom');
   const [customPreset,    setPresetState]  = useState<LavaLampVariant>('assi');
-  const [subjectOverride, setSubjectOverrideState] = useState<string | null>(null);
+  const [subjectOverride,      setSubjectOverrideState]  = useState<string | null>(null);
+  const [subjectThemeEnabled,  setSubjectThemeEnabledState] = useState<boolean>(true);
   const [timeOfDay,       setTimeOfDay]      = useState<TimeOfDay>('day');
   const [nightIntensity,  setNightIntensity] = useState<number>(0);
   const [timeAuto,        setTimeAutoState]  = useState<boolean>(true);
@@ -562,7 +565,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     visualIntensity?: string;
     timeAuto?:        boolean;
   }) => {
-    const mode    = (prefs.colorMode    as ColorMode)    || 'dark';
+    const mode    = (prefs.colorMode    as ColorMode)    || 'custom';
     const group   = (prefs.themeGroup   as ThemeGroup)   || 'lavalamp';
     const variant = (prefs.themeVariant as ThemeVariant) || 'assi';
 
@@ -581,30 +584,34 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // ── Reset to defaults on logout — stops DB persistence until next hydration ──
   const resetTheme = useCallback(() => {
     hydratedRef.current = false;
-    setModeState('dark');
+    setModeState('custom');
     setGroupState('lavalamp');
     setVariantState('assi');
     setPresetState('assi');
     setSubjectOverrideState(null);
+    setSubjectThemeEnabledState(true);
     setSeasonAuto(false);
     setWeatherAuto(false);
     setIntensityState('balanced');
     setTimeAutoState(true);
   }, []);
 
-  // ── Resolve active variant (subject override wins) ──
+  // ── Resolve active variant ──
+  // Subject override only applies when:
+  //   1. colorMode is 'custom' (lava lamp active — subject themes make visual sense)
+  //   2. subjectThemeEnabled is true (user hasn't disabled it per-session)
   const activeVariant: ThemeVariant = useMemo(() => {
-    if (subjectOverride) {
+    if (colorMode === 'custom' && subjectThemeEnabled && subjectOverride) {
       const sv = SUBJECT_NAME_TO_VARIANT[subjectOverride];
       if (sv) return sv;
     }
     return themeVariant;
-  }, [subjectOverride, themeVariant]);
+  }, [colorMode, subjectThemeEnabled, subjectOverride, themeVariant]);
 
   const activeGroup: ThemeGroup = useMemo(() => {
-    if (subjectOverride && SUBJECT_NAME_TO_VARIANT[subjectOverride]) return 'subjects';
+    if (colorMode === 'custom' && subjectThemeEnabled && subjectOverride && SUBJECT_NAME_TO_VARIANT[subjectOverride]) return 'subjects';
     return themeGroup;
-  }, [subjectOverride, themeGroup]);
+  }, [colorMode, subjectThemeEnabled, subjectOverride, themeGroup]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme-group',   activeGroup);
@@ -648,6 +655,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Subject override is ephemeral (page-scoped) — never persisted to DB
   }
 
+  function setSubjectThemeEnabled(enabled: boolean) {
+    setSubjectThemeEnabledState(enabled);
+    // Also ephemeral — per-session preference, not persisted
+  }
+
   function applyTheme(mode: ColorMode, group: ThemeGroup, variant: ThemeVariant) {
     setModeState(mode);
     setGroupState(group);
@@ -682,6 +694,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setVisualIntensity,
     setTimeAuto,
     setSubjectOverride,
+    setSubjectThemeEnabled,
+    subjectThemeEnabled,
     setSeasonAuto,
     setWeatherAuto,
     hydrateFromServer,

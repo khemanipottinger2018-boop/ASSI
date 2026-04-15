@@ -113,7 +113,7 @@ function SubjectPicker({
         {/* General chat */}
         <button
           onClick={() => onSelect(GENERAL_SUBJECT)}
-          className="w-full glass rounded-2xl p-4 text-left mb-6 border border-white/8 hover:border-orange-400/25 hover:bg-orange-400/4 transition group flex items-center gap-3"
+          className="w-full panel rounded-2xl p-4 text-left mb-6 border border-white/8 hover:border-orange-400/25 hover:bg-orange-400/4 transition group flex items-center gap-3"
         >
           <div className="w-9 h-9 rounded-xl bg-orange-400/10 border border-orange-400/15 flex items-center justify-center flex-shrink-0">
             <MessageSquare size={15} className="text-orange-400" />
@@ -685,7 +685,7 @@ function ChatView({
 
         {/* Main input bar */}
         <div>
-          <div className={`flex items-end gap-2 glass rounded-2xl px-3 py-2.5 border transition ${
+          <div className={`flex items-end gap-2 panel rounded-2xl px-3 py-2.5 border transition ${
             locked ? 'border-white/5 opacity-60' : 'border-white/8 focus-within:border-white/18'
           }`}>
 

@@ -105,7 +105,7 @@ export default function StudentDashboard() {
               {greeting()}
             </p>
             <h1 className="text-white font-semibold text-xl tracking-tight flex items-center gap-2">
-              {user?.username} 👋
+              {user?.username}
               {streak.currentStreak > 0 && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/20 text-[11px] font-semibold text-orange-400">
                   <Flame size={10} />

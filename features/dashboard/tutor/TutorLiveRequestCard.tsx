@@ -66,7 +66,7 @@ export default function TutorLiveRequestCard({
       animate="animate"
       exit="exit"
       transition={alertTransition}
-      className="relative glass rounded-2xl p-4 overflow-hidden border border-emerald-500/20"
+      className="relative panel rounded-2xl p-4 overflow-hidden border border-emerald-500/20"
     >
       {/* Progress bar — drains left to right */}
       <div className="absolute bottom-0 left-0 h-0.5 bg-emerald-500/30 w-full">

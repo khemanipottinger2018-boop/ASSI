@@ -31,7 +31,7 @@ export default function TutorSessionRequestCard({
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
       onClick={() => router.push(`/sessions/${sessionId}`)}
-      className="relative glass rounded-2xl p-4 cursor-pointer hover:bg-white/8 transition overflow-hidden group"
+      className="relative panel rounded-2xl p-4 cursor-pointer hover:bg-white/[0.05] transition overflow-hidden group"
     >
       {/* Orange left accent bar */}
       <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-orange-400/60 group-hover:bg-orange-400/90 transition" />

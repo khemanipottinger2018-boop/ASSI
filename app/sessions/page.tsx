@@ -8,7 +8,7 @@ import {
   Calendar, User, BookOpen, ChevronRight,
   Loader2, LogIn, XCircle, CheckCircle,
   X, AlertTriangle, MessageCircle,
-  PhoneOff, LogOut, Clock,
+  PhoneOff, LogOut, Clock, Users, Radio,
 } from 'lucide-react';
 import { sessionsApi, api }  from '@/lib/api';
 import { browseApi }         from '@/features/booking/browseApi';
@@ -305,7 +305,7 @@ export default function SessionsPage() {
         {readyAlert && (
           <motion.div
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className="glass rounded-2xl px-4 py-3 border border-emerald-500/25 bg-emerald-500/8 flex items-center gap-3"
+            className="panel rounded-2xl px-4 py-3 border border-emerald-500/25 bg-emerald-500/8 flex items-center gap-3"
           >
             <div className="relative flex-shrink-0">
               <span className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
@@ -351,7 +351,7 @@ export default function SessionsPage() {
         </div>
       ) : displayed.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="glass rounded-2xl px-4 py-12 text-center">
+          className="surface rounded-2xl px-4 py-12 text-center">
           <Calendar size={20} className="text-white/20 mx-auto mb-3" />
           <p className="text-white/30 text-sm">
             {tab === 'upcoming' ? 'No upcoming sessions' : 'No sessions yet'}
@@ -382,10 +382,14 @@ export default function SessionsPage() {
                 variants={listItemVariants} initial="initial" animate="animate"
                 transition={listTransition(i)}
                 onClick={() => openModal(session)}
-                className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition group"
+                className="panel rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.05] transition group"
                 style={isGrace ? { borderColor: 'rgba(251,146,60,0.2)' } : undefined}
               >
-                <div className="w-10 h-10 rounded-xl glass-soft flex items-center justify-center flex-shrink-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  session.type === 'group_study' ? 'bg-blue-500/12 border border-blue-500/20' :
+                  session.type === 'conference'  ? 'bg-orange-500/12 border border-orange-500/20' :
+                  'bg-white/8'
+                }`}>
                   {isLive && !isGrace
                     ? <span className="relative flex h-2.5 w-2.5">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -393,20 +397,28 @@ export default function SessionsPage() {
                       </span>
                     : isGrace
                     ? <Clock size={15} className="text-orange-400" />
+                    : session.type === 'group_study'
+                    ? <Users size={15} className="text-blue-300" />
+                    : session.type === 'conference'
+                    ? <Radio size={15} className="text-orange-300" />
                     : <User size={15} className="text-white/35" />
                   }
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white/80 text-sm font-medium">{session.partnerName}</span>
+                    <span className="text-white/80 text-sm font-medium">
+                      {session.type === 'group_study' ? 'Group Study'
+                      : session.type === 'conference' ? 'Conference'
+                      : session.partnerName}
+                    </span>
                     <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${style.color}`}>
                       {style.label}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 mt-0.5 text-white/30 text-xs">
                     <BookOpen size={10} />
-                    <span>{session.subjectName}</span>
+                    <span>{session.subjectName || (session.type === 'group_study' ? 'Study Room' : session.type === 'conference' ? 'Lecture' : '—')}</span>
                   </div>
                 </div>
 
@@ -432,12 +444,12 @@ export default function SessionsPage() {
               key={conf.id}
               layout
               onClick={() => router.push(`/live-chat/${conf.id}`)}
-              className="w-full text-left glass rounded-2xl p-4 border border-orange-500/15 hover:bg-white/[0.04] transition group"
+              className="w-full text-left panel rounded-2xl p-4 border border-orange-500/15 hover:bg-white/[0.04] transition group"
             >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-orange-500/12 border border-orange-500/25 flex items-center justify-center flex-shrink-0">
-                  <span className="text-orange-300 text-xs">
-                    {conf.isPublic ? '🌐' : '🔒'}
+                  <span className="text-orange-300 text-[10px] font-semibold tracking-wide">
+                    {conf.isPublic ? 'PUB' : 'PRV'}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">

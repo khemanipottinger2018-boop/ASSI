@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Send, PhoneOff, Users, PauseCircle,
-  Hand, Mic, MicOff, Settings, ChevronDown, Wifi, LogOut,
+  Hand, Mic, MicOff, Settings, ChevronDown, Wifi, LogOut, Palette,
 } from 'lucide-react';
+import { useTheme } from '@/features/themes/core/ThemeProvider';
 import type { ChatMessage, Participant, SpeakMode } from '@/features/live-chat/types/SocketEvents';
 
 /* ── Timer ── */
@@ -207,6 +208,7 @@ export function SessionHeader({
   currentUser, peerUser,
 }: HeaderProps) {
   const isDual = !!(currentUser && peerUser);
+  const { colorMode, subjectThemeEnabled, setSubjectThemeEnabled } = useTheme();
 
   return (
     <div
@@ -261,6 +263,20 @@ export function SessionHeader({
             limitSecs={timerLimitSecs}
             endsAt={endsAt}
           />
+          {/* Subject theme toggle — only visible when custom colorMode is active */}
+          {colorMode === 'custom' && (
+            <button
+              onClick={() => setSubjectThemeEnabled(!subjectThemeEnabled)}
+              title={subjectThemeEnabled ? 'Disable subject theme' : 'Enable subject theme'}
+              className={`p-1.5 rounded-lg transition ${
+                subjectThemeEnabled
+                  ? 'text-white/50 hover:text-white/80 hover:bg-white/8'
+                  : 'text-white/20 hover:text-white/50 hover:bg-white/6'
+              }`}
+            >
+              <Palette size={12} />
+            </button>
+          )}
           {rightSlot}
         </>
       )}
@@ -563,7 +579,7 @@ export function SessionEndedScreen({ reason, role }: { reason: string; role?: 's
     <div className="h-full flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, scale: 0.95, y: 8 }} animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-5">
+        className="surface rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-5">
         <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
           <PhoneOff size={22} className="text-white/30" />
         </div>
@@ -607,7 +623,7 @@ export function SessionWaitingRoom({ title, subtitle, onJoinNow, onCancel }: {
     <div className="h-full flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="glass rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-8">
+        className="panel rounded-3xl px-10 py-14 text-center max-w-sm w-full space-y-8">
         <div className="relative w-20 h-20 mx-auto">
           <motion.div className="absolute inset-0 rounded-full bg-orange-500/10"
             animate={{ scale: [1, 1.4, 1], opacity: [0.5, 0, 0.5] }}
@@ -678,7 +694,7 @@ export function ParticipantList({ participants, currentUserId, isHost, onMute, o
             <p className="text-white/20 text-[9px] capitalize">{p.role}</p>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            {p.handRaised && <span className="text-[11px]">✋</span>}
+            {p.handRaised && <span className="text-white/50 text-[9px] font-semibold">▲</span>}
             {p.isMuted ? <MicOff size={10} className="text-white/15" /> : <Mic size={10} className="text-emerald-400/50" />}
             {isHost && p.userId !== currentUserId && (
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
@@ -727,7 +743,7 @@ export function SpeakModeToggle({ mode, onChange }: { mode: SpeakMode; onChange:
         {open && (
           <motion.div initial={{ opacity: 0, y: 4, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }} transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full mt-1.5 glass rounded-xl overflow-hidden z-50 w-48 shadow-xl shadow-black/30">
+            className="absolute right-0 top-full mt-1.5 dropdown rounded-xl overflow-hidden z-50 w-48 shadow-xl shadow-black/30">
             {([['request', 'Request to speak', 'Students raise hand'], ['open', 'Open floor', 'Anyone can speak']] as [SpeakMode, string, string][]).map(([m, label, desc]) => (
               <button key={m} onClick={() => { onChange(m); setOpen(false); }}
                 className="w-full flex items-start gap-3 px-3 py-3 text-left hover:bg-white/8 transition">

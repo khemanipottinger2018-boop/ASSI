@@ -86,7 +86,7 @@ export default function ErrorsPage() {
         className="flex items-center justify-between"
       >
         <div className="flex items-center gap-3">
-          <div className="glass-soft w-9 h-9 rounded-xl flex items-center justify-center">
+          <div className="bg-white/8 w-9 h-9 rounded-xl flex items-center justify-center">
             <AlertTriangle size={16} className="text-white/60" />
           </div>
           <div>
@@ -98,7 +98,7 @@ export default function ErrorsPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 glass-soft rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-white/6 border border-white/8 rounded-lg p-1">
             {(['24h', '7d', '30d'] as const).map((r) => (
               <button
                 key={r}
@@ -114,7 +114,7 @@ export default function ErrorsPage() {
           <button
             onClick={() => load()}
             disabled={loading}
-            className="glass-soft p-2 rounded-lg text-white/30 hover:text-white/60 transition"
+            className="bg-white/6 p-2 rounded-lg text-white/30 hover:text-white/60 transition"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -122,7 +122,7 @@ export default function ErrorsPage() {
       </motion.div>
 
       {error && (
-        <div className="glass rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
+        <div className="panel rounded-xl px-4 py-3 border border-red-500/20 flex items-center gap-2">
           <AlertTriangle size={13} className="text-red-400 flex-shrink-0" />
           <p className="text-red-400/80 text-sm">{error}</p>
         </div>
@@ -133,8 +133,8 @@ export default function ErrorsPage() {
           <Loader2 size={20} className="text-white/30 animate-spin" />
         </div>
       ) : logs.length === 0 ? (
-        <div className="glass rounded-2xl px-4 py-12 text-center">
-          <p className="text-white/25 text-sm">No errors logged 🎉</p>
+        <div className="surface rounded-2xl px-4 py-12 text-center">
+          <p className="text-white/25 text-sm">No errors logged</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -144,7 +144,7 @@ export default function ErrorsPage() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03, duration: 0.25 }}
-              className="glass rounded-2xl overflow-hidden"
+              className="panel rounded-2xl overflow-hidden"
             >
               <button
                 onClick={() => setExpanded(expanded === log.id ? null : log.id)}
