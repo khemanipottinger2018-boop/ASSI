@@ -14,9 +14,26 @@ import { sessionsApi, api }  from '@/lib/api';
 import { browseApi }         from '@/features/booking/browseApi';
 import { useAuth }           from '@/features/auth';
 import { useSocketContext }  from '@/features/socket';
+import SessionSignalModal    from '@/features/progress/SessionSignalModal';
 import type { ChatSession }  from '@/lib/api';
 
 type Tab = 'upcoming' | 'completed' | 'all';
+
+/* ── Module-level helpers ────────────────────────────────────── */
+
+function sessionLabel(s: ChatSession): string {
+  if (s.type === 'group_study') return 'Group Study';
+  if (s.type === 'conference')  return 'Conference';
+  if (!s.partnerName)           return s.status === 'waiting' || s.status === 'instant_pending' ? 'Waiting for tutor…' : 'Session';
+  return s.partnerName;
+}
+
+function sessionSubLabel(s: ChatSession): string {
+  if (s.subjectName)            return s.subjectName;
+  if (s.type === 'group_study') return 'Study Room';
+  if (s.type === 'conference')  return 'Lecture';
+  return '—';
+}
 
 const statusStyle: Record<string, { label: string; color: string }> = {
   active:          { label: 'Live',      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/20' },
@@ -59,6 +76,9 @@ export default function SessionsPage() {
 
   // Student alert when tutor joins
   const [readyAlert, setReadyAlert] = useState<string | null>(null);
+
+  // Session signal capture — shown after student ends a live session
+  const [signalSubject, setSignalSubject] = useState<string | null>(null);
 
   type UpcomingConference = {
     id:              string;
@@ -260,7 +280,11 @@ export default function SessionsPage() {
       setSessions(prev => prev.map(s =>
         s.sessionId === selected.sessionId ? { ...s, status: 'ended' as any, live: false } : s
       ));
+      const endedSubject = selected.subjectName;
       closeModal();
+      if (!isTutor && endedSubject) {
+        setSignalSubject(endedSubject);
+      }
     } finally {
       setActioning(false);
     }
@@ -278,32 +302,52 @@ export default function SessionsPage() {
 
   // ── Derived lists ──────────────────────────────────────────────
 
-  const upcoming  = sessions.filter(s => UPCOMING_STATUSES.includes(s.status));
-  const completed = sessions.filter(s => COMPLETED_STATUSES.includes(s.status));
-  const raw       = tab === 'upcoming' ? upcoming : tab === 'completed' ? completed : sessions;
-  const displayed = Array.from(new Map(raw.map(s => [s.sessionId, s])).values());
+  const liveSession = sessions.find(s => s.live && LIVE_STATUSES.includes(s.status));
+  const nonLive     = sessions.filter(s => s.sessionId !== liveSession?.sessionId);
+  const upcoming    = nonLive.filter(s => UPCOMING_STATUSES.includes(s.status));
+  const completed   = nonLive.filter(s => COMPLETED_STATUSES.includes(s.status));
+  const raw         = tab === 'upcoming' ? upcoming : tab === 'completed' ? completed : nonLive;
+  const displayed   = Array.from(new Map(raw.map(s => [s.sessionId, s])).values());
 
   // ── Render ─────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-5">
 
-      <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(0)}>
-        <div className="flex items-center gap-3">
-          <div className="glass-soft w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Calendar size={18} className="text-white/80" />
-          </div>
-          <div>
-            <h1 className="text-white font-semibold text-xl tracking-tight">Sessions</h1>
-            <p className="text-white/40 text-sm">Your tutoring history and upcoming bookings</p>
-          </div>
+      {/* ── Page header ── */}
+      <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(0)}
+        className="flex items-center gap-3"
+      >
+        <div className="bg-white/8 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+          <Calendar size={17} className="text-white/60" />
+        </div>
+        <div>
+          <h1 className="text-white font-semibold text-xl tracking-tight">Sessions</h1>
+          <p className="text-white/35 text-sm">Your history and upcoming bookings</p>
         </div>
       </motion.div>
 
-      {/* ── Student alert: tutor joined ── */}
+      {/* ── Live session hero card ── */}
       <AnimatePresence>
-        {readyAlert && (
+        {liveSession && (
           <motion.div
+            key="live-hero"
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <LiveSessionCard
+              session={liveSession}
+              isTutor={isTutor}
+              onOpen={() => openModal(liveSession)}
+              onRejoin={() => router.push(`/live-chat/${liveSession.sessionId}`)}
+            />
+          </motion.div>
+        )}
+
+        {/* Tutor joined alert (student) */}
+        {readyAlert && !liveSession && (
+          <motion.div
+            key="ready-alert"
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
             className="panel rounded-2xl px-4 py-3 border border-emerald-500/25 bg-emerald-500/8 flex items-center gap-3"
           >
@@ -327,7 +371,7 @@ export default function SessionsPage() {
 
       {/* ── Tabs ── */}
       <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(1)}
-        className="flex items-center gap-1 glass-soft rounded-xl p-1 w-fit"
+        className="flex items-center gap-1 bg-white/6 border border-white/8 rounded-xl p-1 w-fit"
       >
         {([
           { key: 'upcoming',  label: `Upcoming (${upcoming.length})`   },
@@ -367,8 +411,6 @@ export default function SessionsPage() {
         <div className="space-y-2">
           {displayed.map((session, i) => {
             const style     = statusStyle[session.status] ?? statusStyle.pending;
-            const isLive    = LIVE_STATUSES.includes(session.status);
-            const isGrace   = session.status === 'host_left_grace';
             const startedAt = session.startedAt ? new Date(session.startedAt) : null;
             const dateStr   = startedAt
               ? startedAt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -377,57 +419,46 @@ export default function SessionsPage() {
               ? startedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
               : null;
 
+            const isGroup   = session.type === 'group_study';
+            const isConf    = session.type === 'conference';
+
             return (
               <motion.div key={session.sessionId}
                 variants={listItemVariants} initial="initial" animate="animate"
                 transition={listTransition(i)}
                 onClick={() => openModal(session)}
-                className="panel rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.05] transition group"
-                style={isGrace ? { borderColor: 'rgba(251,146,60,0.2)' } : undefined}
+                className="panel rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.04] transition group"
               >
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  session.type === 'group_study' ? 'bg-blue-500/12 border border-blue-500/20' :
-                  session.type === 'conference'  ? 'bg-orange-500/12 border border-orange-500/20' :
-                  'bg-white/8'
+                {/* Icon */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border ${
+                  isGroup ? 'bg-blue-500/10 border-blue-500/18' :
+                  isConf  ? 'bg-orange-500/10 border-orange-500/18' :
+                  'bg-white/6 border-white/10'
                 }`}>
-                  {isLive && !isGrace
-                    ? <span className="relative flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400" />
-                      </span>
-                    : isGrace
-                    ? <Clock size={15} className="text-orange-400" />
-                    : session.type === 'group_study'
-                    ? <Users size={15} className="text-blue-300" />
-                    : session.type === 'conference'
-                    ? <Radio size={15} className="text-orange-300" />
-                    : <User size={15} className="text-white/35" />
-                  }
+                  {isGroup ? <Users size={15} className="text-blue-300/80" />
+                  : isConf ? <Radio  size={15} className="text-orange-300/80" />
+                  : session.status === 'host_left_grace' ? <Clock size={15} className="text-orange-400" />
+                  : <User  size={15} className="text-white/40" />}
                 </div>
 
+                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white/80 text-sm font-medium">
-                      {session.type === 'group_study' ? 'Group Study'
-                      : session.type === 'conference' ? 'Conference'
-                      : session.partnerName}
-                    </span>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${style.color}`}>
+                    <span className="text-white/80 text-sm font-medium truncate">{sessionLabel(session)}</span>
+                    <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${style.color}`}>
                       {style.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 mt-0.5 text-white/30 text-xs">
-                    <BookOpen size={10} />
-                    <span>{session.subjectName || (session.type === 'group_study' ? 'Study Room' : session.type === 'conference' ? 'Lecture' : '—')}</span>
-                  </div>
+                  <p className="text-white/30 text-xs mt-0.5 truncate">{sessionSubLabel(session)}</p>
                 </div>
 
+                {/* Date */}
                 <div className="text-right flex-shrink-0">
-                  <p className="text-white/50 text-xs">{dateStr}</p>
-                  {timeStr && <p className="text-white/25 text-[10px] mt-0.5">{timeStr}</p>}
+                  <p className="text-white/40 text-xs">{dateStr}</p>
+                  {timeStr && <p className="text-white/22 text-[10px] mt-0.5">{timeStr}</p>}
                 </div>
 
-                <ChevronRight size={14} className="text-white/20 group-hover:text-white/50 transition flex-shrink-0" />
+                <ChevronRight size={13} className="text-white/18 group-hover:text-white/45 transition flex-shrink-0" />
               </motion.div>
             );
           })}
@@ -494,6 +525,119 @@ export default function SessionsPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Session signal capture (students only, after ending a live session) ── */}
+      <SessionSignalModal
+        subjectName={signalSubject ?? ''}
+        isOpen={signalSubject !== null}
+        onClose={() => setSignalSubject(null)}
+      />
+    </div>
+  );
+}
+
+/* ── Live session hero card ───────────────────────────────────── */
+
+function LiveSessionCard({
+  session, isTutor, onOpen, onRejoin,
+}: {
+  session:  ChatSession;
+  isTutor:  boolean;
+  onOpen:   () => void;
+  onRejoin: () => void;
+}) {
+  const [elapsed, setElapsed] = useState('');
+
+  useEffect(() => {
+    if (!session.startedAt) return;
+    const start = new Date(session.startedAt).getTime();
+    const tick = () => {
+      const diff = Math.max(0, Date.now() - start);
+      const h = Math.floor(diff / 3_600_000);
+      const m = Math.floor((diff % 3_600_000) / 60_000);
+      const s = Math.floor((diff % 60_000) / 1_000);
+      setElapsed(h > 0
+        ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${m}:${String(s).padStart(2, '0')}`,
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1_000);
+    return () => clearInterval(id);
+  }, [session.startedAt]);
+
+  const isGroup   = session.type === 'group_study';
+  const isConf    = session.type === 'conference';
+  const isWaiting = ['waiting', 'instant_pending'].includes(session.status);
+
+  return (
+    <div className="panel rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] overflow-hidden">
+      <div className="px-5 py-4">
+
+        <div className="flex items-start gap-4">
+
+          {/* Session type icon with live dot */}
+          <div className="relative flex-shrink-0">
+            {!isWaiting && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 z-10 flex items-center justify-center">
+                <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-60" />
+              </span>
+            )}
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${
+              isGroup   ? 'bg-blue-500/10 border-blue-500/20' :
+              isConf    ? 'bg-orange-500/10 border-orange-500/20' :
+              isWaiting ? 'bg-white/6 border-white/10' :
+              'bg-emerald-500/10 border-emerald-500/20'
+            }`}>
+              {isGroup
+                ? <Users size={18} className="text-blue-300" />
+                : isConf
+                ? <Radio  size={18} className="text-orange-300" />
+                : <User   size={18} className={isWaiting ? 'text-white/30' : 'text-emerald-300'} />
+              }
+            </div>
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isWaiting ? (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border text-yellow-400 bg-yellow-500/15 border-yellow-500/20">
+                  Waiting
+                </span>
+              ) : (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border text-emerald-400 bg-emerald-500/15 border-emerald-500/20">
+                  Live
+                </span>
+              )}
+              {elapsed && !isWaiting && (
+                <span className="text-white/28 text-[10px] font-mono tabular-nums">{elapsed}</span>
+              )}
+            </div>
+            <p className="text-white font-semibold text-[15px] mt-1 leading-snug truncate">
+              {sessionLabel(session)}
+            </p>
+            <p className="text-white/40 text-xs mt-0.5 truncate">{sessionSubLabel(session)}</p>
+          </div>
+        </div>
+
+        {/* CTA row */}
+        <div className="flex gap-2 mt-4">
+          <button
+            onClick={onRejoin}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition flex items-center justify-center gap-2"
+          >
+            <LogIn size={14} />
+            {isWaiting ? 'Open Chat' : (isGroup || isConf) ? 'Rejoin Room' : 'Rejoin'}
+          </button>
+          <button
+            onClick={onOpen}
+            className="px-4 py-2.5 rounded-xl bg-white/6 hover:bg-white/10 border border-white/8 text-white/50 hover:text-white/75 text-sm transition"
+          >
+            Manage
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -549,13 +693,22 @@ function SessionModal({
           {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl surface flex items-center justify-center flex-shrink-0">
-                <span className="text-white/60 text-base font-semibold">
-                  {session.partnerName?.[0]?.toUpperCase() ?? '?'}
-                </span>
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border ${
+                session.type === 'group_study' ? 'bg-blue-500/10 border-blue-500/20 surface' :
+                session.type === 'conference'  ? 'bg-orange-500/10 border-orange-500/20 surface' :
+                'surface border-transparent'
+              }`}>
+                {session.type === 'group_study'
+                  ? <Users size={18} className="text-blue-300/80" />
+                  : session.type === 'conference'
+                  ? <Radio  size={18} className="text-orange-300/80" />
+                  : <span className="text-white/60 text-base font-semibold">
+                      {session.partnerName?.[0]?.toUpperCase() ?? '?'}
+                    </span>
+                }
               </div>
               <div>
-                <p className="text-white/85 text-sm font-semibold leading-tight">{session.partnerName}</p>
+                <p className="text-white/85 text-sm font-semibold leading-tight">{sessionLabel(session)}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wide border ${style.color}`}>
                     {style.label}

@@ -52,10 +52,11 @@ type AttachedFile = {
 };
 
 type Message = {
-  role:         'user' | 'assistant';
-  content:      string;
+  role:          'user' | 'assistant';
+  content:       string;
   modelDisplay?: string;
-  attachments?: { name: string; kind: 'image' | 'doc'; preview: string | null }[];
+  suggestedNext?: string;
+  attachments?:  { name: string; kind: 'image' | 'doc'; preview: string | null }[];
 };
 
 // File attachment limits by tier (message limits are now backend-enforced daily per subject)
@@ -513,7 +514,12 @@ function ChatView({
 
       const data = await res.json();
       if (!res.ok || !data?.reply) throw new Error();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply, modelDisplay: config.display }]);
+      setMessages(prev => [...prev, {
+        role:          'assistant',
+        content:       data.reply,
+        modelDisplay:  config.display,
+        suggestedNext: data.suggestedNext ?? undefined,
+      }]);
       setQuotaUsed(prev => {
         const next = prev + 1;
         if (quotaLimit !== null && next >= quotaLimit) setLocked(true);
@@ -623,6 +629,14 @@ function ChatView({
                   <div className="flex items-center gap-1 ml-8 mt-1">
                     <Cpu size={8} className={`${colorClass} opacity-35`} />
                     <span className={`text-[9px] ${colorClass} opacity-30`}>{msg.modelDisplay}</span>
+                  </div>
+                )}
+                {msg.role === 'assistant' && msg.suggestedNext && (
+                  <div className="ml-8 mt-2 flex items-start gap-2">
+                    <ChevronRight size={11} className="text-white/25 mt-0.5 flex-shrink-0" />
+                    <p className="text-[11px] text-white/45 glass-soft rounded-xl px-3 py-1.5 border border-white/8 leading-relaxed">
+                      {msg.suggestedNext}
+                    </p>
                   </div>
                 )}
               </motion.div>

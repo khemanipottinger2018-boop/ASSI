@@ -6,7 +6,7 @@ import { motion }                from 'framer-motion';
 import { listItemVariants, listTransition } from '@/lib/motion';
 import {
   Search, Cpu, Calendar, Bell, BookOpen, Inbox,
-  Flame, CheckCircle2, Circle, Coins,
+  Flame, CheckCircle2, Circle, Coins, TrendingUp, ChevronRight,
 } from 'lucide-react';
 import { useAuth }          from '@/features/auth';
 import { useNotifications } from '@/features/notifications';
@@ -14,6 +14,8 @@ import { useMessages }      from '@/features/live-chat';
 import { useStreak }        from '@/features/platform';
 import { useSocketContext }  from '@/features/socket';
 import { sessionsApi, tutorsApi, notificationsApi, userApi } from '@/lib/api';
+import { progressApi } from '@/features/progress/progressApi';
+import type { MasteryDistribution } from '@/features/progress/progressApi';
 import { filterActive } from '@/features/types/notification';
 import type { ChatSession }  from '@/lib/api';
 import type { TutorSummary } from '@/lib/api';
@@ -51,7 +53,8 @@ export default function StudentDashboard() {
   const [activeSession, setActiveSession] = useState<{
     sessionId: string; partnerName: string; subjectName: string;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading,     setLoading]     = useState(true);
+  const [masteryData, setMasteryData] = useState<MasteryDistribution[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -60,11 +63,12 @@ export default function StudentDashboard() {
       tutorsApi.getAvailable(),
       userApi.getDailyTasks(),
       sessionsApi.getActiveSession(),
-    ]).then(([s, n, t, tasks, active]) => {
-      if (s.success)     setSessions(s.sessions ?? []);
-      if (n.success)     setNotifications(filterActive(n.notifications ?? []).slice(0, 5));
-      if (t.success)     setTutors((t.tutors ?? []).slice(0, 4));
-      if (tasks.success) setDailyTasks(tasks.tasks ?? []);
+      progressApi.getProgressMe(),
+    ]).then(([s, n, t, tasks, active, progress]) => {
+      if (s.success)        setSessions(s.sessions ?? []);
+      if (n.success)        setNotifications(filterActive(n.notifications ?? []).slice(0, 5));
+      if (t.success)        setTutors((t.tutors ?? []).slice(0, 4));
+      if (tasks.success)    setDailyTasks(tasks.tasks ?? []);
       if (active.success && active.session) {
         setActiveSession({
           sessionId:   active.session.sessionId,
@@ -72,6 +76,7 @@ export default function StudentDashboard() {
           subjectName: active.session.subjectName,
         });
       }
+      if (progress.success) setMasteryData(progress.subjects ?? []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -214,6 +219,58 @@ export default function StudentDashboard() {
                 </div>
               ))
             )}
+          </DashboardSection>
+        </motion.div>
+      )}
+
+      {/* ── Your progress ── */}
+      {masteryData.length > 0 && (
+        <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(4.5)}>
+          <DashboardSection title="Your Progress" icon={TrendingUp}>
+            {masteryData.map(item => {
+              const pct = (n: number) => item.total > 0 ? Math.round((n / item.total) * 100) : 0;
+              return (
+                <button
+                  key={item.subjectId}
+                  onClick={() => router.push(`/progress/${item.subjectId}`)}
+                  className="w-full glass-soft rounded-2xl px-4 py-3 text-left hover:bg-white/5 transition group"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-white/75">{item.subjectName}</p>
+                    <div className="flex items-center gap-1 text-white/25 group-hover:text-white/50 transition">
+                      <span className="text-[10px]">{item.total} topic{item.total !== 1 ? 's' : ''}</span>
+                      <ChevronRight size={11} />
+                    </div>
+                  </div>
+                  {/* Mastery distribution bar */}
+                  <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
+                    {item.mastered > 0 && (
+                      <div className="bg-emerald-500/70 rounded-full" style={{ width: `${pct(item.mastered)}%` }} />
+                    )}
+                    {item.proficient > 0 && (
+                      <div className="bg-blue-500/70 rounded-full" style={{ width: `${pct(item.proficient)}%` }} />
+                    )}
+                    {item.developing > 0 && (
+                      <div className="bg-yellow-500/70 rounded-full" style={{ width: `${pct(item.developing)}%` }} />
+                    )}
+                    {item.emerging > 0 && (
+                      <div className="bg-orange-500/70 rounded-full" style={{ width: `${pct(item.emerging)}%` }} />
+                    )}
+                    {/* Remaining untouched topics */}
+                    {item.total > (item.mastered + item.proficient + item.developing + item.emerging) && (
+                      <div className="flex-1 bg-white/8 rounded-full" />
+                    )}
+                  </div>
+                  {/* Legend */}
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    {item.mastered   > 0 && <span className="text-[9px] text-emerald-400/70">{item.mastered} mastered</span>}
+                    {item.proficient > 0 && <span className="text-[9px] text-blue-400/70">{item.proficient} proficient</span>}
+                    {item.developing > 0 && <span className="text-[9px] text-yellow-400/70">{item.developing} developing</span>}
+                    {item.emerging   > 0 && <span className="text-[9px] text-orange-400/70">{item.emerging} emerging</span>}
+                  </div>
+                </button>
+              );
+            })}
           </DashboardSection>
         </motion.div>
       )}
