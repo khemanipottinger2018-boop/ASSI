@@ -7,6 +7,7 @@ import { listItemVariants, listTransition } from '@/lib/motion';
 import {
   Search, Cpu, Calendar, Bell, BookOpen, Inbox,
   Flame, CheckCircle2, Circle, Coins, TrendingUp, ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAuth }          from '@/features/auth';
 import { useNotifications } from '@/features/notifications';
@@ -223,6 +224,40 @@ export default function StudentDashboard() {
         </motion.div>
       )}
 
+      {/* ── Continue learning ── */}
+      {(() => {
+        const continueSubjects = masteryData
+          .filter(s => s.developing > 0)
+          .sort((a, b) => b.developing - a.developing)
+          .slice(0, 3);
+        if (!loading && continueSubjects.length === 0) return null;
+        return (
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(4.2)}>
+            <DashboardSection title="Continue Learning" icon={TrendingUp} onSeeAll={() => router.push('/progress')}>
+              {loading ? (
+                <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-10 animate-pulse" />)}</>
+              ) : (
+                continueSubjects.map(item => (
+                  <button
+                    key={item.subjectId}
+                    onClick={() => router.push(`/progress/${item.subjectId}`)}
+                    className="w-full flex items-center justify-between glass-soft rounded-2xl px-4 py-3 text-left hover:bg-white/5 transition group"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white/80">{item.subjectName}</p>
+                      <p className="text-[10px] text-yellow-400/65 mt-0.5">
+                        {item.developing} topic{item.developing !== 1 ? 's' : ''} in progress
+                      </p>
+                    </div>
+                    <ChevronRight size={13} className="text-white/22 group-hover:text-white/50 transition flex-shrink-0" />
+                  </button>
+                ))
+              )}
+            </DashboardSection>
+          </motion.div>
+        );
+      })()}
+
       {/* ── Your progress ── */}
       {masteryData.length > 0 && (
         <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(4.5)}>
@@ -274,6 +309,40 @@ export default function StudentDashboard() {
           </DashboardSection>
         </motion.div>
       )}
+
+      {/* ── Weak areas ── */}
+      {(() => {
+        const weakSubjects = masteryData
+          .filter(s => s.emerging > 0)
+          .sort((a, b) => (b.emerging / Math.max(b.total, 1)) - (a.emerging / Math.max(a.total, 1)))
+          .slice(0, 3);
+        if (!loading && weakSubjects.length === 0) return null;
+        return (
+          <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(5.2)}>
+            <DashboardSection title="Needs Work" icon={AlertTriangle} onSeeAll={() => router.push('/insights')}>
+              {loading ? (
+                <>{[0, 1].map(i => <div key={i} className="glass-soft rounded-2xl h-10 animate-pulse" />)}</>
+              ) : (
+                weakSubjects.map(item => (
+                  <button
+                    key={item.subjectId}
+                    onClick={() => router.push(`/progress/${item.subjectId}`)}
+                    className="w-full flex items-center justify-between glass-soft rounded-2xl px-4 py-3 text-left hover:bg-white/5 transition group"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-white/80">{item.subjectName}</p>
+                      <p className="text-[10px] text-orange-400/65 mt-0.5">
+                        {item.emerging} topic{item.emerging !== 1 ? 's' : ''} need review
+                      </p>
+                    </div>
+                    <ChevronRight size={13} className="text-white/22 group-hover:text-white/50 transition flex-shrink-0" />
+                  </button>
+                ))
+              )}
+            </DashboardSection>
+          </motion.div>
+        );
+      })()}
 
       {/* ── Upcoming sessions ── */}
       <motion.div variants={listItemVariants} initial="initial" animate="animate" transition={listTransition(5)}>

@@ -994,3 +994,109 @@ html {
   background:              rgba(4,4,10,0.45);
   transition:              opacity 0.3s ease;
 }
+
+/* =====================================================
+   Z-INDEX LAYER SYSTEM
+   Reference tokens for consistent modal/overlay ordering.
+   Use via Tailwind: z-[var(--z-modal)] etc.
+
+   Full budget (position:fixed in body stacking context):
+     theme bg:       0
+     Vignette:       9
+     GrainOverlay:  10
+     .ui-layer:     11  (all app content)
+     sidebar:       40
+     dropdown:      45
+     modal-bg:      50
+     modal:         51
+     toast:         60
+     critical:      80
+     ASSI DOF:    9997
+     ASSI orb:    9999
+     ASSI panel: 10000
+   ===================================================== */
+:root {
+  --z-sidebar:   40;
+  --z-dropdown:  45;
+  --z-modal-bg:  50;
+  --z-modal:     51;
+  --z-toast:     60;
+  --z-critical:  80;
+}
+
+/* =====================================================
+   MODAL SURFACE SYSTEM
+   Dense, cinematic surfaces for modals. Denser than
+   .panel — ensures readability over any background.
+   ===================================================== */
+
+/* Modal panel — the visible card itself */
+.modal-surface {
+  background: rgba(10, 10, 14, 0.90);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 1.25rem;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.65),
+    0 8px  24px rgba(0, 0, 0, 0.40),
+    0 0    0  1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 60px rgba(249, 115, 22, 0.04);
+}
+
+/* Modal backdrop — heavy blur + dark tint */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* =====================================================
+   FORM INPUT UTILITY
+   Consistent input styling — stops per-modal duplication.
+   ===================================================== */
+.form-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.625rem;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  appearance: none;
+}
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+.form-input:focus {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.10);
+}
+
+/* Light mode overrides for modal-surface and form-input */
+[data-color-mode="light"] .modal-surface {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.20),
+    0 8px  24px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 1.0);
+}
+
+[data-color-mode="light"] .form-input {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #111;
+}
+[data-color-mode="light"] .form-input::placeholder {
+  color: rgba(0, 0, 0, 0.30);
+}
+[data-color-mode="light"] .form-input:focus {
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.10);
+}

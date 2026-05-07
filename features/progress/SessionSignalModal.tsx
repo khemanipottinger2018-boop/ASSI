@@ -98,7 +98,7 @@ export default function SessionSignalModal({ subjectName, isOpen, onClose }: Pro
             animate="animate"
             exit="exit"
             transition={backdropTransition}
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            className="modal-backdrop fixed inset-0 z-[var(--z-modal-bg)]"
             onClick={onClose}
           />
 
@@ -109,10 +109,10 @@ export default function SessionSignalModal({ subjectName, isOpen, onClose }: Pro
             animate="animate"
             exit="exit"
             transition={modalTransition}
-            className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none"
+            className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4 pointer-events-none"
           >
             <div
-              className="panel rounded-3xl border border-white/10 w-full max-w-sm pointer-events-auto shadow-2xl"
+              className="modal-surface w-full max-w-sm pointer-events-auto"
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}

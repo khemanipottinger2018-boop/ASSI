@@ -20,7 +20,9 @@
 
 import { useEffect, useRef, useState, FormEvent, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Loader2, BookOpen } from 'lucide-react';
+import { CheckCircle, Loader2, BookOpen, Megaphone, X } from 'lucide-react';
+import { alertVariants, alertTransition } from '@/lib/motion';
+import type { SessionBroadcast } from '@/features/broadcasts/broadcastApi';
 import { StudyPanel } from '../components/StudyPanel';
 import type { StudyTool } from '../components/StudyPanel';
 import { useRouter } from 'next/navigation';
@@ -101,6 +103,9 @@ export function InstantChatView({
   const [showTools,    setShowTools]    = useState(false);
   const joinedRef      = useRef(false);
 
+  const [liveBroadcast, setLiveBroadcast] = useState<SessionBroadcast | null>(null);
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Tools available per role
   const studentTools: StudyTool[] = ['notebook', 'files'];
   const tutorTools:   StudyTool[] = ['whiteboard', 'problems', 'files', 'broadcast'];
@@ -118,6 +123,7 @@ export function InstantChatView({
 
   useEffect(() => () => {
     clearActivityInterval();
+    if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
   }, []);
 
   /* ── Seed peer/accept state from hydrated session status ── */
@@ -206,11 +212,18 @@ export function InstantChatView({
     };
     const onInviteRes = () => setPendingInvite(null);
 
+    const onBroadcast = (broadcast: SessionBroadcast) => {
+      setLiveBroadcast(broadcast);
+      if (broadcastTimerRef.current) clearTimeout(broadcastTimerRef.current);
+      broadcastTimerRef.current = setTimeout(() => setLiveBroadcast(null), 5000);
+    };
+
     on('chat:tutor_joined',    onTutorJoined);
     on('session:ready',        onReady);
     on('chat:invite_request',  onInviteReq);
     on('chat:invite_accepted', onInviteRes);
     on('chat:invite_declined', onInviteRes);
+    on('session:broadcast',    onBroadcast);
 
     return () => {
       off('chat:tutor_joined',    onTutorJoined);
@@ -218,6 +231,7 @@ export function InstantChatView({
       off('chat:invite_request',  onInviteReq);
       off('chat:invite_accepted', onInviteRes);
       off('chat:invite_declined', onInviteRes);
+      off('session:broadcast',    onBroadcast);
     };
   // peerJoined + sessionEnded included so invite guard stays current
   }, [sessionId, currentUserId, role, peerJoined, sessionEnded, on, off]);
@@ -410,6 +424,34 @@ export function InstantChatView({
   /* ── Live session ── */
   return (
     <>
+      {/* Broadcast toast — fixed, auto-dismisses after 5 s */}
+      <AnimatePresence>
+        {liveBroadcast && (
+          <motion.div
+            variants={alertVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={alertTransition}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[var(--z-toast)] w-full max-w-sm px-4 pointer-events-none"
+          >
+            <div className="glass-soft rounded-2xl px-4 py-3 border border-orange-500/15 bg-orange-500/5 flex items-start gap-3 pointer-events-auto">
+              <Megaphone size={14} className="text-orange-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] text-orange-400/60 font-semibold uppercase tracking-wide mb-0.5">Broadcast</p>
+                <p className="text-sm text-white/80 leading-relaxed">{liveBroadcast.content}</p>
+              </div>
+              <button
+                onClick={() => setLiveBroadcast(null)}
+                className="text-white/20 hover:text-white/50 transition flex-shrink-0"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {pendingInvite && (
         <InviteModal
           invite={pendingInvite}

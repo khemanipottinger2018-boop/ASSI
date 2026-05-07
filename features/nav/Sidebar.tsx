@@ -60,6 +60,7 @@ const STUDENT_CATEGORIES: Category[] = [
       { label: 'Request Tutor', href: '/live-chat',                  icon: MessageCircle },
       { label: 'Group Study',   href: '/live-chat?mode=group_study', icon: Users },
       { label: 'Browse & Book', href: '/browse',                     icon: Search },
+      { label: 'Broadcasts',    href: '/broadcasts',                  icon: Radio },
     ],
   },
   {
@@ -68,7 +69,8 @@ const STUDENT_CATEGORIES: Category[] = [
       { label: 'ASSI',        href: '/assi',        icon: Sparkles,   feature: 'ai_bundles' },
       { label: 'Assignments', href: '/assignments', icon: PenTool,    feature: 'assignments' },
       { label: 'Resources',   href: '/resources',   icon: BookMarked, feature: 'past_papers', soon: true },
-      { label: 'Progress',    href: '/progress',    icon: TrendingUp, soon: true },
+      { label: 'Progress',    href: '/progress',    icon: TrendingUp },
+      { label: 'Insights',   href: '/insights',    icon: BarChart2 },
     ],
   },
   {

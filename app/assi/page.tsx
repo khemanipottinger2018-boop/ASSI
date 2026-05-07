@@ -7,12 +7,13 @@ import {
   Send, ChevronDown, RotateCcw, Cpu, Sparkles,
   MessageSquare, ChevronRight, Search, Loader2,
   Paperclip, Mic, MicOff, X, Image as ImageIcon, FileText,
-  Zap,
+  Zap, BookOpen,
 } from 'lucide-react';
 import { useAuth }     from '@/features/auth';
 import { useFeatures } from '@/features/platform';
 import { useSubjects } from '@/features/platform';
 import { subjectToModel, subjectHint } from '@/features/platform/subjectToModel';
+import { progressApi } from '@/features/progress/progressApi';
 import AssiMessage    from '@/features/assi/AssiMessage';
 import AssiTypingDots from '@/features/assi/AssiTypingDots';
 import type { Subject } from '@/features/platform';
@@ -372,6 +373,9 @@ function ChatView({
   const [recording, setRecording] = useState(false);
   const [recError,  setRecError]  = useState<string | null>(null);
 
+  const [topics,          setTopics]          = useState<{ id: string; name: string }[]>([]);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | undefined>(undefined);
+
   const bottomRef  = useRef<HTMLDivElement>(null);
   const inputRef   = useRef<HTMLTextAreaElement>(null);
   const fileRef    = useRef<HTMLInputElement>(null);
@@ -397,6 +401,15 @@ function ChatView({
       })
       .catch(() => { /* fail open — don't block the UI */ });
   }, [subject]);
+
+  // Fetch topics when subject changes (for optional topic context)
+  useEffect(() => {
+    setSelectedTopicId(undefined);
+    if (subject.id === 'casual') { setTopics([]); return; }
+    progressApi.getSubjectCurriculum(subject.id)
+      .then(d => { if (d.success) setTopics(d.units.flatMap(u => u.topics)); })
+      .catch(() => setTopics([]));
+  }, [subject.id]);
 
   // ── File attachment ──────────────────────────────────────
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -499,6 +512,8 @@ function ChatView({
           category:  subject.category,
           model:     config.model,
           hasFiles:  attachments.length > 0,
+          topicId:   selectedTopicId,
+          sessionId: `assi_${subject.id}_${Date.now()}`,
         }),
       });
 
@@ -595,6 +610,22 @@ function ChatView({
               <Zap size={11} className="text-orange-400" />
               <span className="text-orange-400 text-[11px] font-medium">ASSI+</span>
             </button>
+          )}
+          {topics.length > 0 && (
+            <div className="relative flex items-center gap-1.5 glass-soft rounded-xl px-2.5 py-1.5 border border-white/8">
+              <BookOpen size={11} className="text-white/28 flex-shrink-0" />
+              <select
+                value={selectedTopicId ?? ''}
+                onChange={e => setSelectedTopicId(e.target.value || undefined)}
+                className="bg-transparent text-white/50 text-xs outline-none appearance-none max-w-[110px] truncate cursor-pointer"
+                title="Focus on a specific topic"
+              >
+                <option value="">Topic (optional)</option>
+                {topics.map(t => (
+                  <option key={t.id} value={t.id} className="bg-[#0a0a10] text-white/80">{t.name}</option>
+                ))}
+              </select>
+            </div>
           )}
           <SubjectSwitcher current={subject} subjects={subjects} csec={csec} cape={cape} onSwitch={onSwitchSubject} />
           <button onClick={onReset} title="New chat"

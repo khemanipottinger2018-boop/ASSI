@@ -817,11 +817,21 @@ function BroadcastTool({ sessionId, text, onChange, canDrive, emit }: BroadcastT
   const [sending, setSending] = useState(false);
   const [sent,    setSent]    = useState<string[]>([]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = text.trim();
     if (!trimmed || !canDrive) return;
     setSending(true);
-    emit('study:broadcast', { sessionId, message: trimmed });
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      await fetch(`${API_URL}/api/sessions/${sessionId}/broadcast`, {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ content: trimmed, type: 'announcement' }),
+      });
+    } catch {
+      emit('study:broadcast', { sessionId, message: trimmed });
+    }
     setSent(prev => [trimmed, ...prev.slice(0, 4)]);
     onChange('');
     setSending(false);
